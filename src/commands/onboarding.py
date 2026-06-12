@@ -14,7 +14,8 @@ import click
 
 from backend.approval import requires_approval
 from backend.account_storage import (
-    create_account, get_account_by_email, set_provision_status, get_account_provisions
+    create_account, get_account_by_email, set_provision_status, get_account_provisions,
+    get_active_provisions
 )
 from backend.github_provisioning import check_github_invitations
 from backend.providers import PROVIDERS, RESOURCE_LABELS
@@ -158,6 +159,9 @@ def offboard(ctx: ExtendedContext, email: str):
     """Offboard a colleague: remove all licenses/entries and deactivate Slack.
     
     USAGE: bot offboard <email>
+    
+    Reads all active provisions from storage and calls deprovision for each resource.
+    Updates provision status to 'deprovisioned' on success.
     """
     # Look up account by email
     account = get_account_by_email(email)
@@ -166,20 +170,46 @@ def offboard(ctx: ExtendedContext, email: str):
         return f"Error: No account found for {email}"
     
     results = []
-    provisions = get_account_provisions(account.id)
+    provision_updates = []
+    
+    # Get all active provisions for this account
+    provisions = get_active_provisions(account.id)
     
     # Create a ProviderAccount for compatibility with deprovision stubs
     account_obj = ProviderAccount(name=account.name or email, email=email)
     
     # Deprovision each active resource
     for provision in provisions:
-        if provision.resource in PROVIDERS:
+        if provision.resource not in PROVIDERS:
+            ctx.logger.warning(f"Unknown resource type: {provision.resource}")
+            continue
+        
+        try:
+            # Call deprovision (provider can access provision.data for resource-specific info)
             message = PROVIDERS[provision.resource].deprovision(ctx, account_obj)
             results.append({'Resource': RESOURCE_LABELS[provision.resource], 'Result': message})
+            
+            # Mark as deprovisioned
+            provision_updates.append((provision.account_id, provision.resource, 'deprovisioned'))
+            
+        except Exception as e:
+            ctx.logger.exception(f"Error deprovisioning {provision.resource} for {email}")
+            results.append({
+                'Resource': RESOURCE_LABELS[provision.resource],
+                'Result': f"Error: {str(e)}"
+            })
     
-    # Deactivate Slack
-    slack_result = slack_provision.deactivate(ctx, account_obj)
-    results.append({'Resource': 'Slack account', 'Result': slack_result})
+    # Deactivate Slack (always attempt)
+    try:
+        slack_result = slack_provision.deactivate(ctx, account_obj)
+        results.append({'Resource': 'Slack account', 'Result': slack_result})
+    except Exception as e:
+        ctx.logger.exception(f"Error deactivating Slack for {email}")
+        results.append({'Resource': 'Slack account', 'Result': f"Error: {str(e)}"})
+    
+    # Update all successful deprovisions to 'deprovisioned' status
+    for account_id, resource, status in provision_updates:
+        set_provision_status(account_id, resource, status, {})
     
     ctx.chat.send_table(title=f'Offboarded {email}', table=results)
     return '\n'.join(f"{row['Resource']}: {row['Result']}" for row in results)
