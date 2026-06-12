@@ -229,3 +229,19 @@ def get_account_provisions(account_id: UUID) -> List[Provision]:
             )
             rows = cur.fetchall()
     return [Provision.from_dict(row) for row in rows]
+
+
+def get_active_provisions(account_id: UUID) -> List[Provision]:
+    """Get all active (non-deprovisioned) provisions for an account."""
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT * FROM account_provisions 
+                WHERE account_id = %s AND status != 'deprovisioned'
+                ORDER BY resource;
+                """,
+                (str(account_id),),
+            )
+            rows = cur.fetchall()
+    return [Provision.from_dict(row) for row in rows]
