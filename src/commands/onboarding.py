@@ -4,13 +4,21 @@ Both are gated behind the generic approval queue (see ``backend.approval``): iss
 them enqueues a request that a designated approver must approve before the actual
 provisioning runs. Provisioning itself is delegated to the provider stubs in
 ``backend.providers``.
+
+Account metadata and provisioning state are persisted to PostgreSQL via account_storage
+for tracking and deprovisioning workflows.
 """
 import os
 
 import click
 
 from backend.approval import requires_approval
-from backend.providers import PROVIDERS, RESOURCE_LABELS, Account, slack_provision
+from backend.account_storage import (
+    create_account, get_account_by_email, set_provision_status, get_account_provisions
+)
+from backend.providers import PROVIDERS, RESOURCE_LABELS
+from backend.providers.base import Account as ProviderAccount
+from backend.providers import slack_provision
 from commands import gyrobot
 from commands.extended_context import ExtendedContext
 
@@ -19,23 +27,24 @@ if 'APPROVAL_DATABASE_URL' not in os.environ:
 
 
 def _github_summary(params: dict) -> str:
-    return f"onboard {params['name']} <{params['email']}> [GitHub Copilot]"
-
-
-def _jetbrains_summary(params: dict) -> str:
-    return f"onboard {params['name']} <{params['email']}> [JetBrains]"
+    return f"onboard {params['username']} to GitHub team {params['team']}"
 
 
 def _crowd_summary(params: dict) -> str:
-    return f"onboard {params['name']} <{params['email']}> [Crowd]"
+    return f"onboard {params['username']} to Crowd team {params['team']}"
+
+
+def _jetbrains_summary(params: dict) -> str:
+    return f"onboard {params['email']} to JetBrains team {params['team_name']}"
 
 
 def _slack_summary(params: dict) -> str:
-    return f"onboard {params['name']} <{params['email']}> [Slack]"
+    member_ids = ', '.join(params.get('member_ids', []))
+    return f"onboard {params['email']} to Slack (member IDs: {member_ids})"
 
 
 def _offboard_summary(params: dict) -> str:
-    return f"offboard {params['name']} <{params['email']}> (all resources + Slack)"
+    return f"offboard {params['email']} (all resources + Slack)"
 
 
 @gyrobot.group('onboard')
@@ -46,73 +55,130 @@ def onboard(ctx: ExtendedContext):
 
 
 @onboard.command('github')
-@click.argument('name')
-@click.argument('email')
+@click.argument('username')
+@click.argument('team')
 @click.pass_context
 @requires_approval(summarize=_github_summary)
-def onboard_github(ctx: ExtendedContext, name: str, email: str):
-    """Onboard a colleague for GitHub Copilot"""
-    account = Account(name=name, email=email)
-    message = PROVIDERS['github'].provision(ctx, account)
+def onboard_github(ctx: ExtendedContext, username: str, team: str):
+    """Onboard a colleague for GitHub Copilot.
+    
+    USAGE: bot onboard github <username> <team>
+    """
+    provision_data = {'username': username, 'team': team}
+    
+    # For now, provision via the stub (using email for ProviderAccount)
+    # In real integration, the provider will populate node_id, login, enterprise_user_id
+    account_obj = ProviderAccount(name=username, email=username)
+    message = PROVIDERS['github'].provision(ctx, account_obj)
+    
+    # Store account and provision status
+    account = create_account(name=username, primary_email=username)
+    set_provision_status(account.id, 'github', 'invited', provision_data)
+    
     result = [{'Resource': RESOURCE_LABELS['github'], 'Result': message}]
-    ctx.chat.send_table(title=f'Onboarded {name}', table=result)
+    ctx.chat.send_table(title=f'Onboarded {username}', table=result)
     return f"{RESOURCE_LABELS['github']}: {message}"
 
 
-@onboard.command('jetbrains')
-@click.argument('name')
-@click.argument('email')
-@click.pass_context
-@requires_approval(summarize=_jetbrains_summary)
-def onboard_jetbrains(ctx: ExtendedContext, name: str, email: str):
-    """Onboard a colleague for JetBrains IntelliJ IDEA"""
-    account = Account(name=name, email=email)
-    message = PROVIDERS['jetbrains'].provision(ctx, account)
-    result = [{'Resource': RESOURCE_LABELS['jetbrains'], 'Result': message}]
-    ctx.chat.send_table(title=f'Onboarded {name}', table=result)
-    return f"{RESOURCE_LABELS['jetbrains']}: {message}"
-
-
 @onboard.command('crowd')
-@click.argument('name')
-@click.argument('email')
+@click.argument('username')
+@click.argument('team')
 @click.pass_context
 @requires_approval(summarize=_crowd_summary)
-def onboard_crowd(ctx: ExtendedContext, name: str, email: str):
-    """Onboard a colleague for Crowd entry"""
-    account = Account(name=name, email=email)
-    message = PROVIDERS['crowd'].provision(ctx, account)
+def onboard_crowd(ctx: ExtendedContext, username: str, team: str):
+    """Onboard a colleague for Crowd entry.
+    
+    USAGE: bot onboard crowd <username> <team>
+    """
+    provision_data = {'username': username, 'team': team}
+    
+    account_obj = ProviderAccount(name=username, email=username)
+    message = PROVIDERS['crowd'].provision(ctx, account_obj)
+    
+    account = create_account(name=username, primary_email=username)
+    set_provision_status(account.id, 'crowd', 'active', provision_data)
+    
     result = [{'Resource': RESOURCE_LABELS['crowd'], 'Result': message}]
-    ctx.chat.send_table(title=f'Onboarded {name}', table=result)
+    ctx.chat.send_table(title=f'Onboarded {username}', table=result)
     return f"{RESOURCE_LABELS['crowd']}: {message}"
 
 
-@onboard.command("slack")
-@click.argument('name')
+@onboard.command('jetbrains')
 @click.argument('email')
+@click.argument('team_name')
+@click.pass_context
+@requires_approval(summarize=_jetbrains_summary)
+def onboard_jetbrains(ctx: ExtendedContext, email: str, team_name: str):
+    """Onboard a colleague for JetBrains IntelliJ IDEA.
+    
+    USAGE: bot onboard jetbrains <email> <team_name>
+    """
+    provision_data = {'email': email, 'team_name': team_name}
+    
+    account_obj = ProviderAccount(name=email, email=email)
+    message = PROVIDERS['jetbrains'].provision(ctx, account_obj)
+    
+    account = create_account(name=email, primary_email=email)
+    set_provision_status(account.id, 'jetbrains', 'active', provision_data)
+    
+    result = [{'Resource': RESOURCE_LABELS['jetbrains'], 'Result': message}]
+    ctx.chat.send_table(title=f'Onboarded {email}', table=result)
+    return f"{RESOURCE_LABELS['jetbrains']}: {message}"
+
+
+@onboard.command('slack')
+@click.argument('email')
+@click.argument('member_ids', nargs=-1, required=True)
 @click.pass_context
 @requires_approval(summarize=_slack_summary)
-def onboard_slack(ctx: ExtendedContext, name: str, email: str):
-    """Onboard a colleague for Slack entry"""
-    account = Account(name=name, email=email)
-    message = PROVIDERS['slack'].provision(ctx, account)
+def onboard_slack(ctx: ExtendedContext, email: str, member_ids: tuple):
+    """Onboard a colleague for Slack.
+    
+    USAGE: bot onboard slack <email> <member_id> [<member_id> ...]
+    """
+    provision_data = {'email': email, 'member_ids': list(member_ids)}
+    
+    account_obj = ProviderAccount(name=email, email=email)
+    message = PROVIDERS['slack'].provision(ctx, account_obj)
+    
+    account = create_account(name=email, primary_email=email)
+    set_provision_status(account.id, 'slack', 'active', provision_data)
+    
     result = [{'Resource': RESOURCE_LABELS['slack'], 'Result': message}]
-    ctx.chat.send_table(title=f'Onboarded {name}', table=result)
+    ctx.chat.send_table(title=f'Onboarded {email}', table=result)
     return f"{RESOURCE_LABELS['slack']}: {message}"
 
 
 @gyrobot.command('offboard')
-@click.argument('name')
 @click.argument('email')
 @click.pass_context
 @requires_approval(summarize=_offboard_summary)
-def offboard(ctx: ExtendedContext, name: str, email: str):
-    """Offboard a colleague: remove all licenses/entries and deactivate Slack (queued for approval)"""
-    account = Account(name=name, email=email)
+def offboard(ctx: ExtendedContext, email: str):
+    """Offboard a colleague: remove all licenses/entries and deactivate Slack.
+    
+    USAGE: bot offboard <email>
+    """
+    # Look up account by email
+    account = get_account_by_email(email)
+    if not account:
+        ctx.chat.send_text(f"No account found for {email}", is_error=True)
+        return f"Error: No account found for {email}"
+    
     results = []
-    for key, provider in PROVIDERS.items():
-        message = provider.deprovision(ctx, account)
-        results.append({'Resource': RESOURCE_LABELS[key], 'Result': message})
-    results.append({'Resource': 'Slack account', 'Result': slack_provision.deactivate(ctx, account)})
-    ctx.chat.send_table(title=f'Offboarded {name}', table=results)
+    provisions = get_account_provisions(account.id)
+    
+    # Create a ProviderAccount for compatibility with deprovision stubs
+    account_obj = ProviderAccount(name=account.name or email, email=email)
+    
+    # Deprovision each active resource
+    for provision in provisions:
+        if provision.resource in PROVIDERS:
+            message = PROVIDERS[provision.resource].deprovision(ctx, account_obj)
+            results.append({'Resource': RESOURCE_LABELS[provision.resource], 'Result': message})
+    
+    # Deactivate Slack
+    slack_result = slack_provision.deactivate(ctx, account_obj)
+    results.append({'Resource': 'Slack account', 'Result': slack_result})
+    
+    ctx.chat.send_table(title=f'Offboarded {email}', table=results)
     return '\n'.join(f"{row['Resource']}: {row['Result']}" for row in results)
