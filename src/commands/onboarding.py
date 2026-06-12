@@ -12,15 +12,14 @@ import os
 
 import click
 
-from backend.approval import requires_approval
 from backend.account_storage import (
-    create_account, get_account_by_email, set_provision_status, get_account_provisions,
-    get_active_provisions
+    create_account, get_account_by_email, set_provision_status, get_active_provisions
 )
+from backend.approval import requires_approval
 from backend.github_provisioning import check_github_invitations
 from backend.providers import PROVIDERS, RESOURCE_LABELS
-from backend.providers.base import Account as ProviderAccount
 from backend.providers import slack_provision
+from backend.providers.base import Account as ProviderAccount
 from commands import gyrobot
 from commands.extended_context import ExtendedContext
 
