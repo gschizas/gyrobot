@@ -18,6 +18,7 @@ import commands
 import commands.convert
 import commands.generic
 import commands.roll
+from background_tasks import init_background_tasks, shutdown_background_tasks
 from bot_framework.common import normalize_text
 from bot_framework.common import setup_logging
 from bot_framework.praw_wrapper import praw_wrapper
@@ -72,6 +73,10 @@ def init():
 
     chat_obj = get_chat_wrapper(logger, trigger_words[0], handle_message)
     _init_reddit()
+    
+    # Initialize background tasks (GitHub checks, etc.)
+    init_background_tasks()
+    
     chat_obj.start()
 
 
