@@ -35,6 +35,7 @@ def do_imports():
         module_without_folder = module_filename.removeprefix('src/')
         module_without_extension = os.path.splitext(module_without_folder)[0]
         module_name = module_without_extension.replace(os.path.sep, '.')
+        print(module_name)
         try:
             importlib.import_module(module_name)
         except Exception as e:
@@ -46,7 +47,7 @@ chat_obj: ChatWrapper
 reddit_session: praw.Reddit = None
 bot_reddit_session: praw.reddit.Reddit = None
 subreddit: praw.reddit.Subreddit = None
-subreddit_name: str
+subreddit_name: str | None
 trigger_words: list
 shortcut_words: dict
 bot_name: str
