@@ -9,11 +9,11 @@ from backend.providers.base import Account
 
 def provision(ctx, account: Account) -> str:
     # TODO: assign a Copilot seat via the GitHub Copilot billing API.
-    ctx.logger.info(f"[stub] Assign GitHub Copilot licence to {account.email}")
-    return f"GitHub Copilot licence would be assigned to {account.email} (stub)"
+    ctx.logger.info(f"[stub] Assign GitHub Copilot licence to {account.userid}")
+    return f"GitHub Copilot licence would be assigned to {account.userid} (stub)"
 
 
 def deprovision(ctx, account: Account) -> str:
     # TODO: remove the Copilot seat via the GitHub Copilot billing API.
-    ctx.logger.info(f"[stub] Remove GitHub Copilot licence from {account.email}")
-    return f"GitHub Copilot licence would be removed from {account.email} (stub)"
+    ctx.logger.info(f"[stub] Remove GitHub Copilot licence from {account.userid}")
+    return f"GitHub Copilot licence would be removed from {account.userid} (stub)"
