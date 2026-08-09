@@ -16,15 +16,25 @@ def fortune(ctx: ExtendedContext):
 
 
 @gyrobot.command('joke')
+@click.option('-x', '--extended', 'extended', is_flag=True, default=False)
 @click.pass_context
-def joke(ctx: ExtendedContext):
+def joke(ctx: ExtendedContext, extended):
     """Tell a joke"""
     proxies = {'http': os.environ['ALT_PROXY'], 'https': os.environ['ALT_PROXY']} if 'ALT_PROXY' in os.environ else {}
     joke_page = requests.get(
         'https://icanhazdadjoke.com/',
         headers={
-            'Accept': 'text/plain',
+            'Accept': 'application/json',
             'User-Agent': 'Slack Bot for Reddit (https://github.com/gschizas/slack-bot)'},
         proxies=proxies)
-    joke_text = joke_page.content
-    ctx.chat.send_text(joke_text.decode())
+    joke_obj = joke_page.json()
+    if extended:
+        blocks = [
+            {
+                "type": "markdown",
+                "text": f"[{joke_obj['joke']}](https://icanhazdadjoke.com/j/{joke_obj['id']})"
+            }
+        ]
+        ctx.chat.send_blocks(blocks)
+    else:
+        ctx.chat.send_text(joke_obj['joke'])
