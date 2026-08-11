@@ -103,6 +103,7 @@ class SlackConversation(Conversation):
             icon_emoji=':robot_face:',
             blocks=blocks,
             text="...",
+            unfurl_links=False,
             username=self.bot_name)
 
     def get_user_info(self, user_id):
