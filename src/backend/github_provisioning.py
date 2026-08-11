@@ -6,10 +6,20 @@ to teams once their invitations are accepted.
 import logging
 from typing import List, Dict, Any
 from uuid import UUID
+import datetime
 
 from backend.account_storage import get_pending_provisions, set_provision_status, get_account
+from backend.github_api import GitHubApi
 
 logger = logging.getLogger(__name__)
+
+github_api_client: GitHubApi | None = None
+
+def init_github_client() -> None:
+    global github_api_client
+    if github_api_client is None:
+        github_api_client = GitHubApi()
+        logger.info("GitHub API client initialized")
 
 
 def check_github_invitations() -> Dict[str, Any]:
@@ -23,6 +33,8 @@ def check_github_invitations() -> Dict[str, Any]:
         'errors': List[str],
     }
     """
+    global github_api_client
+
     results = {
         'total_pending': 0,
         'accepted_and_assigned': [],
@@ -61,41 +73,49 @@ def check_github_invitations() -> Dict[str, Any]:
                         'error': 'Missing username or team in provision data',
                     })
                     continue
-                
-                # TODO: Call GitHub API to check if invitation was accepted
-                # github_client = get_github_client()
-                # invitation_status = github_client.check_enterprise_invitation(username)
-                # 
-                # if invitation_status == 'accepted':
-                #     # TODO: Call GitHub API to assign user to team
-                #     github_client.assign_to_team(username, team)
-                #
-                #     # Update provision status
-                #     provision.data['accepted_at'] = datetime.utcnow().isoformat()
-                #     provision.data['assigned_at'] = datetime.utcnow().isoformat()
-                #     set_provision_status(provision.account_id, 'github', 'assigned', provision.data)
-                #     results['accepted_and_assigned'].append(username)
-                #     logger.info(f"Auto-assigned {username} to GitHub team {team}")
-                # elif invitation_status == 'failed':
-                #     results['failed'].append({
-                #         'username': username,
-                #         'error': 'Invitation rejected or expired',
-                #     })
-                
-                # For now, log that we would check this invitation
-                logger.debug(f"[stub] Would check GitHub invitation for {username} to team {team}")
-                
+
+                # Check GitHub invitation status
+                init_github_client()
+                invitations = github_api_client.get_pending_invitations()
+                if username in invitations:
+                    logger.debug(f"Invitation for {username} is still pending")
+                    continue  # Invitation not yet accepted
+
+                all_users = github_api_client.get_ent_members()
+                all_user_logins = {user['login'] for user in all_users}
+                if username not in all_user_logins:
+                    results['failed'].append({
+                        'username': username,
+                        'error': 'User not found in GitHub organization',
+                    })
+                    logger.warning(f"User {username} not found in GitHub organization")
+                    continue
+                logger.debug(f"Invitation for {username} has been accepted")
+                # Assign user to team
+                try:
+                    github_api_client.add_users_to_ent_team(team, [username])
+                    provision.data['accepted_at'] = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+                    provision.data['assigned_at'] = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+                    set_provision_status(provision.account_id, 'github', 'assigned', provision.data)
+                    results['accepted_and_assigned'].append(username)
+                    logger.info(f"Auto-assigned {username} to GitHub team {team}")
+                except Exception as e:
+                    logger.exception(f"Failed to assign {username} to team {team}: {e}")
+                    results['failed'].append({
+                        'username': username,
+                        'error': str(e),
+                    })
             except Exception as e:
                 logger.exception(f"Error checking invitation for {provision.data.get('username', 'unknown')}: {e}")
                 results['errors'].append(str(e))
-        
+
         logger.info(f"GitHub invitation check complete: "
-                   f"{len(results['accepted_and_assigned'])} assigned, "
-                   f"{len(results['failed'])} failed, "
-                   f"{len(results['errors'])} errors")
-        
+                    f"{len(results['accepted_and_assigned'])} assigned, "
+                    f"{len(results['failed'])} failed, "
+                    f"{len(results['errors'])} errors")
+
     except Exception as e:
         logger.exception("Unexpected error during GitHub invitation check")
         results['errors'].append(f"Unexpected error: {str(e)}")
-    
+
     return results
