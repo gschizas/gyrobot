@@ -7,4 +7,5 @@ class Account:
     name: str
     email: str
     userid: str
+    team: str
 
