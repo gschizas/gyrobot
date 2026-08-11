@@ -1,69 +1,54 @@
-import json
-import os
+import pathlib
 import time
-
-import numpy as np
-import pandas as pd
 
 import jwt
 import requests
-from requests.structures import CaseInsensitiveDict
-from tabulate import tabulate
+from ruamel.yaml import YAML
 
 GITHUB_API_URL = "https://api.github.com"
 GRAPHQL_URL = f"{GITHUB_API_URL}/graphql"
 
-os.environ['HTTP_PROXY'] = 'http://localhost:18899'
-os.environ['HTTPS_PROXY'] = 'http://localhost:18899'
-os.environ['REQUESTS_CA_BUNDLE'] = f'{os.environ["ONEDRIVECONSUMER"]}/Config/Fiddler/FiddlerRoot-{os.environ["COMPUTERNAME"]}.pem'
 
 class GitHubApi():
-    enterprise = 'MY_ENTERPRISE'
-    organization = 'MY_ORGANIZATION'
+    enterprise: str
+    organization: str
+    client_id: str
+    client_secret: str
+    signing_key: str
+    enterprise_id: str | None = None
 
-    CLIENT_ID = 'my_client_id'
-    CLIENT_SECRET = 'my_client_secret'
+    def __init__(self):
+        self.enterprise_id = None
+        self._load_config()
 
-    signing_key = """\
-    -----BEGIN RSA PRIVATE KEY-----
-    REDACTED
-    -----END RSA PRIVATE KEY-----
-    """
-
-    def init(self):
         payload = {
-            # Issued at time
-            'iat': int(time.time()),
-            # JWT expiration time (10 minutes maximum)
-            'exp': int(time.time()) + 600,
-            
-            # GitHub App's client ID
-            'iss': self.CLIENT_ID
-        
+            'iat': int(time.time()),  # Issued at time
+            'exp': int(time.time()) + 600,  # JWT expiration time (10 minutes maximum)
+            'iss': self.client_id  # GitHub App's client ID
         }
-        
+
         # Create JWT
         encoded_jwt = jwt.encode(payload, self.signing_key, algorithm='RS256')
-        
-        self.ses_installation = requests.session()
-        
-        self.ses_installation.headers['Accept'] = 'application/vnd.github+json'
-        self.ses_installation.headers['Authorization'] = 'Bearer ' + encoded_jwt
-        self.ses_installation.headers['X-GitHub-Api-Version'] = '2026-03-10'
-        
-        installations_page = self.ses_installation.get(f"{GITHUB_API_URL}/app/installations")
-        
-        ent_installation_id = [inst for inst in installations_page.json() if inst['target_type'] == 'Enterprise'][0]['id']
-        org_installation_id = [inst for inst in installations_page.json() if inst['target_type'] == 'Organization'][0]['id']
-        access_tokens_ent = self.ses_installation.post(f"{GITHUB_API_URL}/app/installations/{ent_installation_id}/access_tokens")
-        access_tokens_org = self.ses_installation.post(f"{GITHUB_API_URL}/app/installations/{org_installation_id}/access_tokens")
-        
+
+        self.ses_inst = requests.session()
+
+        self.ses_inst.headers['Accept'] = 'application/vnd.github+json'
+        self.ses_inst.headers['Authorization'] = 'Bearer ' + encoded_jwt
+        self.ses_inst.headers['X-GitHub-Api-Version'] = '2026-03-10'
+
+        installations_page = self.ses_inst.get(f"{GITHUB_API_URL}/app/installations")
+        installations = installations_page.json()
+        ent_inst_id = [inst for inst in installations if inst['target_type'] == 'Enterprise'][0]['id']
+        org_inst_id = [inst for inst in installations if inst['target_type'] == 'Organization'][0]['id']
+        access_tokens_ent = self.ses_inst.post(f"{GITHUB_API_URL}/app/installations/{ent_inst_id}/access_tokens")
+        access_tokens_org = self.ses_inst.post(f"{GITHUB_API_URL}/app/installations/{org_inst_id}/access_tokens")
+
         token_ent = access_tokens_ent.json()['token']
         self.ses_ent = requests.session()
         self.ses_ent.headers['Accept'] = 'application/vnd.github+json'
         self.ses_ent.headers['Authorization'] = 'Bearer ' + token_ent
         self.ses_ent.headers['X-GitHub-Api-Version'] = '2026-03-10'
-        
+
         token_org = access_tokens_org.json()['token']
         self.ses_org = requests.session()
         self.ses_org.headers['Accept'] = 'application/vnd.github+json'
@@ -72,14 +57,27 @@ class GitHubApi():
 
         self.ses_usr = requests.session()
         self.ses_usr.headers['Accept'] = 'application/vnd.github+json'
-        # self.ses_usr.headers['Authorization'] = 'Bearer '
+        self.ses_usr.headers['Authorization'] = 'Bearer ' + self.personal_access_token
         self.ses_usr.headers['X-GitHub-Api-Version'] = '2026-03-10'
- 
-    def github_api(self, ses: requests.Session, url: str, **kwargs):
+
+    def _load_config(self):
+        config_file = pathlib.Path(f'config/github.yml')
+        yaml = YAML()
+        if config_file.exists():
+            with config_file.open(mode='r', encoding='utf8') as y:
+                config = dict(yaml.load(y))
+        self.client_id = config['client_id']
+        self.client_secret = config['client_secret']
+        self.enterprise = config['enterprise']
+        self.organization = config['organization']
+        self.signing_key = config['signing_key']
+        self.personal_access_token = config['personal_access_token']
+
+    def _github_api_call(self, ses: requests.Session, url: str, **kwargs):
         final_url = url.format(**kwargs)
         results = []
         page = 1
-    
+
         while True:
             response: requests.Response = ses.get(final_url, params={"per_page": 100, "page": page})
             response.raise_for_status()
@@ -87,34 +85,91 @@ class GitHubApi():
             if not data:
                 break
             results.extend(data)
-            if 'link' not in response.headers: # one page:
+            if 'link' not in response.headers:  # one page:
                 break
             page += 1
-    
+
         return results
-    
+
     def get_org_teams(self):
-        return self.github_api(self.ses_org, f"{GITHUB_API_URL}/orgs/{{org}}/teams", org=self.organization)
-    
+        return self._github_api_call(self.ses_org, f"{GITHUB_API_URL}/orgs/{{org}}/teams", org=self.organization)
+
     def get_ent_teams(self):
-        return self.github_api(self.ses_ent, f"{GITHUB_API_URL}/enterprises/{{ent}}/teams", ent=self.enterprise)
-    
+        return self._github_api_call(self.ses_ent, f"{GITHUB_API_URL}/enterprises/{{ent}}/teams", ent=self.enterprise)
+
     def get_org_team_members(self, team):
-        return self.github_api(self.ses_org, f"{GITHUB_API_URL}/orgs/{{org}}/teams/{team}/members", org=self.organization, team=team)
-    
+        return self._github_api_call(self.ses_org, f"{GITHUB_API_URL}/orgs/{{org}}/teams/{team}/members",
+                                     org=self.organization, team=team)
+
     def get_ent_team_members(self, team):
-        return self.github_api(self.ses_ent, f"{GITHUB_API_URL}/enterprises/{{ent}}/teams/{{team}}/memberships", ent=self.enterprise, team=team)
+        return self._github_api_call(self.ses_ent, f"{GITHUB_API_URL}/enterprises/{{ent}}/teams/{{team}}/memberships",
+                                     ent=self.enterprise, team=team)
 
     def get_org_invitations(self):
-        return self.github_api(f"{GITHUB_API_URL}/orgs/{{org}}/invitations", org=self.organization)
+        return self._github_api_call(f"{GITHUB_API_URL}/orgs/{{org}}/invitations", org=self.organization)
 
     def get_org_members(self):
-        return self.github_api(self.ses_org, f"{GITHUB_API_URL}/orgs/{{self.organization}}/members")
+        return self._github_api_call(self.ses_org, f"{GITHUB_API_URL}/orgs/{{self.organization}}/members")
+
+    def get_ent_members(self):
+        QUERY = """
+        query ListEnterpriseMembersWithEmail($entLogin: String!, $orgLogin: String!, $cursor: String) {
+          enterprise(slug: $entLogin) {
+            members(first: 100, after: $cursor) {
+              nodes {
+                ... on EnterpriseUserAccount {
+                  login
+                  name
+                  user {
+                    organizationVerifiedDomainEmails(login: $orgLogin)
+                    createdAt
+                    organizations(first: 100) {
+                      nodes {
+                        login
+                      }
+                    }            
+                  }
+                }
+              }
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+              totalCount
+            }
+          }
+        }
+        """
+        cursor = None
+        all_members = []
+
+        while True:
+            response = self.ses_usr.post(
+                GRAPHQL_URL,
+                json={"query": QUERY,
+                      "variables": {"entLogin": self.enterprise, "orgLogin": self.organization, "cursor": cursor}},
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            if "errors" in data:
+                raise RuntimeError(f"GraphQL errors: {data['errors']}")
+
+            members_data = data["data"]["enterprise"]["members"]
+            all_members.extend(members_data["nodes"])
+
+            if not members_data["pageInfo"]["hasNextPage"]:
+                break
+            cursor = members_data["pageInfo"]["endCursor"]
+
+        return all_members
 
     def get_user_details(self, username):
-        return self.ses_ent.get(f"{GITHUB_API_URL}/users/{username}")
+        resp = requests.get(f"{GITHUB_API_URL}/users/{username}")
+        resp.raise_for_status()
+        return self.ses_ent.get(f"{GITHUB_API_URL}/users/{username}").json()
 
-    def get_sso_identity(username):
+    def get_sso_identity(self, username):
         url = f"{GITHUB_API_URL}/orgs/{self.organization}/memberships/{username}"
         response = self.ses_org.get(url)
         if response.status_code == 200:
@@ -144,7 +199,7 @@ class GitHubApi():
             }
           }
         }
-        """        
+        """
         cursor = None
 
         response = self.ses_usr.post(
@@ -158,7 +213,8 @@ class GitHubApi():
             },
         )
 
-        return [inv['invitee']['login'] for inv in response.json()['data']['enterprise']['ownerInfo']['pendingUnaffiliatedMemberInvitations']['nodes']]
+        return [inv['invitee']['login'] for inv in
+                response.json()['data']['enterprise']['ownerInfo']['pendingUnaffiliatedMemberInvitations']['nodes']]
 
     # Step 1: Get all org logins in the enterprise
     # Step 2: Get all members with verified domain emails for each org login
@@ -192,8 +248,7 @@ class GitHubApi():
               }}
             }}
             """
-    
-    
+
     def get_org_logins(self) -> list[str]:
         ORG_QUERY = """
         query GetEnterpriseOrgs($slug: String!, $cursor: String) {
@@ -204,11 +259,11 @@ class GitHubApi():
             }
           }
         }
-        """            
+        """
         cursor = None
         logins = []
         while True:
-            response = self.ses_usr.post(
+            response = self.ses_ent.post(
                 GRAPHQL_URL,
                 json={"query": ORG_QUERY, "variables": {"slug": self.enterprise, "cursor": cursor}},
             )
@@ -222,8 +277,7 @@ class GitHubApi():
                 break
             cursor = orgs["pageInfo"]["endCursor"]
         return logins
-    
-    
+
     def extract_verified_emails(self, node: dict, num_orgs: int) -> list[str]:
         """Collect and deduplicate verified domain emails across all org aliases."""
         all_emails = []
@@ -231,18 +285,17 @@ class GitHubApi():
             all_emails.extend(node.get(f"org_{i}") or [])
         return list(dict.fromkeys(all_emails))  # deduplicate, preserve order
 
-    
     def list_enterprise_members(self) -> list[dict]:
         org_logins = self.get_org_logins()
         if not org_logins:
             raise RuntimeError("No organizations found in enterprise.")
-    
+
         query = self.build_member_query(org_logins)
         cursor = None
         all_members = []
-    
+
         while True:
-            response = self.ses_usr.post(
+            response = self.ses_ent.post(
                 GRAPHQL_URL,
                 json={"query": query, "variables": {"slug": self.enterprise, "cursor": cursor}},
             )
@@ -250,7 +303,7 @@ class GitHubApi():
             data = response.json()
             if "errors" in data:
                 raise RuntimeError(f"GraphQL errors: {data['errors']}")
-    
+
             members_data = data["data"]["enterprise"]["members"]
             for node in members_data["nodes"]:
                 # For EnterpriseUserAccount, emails are on the nested user object
@@ -261,11 +314,11 @@ class GitHubApi():
                     "name": node.get("name") or "",
                     "verified_emails": verified_emails,
                 })
-    
+
             if not members_data["pageInfo"]["hasNextPage"]:
                 break
             cursor = members_data["pageInfo"]["endCursor"]
-    
+
         return all_members
 
     def add_users_to_ent_team(self, team_name: str, usernames: list[str]) -> list[dict]:
@@ -274,3 +327,59 @@ class GitHubApi():
             json={'usernames': usernames}
         )
         return result.json()
+
+    def fill_enterprise_id(self) -> None:
+        get_enterprise_id_query = """
+        query GetEnterpriseId($slug: String!) {
+          enterprise(slug: $slug) {
+            id
+          }
+        }
+        """
+
+        response = self.ses_ent.post(
+            GRAPHQL_URL,
+            json={"query": get_enterprise_id_query, "variables": {"slug": self.enterprise}},
+        )
+        response.raise_for_status()
+        data = response.json()
+        if "errors" in data:
+            raise RuntimeError(f"GraphQL errors: {data['errors']}")
+        self.enterprise_id = data["data"]["enterprise"]["id"]
+
+    def _run_invite_mutation(self, input_fields: dict) -> dict:
+        invite_mutation = """
+        mutation InviteEnterpriseMember($input: InviteEnterpriseMemberInput!) {
+          inviteEnterpriseMember(input: $input) {
+            clientMutationId
+            invitation {
+              id
+              createdAt
+              email
+              invitee { login }
+              inviter { login }
+            }
+          }
+        }
+        """
+
+        input_fields["enterpriseId"] = self.enterprise_id
+        response = self.ses_ent.post(
+            GRAPHQL_URL,
+            json={"query": invite_mutation, "variables": {"input": input_fields}},
+        )
+        response.raise_for_status()
+        data = response.json()
+        if "errors" in data:
+            raise RuntimeError(f"GraphQL errors: {data['errors']}")
+        return data["data"]["inviteEnterpriseMember"]["invitation"]
+
+    def invite_by_username(self, username: str) -> dict:
+        if self.enterprise_id is None:
+            self.fill_enterprise_id()
+        return self._run_invite_mutation({"invitee": username})
+
+    def invite_by_email(self, email: str) -> dict:
+        if self.enterprise_id is None:
+            self.fill_enterprise_id()
+        return self._run_invite_mutation({"email": email})
