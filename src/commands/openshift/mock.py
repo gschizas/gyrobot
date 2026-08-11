@@ -119,6 +119,18 @@ def _check_recursive(ctx, vartemplates):
 
 
 def _get_environment_values(env_vars, vartemplates, microservice_info, status):
+    """
+    Parse a microservice config key and build an `oc set env` argument.
+
+    microservice_info can be "deployment$VAR_SHORTCUT" or just "deployment"
+    (in which case an empty-string shortcut is used). The shortcut is looked
+    up in env_vars to get the full variable name.
+
+    Returns (microservice, env_variable_value) where env_variable_value is
+    "FULL_VAR_NAME=status" to set a variable, or "FULL_VAR_NAME-" to unset it
+    (status=None). Any $placeholders in the value are expanded via vartemplates.
+    """
+    if '$' not in microservice_info: microservice_info += '$'
     if '$' not in microservice_info: microservice_info += '$'
     microservice, env_var_shortcut = microservice_info.split('$')
     env_var_name: str = env_vars[env_var_shortcut]
