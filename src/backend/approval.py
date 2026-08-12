@@ -265,7 +265,7 @@ def requires_approval(func: Callable = None, *, summarize: Callable = None,
         if ctx.obj.get('_approved_execution'):
             return ctx.invoke(func, ctx, *args, **kwargs)
 
-        command_name = ctx.command.name
+        command_name = func.__module__ + ':' + func.__name__
         if not security_check(ctx, ROLE_REQUEST, f"request {command_name}"):
             return
 
@@ -292,7 +292,7 @@ def requires_approval(func: Callable = None, *, summarize: Callable = None,
                 channel=notify_channel)
         return None
 
-    APPROVAL_COMMANDS[func.__name__] = wrapper
+    APPROVAL_COMMANDS[func.__module__ + ':' + func.__name__] = wrapper
     wrapper._approval_callback = func
     return wrapper
 
