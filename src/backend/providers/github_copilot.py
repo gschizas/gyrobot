@@ -5,15 +5,21 @@ Real integration target: GitHub Copilot seat management API
 See backend/github_sdk.py for an authenticated requests.Session pattern.
 """
 from backend.providers.base import Account
+from backend.github_api import GitHubApi
 
+github_api_client: GitHubApi | None = None
 
 def provision(ctx, account: Account) -> str:
+    global github_api_client
+    if github_api_client is None:
+        github_api_client = GitHubApi()
     # TODO: assign a Copilot seat via the GitHub Copilot billing API.
-    ctx.logger.info(f"[stub] Assign GitHub Copilot licence to {account.userid}")
-    return f"GitHub Copilot licence would be assigned to {account.userid} (stub)"
+    ctx.logger.info(f"Sending Invitation to {account.userid}")
+    invitation = github_api_client.invite_by_username(account.userid)
+    return f"Sent invitation {invitation['id']} at {invitation['createdAt']} to {account.userid}"
 
 
 def deprovision(ctx, account: Account) -> str:
     # TODO: remove the Copilot seat via the GitHub Copilot billing API.
-    ctx.logger.info(f"[stub] Remove GitHub Copilot licence from {account.userid}")
-    return f"GitHub Copilot licence would be removed from {account.userid} (stub)"
+    ctx.logger.info(f"[stub] Remove {account.userid} from GitHub enterprise")
+    return f"Removed {account.userid} from GitHub enterprise (stub)"
