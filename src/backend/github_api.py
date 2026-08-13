@@ -16,25 +16,72 @@ class GitHubApi():
     client_secret: str
     signing_key: str
     enterprise_id: str | None = None
+    _ses_ent: requests.Session | None = None
+    _ses_org: requests.Session | None = None
+    _ses_inst: requests.Session | None = None
+    _ses_usr: requests.Session | None = None
+    _jwt_token: str | None = None
+    _iat: int | None = None
+    _exp: int | None = None
 
-    def __init__(self):
-        self.enterprise_id = None
-        self._load_config()
+    def _ses_check_expiration(self):
+        if self._iat is None or self._exp is None or self._jwt_token is None:
+            self._init_sessions()
+        if self._exp < int(time.time()):
+            self._init_sessions()
+
+    @property
+    def ses_ent(self) -> requests.Session:
+        self._ses_check_expiration()
+        if self._ses_ent is None:
+            self._init_sessions()
+        assert self._ses_ent is not None
+        return self._ses_ent
+
+    @property
+    def ses_org(self) -> requests.Session:
+        self._ses_check_expiration()
+        if self._ses_org is None:
+            self._init_sessions()
+        assert self._ses_org is not None
+        return self._ses_org
+
+    @property
+    def ses_inst(self) -> requests.Session:
+        self._ses_check_expiration()
+        if self._ses_inst is None:
+            self._init_sessions()
+        assert self._ses_inst is not None
+        return self._ses_inst
+
+    @property
+    def ses_usr(self) -> requests.Session:
+        self._ses_check_expiration()
+        if self._ses_usr is None:
+            self._init_sessions()
+        assert self._ses_usr is not None
+        return self._ses_usr
+
+    def _init_sessions(self):
+        self._iat = int(time.time())
+        self._exp = int(time.time()) + 600
 
         payload = {
-            'iat': int(time.time()),  # Issued at time
-            'exp': int(time.time()) + 600,  # JWT expiration time (10 minutes maximum)
+            'iat': self._iat,  # Issued at time
+            'exp': self._exp,  # JWT expiration time (10 minutes maximum)
             'iss': self.client_id  # GitHub App's client ID
         }
 
         # Create JWT
-        encoded_jwt = jwt.encode(payload, self.signing_key, algorithm='RS256')
+        self._jwt_token = jwt.encode(payload, self.signing_key, algorithm='RS256')
+        assert self._jwt_token is not None
 
-        self.ses_inst = requests.session()
+        self._ses_inst = requests.session()
+        assert self._ses_inst is not None
 
-        self.ses_inst.headers['Accept'] = 'application/vnd.github+json'
-        self.ses_inst.headers['Authorization'] = 'Bearer ' + encoded_jwt
-        self.ses_inst.headers['X-GitHub-Api-Version'] = '2026-03-10'
+        self._ses_inst.headers['Accept'] = 'application/vnd.github+json'
+        self._ses_inst.headers['Authorization'] = 'Bearer ' + self._jwt_token
+        self._ses_inst.headers['X-GitHub-Api-Version'] = '2026-03-10'
 
         installations_page = self.ses_inst.get(f"{GITHUB_API_URL}/app/installations")
         installations = installations_page.json()
@@ -44,21 +91,29 @@ class GitHubApi():
         access_tokens_org = self.ses_inst.post(f"{GITHUB_API_URL}/app/installations/{org_inst_id}/access_tokens")
 
         token_ent = access_tokens_ent.json()['token']
-        self.ses_ent = requests.session()
-        self.ses_ent.headers['Accept'] = 'application/vnd.github+json'
-        self.ses_ent.headers['Authorization'] = 'Bearer ' + token_ent
-        self.ses_ent.headers['X-GitHub-Api-Version'] = '2026-03-10'
+        self._ses_ent = requests.session()
+        assert self._ses_ent is not None
+        self._ses_ent.headers['Accept'] = 'application/vnd.github+json'
+        self._ses_ent.headers['Authorization'] = 'Bearer ' + token_ent
+        self._ses_ent.headers['X-GitHub-Api-Version'] = '2026-03-10'
 
         token_org = access_tokens_org.json()['token']
-        self.ses_org = requests.session()
-        self.ses_org.headers['Accept'] = 'application/vnd.github+json'
-        self.ses_org.headers['Authorization'] = 'Bearer ' + token_org
-        self.ses_org.headers['X-GitHub-Api-Version'] = '2026-03-10'
+        self._ses_org = requests.session()
+        assert self._ses_org is not None
+        self._ses_org.headers['Accept'] = 'application/vnd.github+json'
+        self._ses_org.headers['Authorization'] = 'Bearer ' + token_org
+        self._ses_org.headers['X-GitHub-Api-Version'] = '2026-03-10'
 
-        self.ses_usr = requests.session()
-        self.ses_usr.headers['Accept'] = 'application/vnd.github+json'
-        self.ses_usr.headers['Authorization'] = 'Bearer ' + self.personal_access_token
-        self.ses_usr.headers['X-GitHub-Api-Version'] = '2026-03-10'
+        self._ses_usr = requests.session()
+        assert self._ses_usr is not None
+        self._ses_usr.headers['Accept'] = 'application/vnd.github+json'
+        self._ses_usr.headers['Authorization'] = 'Bearer ' + self.personal_access_token
+        self._ses_usr.headers['X-GitHub-Api-Version'] = '2026-03-10'
+
+    def __init__(self):
+        self.enterprise_id = None
+        self._load_config()
+        self._init_sessions()
 
     def _load_config(self):
         config_file = pathlib.Path(f'config/github.yml')
