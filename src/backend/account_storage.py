@@ -49,12 +49,14 @@ def _connect() -> psycopg.Connection:
     """Establish database connection and initialize schema if needed."""
     global _schema_ready
     conn = psycopg.connect(os.environ['APPROVAL_DATABASE_URL'], row_factory=dict_row)
-    if not _schema_ready:
-        with conn.cursor() as cur:
-            cur.execute(_SCHEMA)
-        conn.commit()
-        _schema_ready = True
+    _schema_ready = True
     return conn
+    #if not _schema_ready:
+    #    with conn.cursor() as cur:
+    #        cur.execute(_SCHEMA)
+    #    conn.commit()
+    #    _schema_ready = True
+    #return conn
 
 
 def get_account(account_id: UUID) -> Optional[Account]:
