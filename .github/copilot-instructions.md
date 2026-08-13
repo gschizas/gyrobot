@@ -42,14 +42,20 @@ src/
     reddit/            # Reddit moderation commands
     openshift/         # OpenShift/Kubernetes deployment commands
     generic/           # Utility commands (binary, unicode, version, etc.)
-    github/            # GitHub integration (empty — not yet implemented)
+    github/            # GitHub integration (`github teams` — enterprise team tree)
+    onboarding/        # Onboard subcommands (github, crowd, jetbrains) — package, not a single file
   bot_framework/       # Shared utilities — GIT SUBMODULE (../bot_framework.git)
     common.py          # Logging setup, normalize_text
     praw_wrapper.py    # Reddit OAuth wrapper
     yaml_wrapper.py    # Configured ruamel.yaml instance
   backend/
     configuration.py   # Config/credentials/permissions loading; check_security decorator
-    github_sdk.py      # GitHub API client
+    github_api.py       # GitHub API client (GitHubApi class; REST + GraphQL)
+    github_provisioning.py  # Pending-invitation check + auto team assignment
+    account_storage.py # PostgreSQL persistence for onboarding accounts/provisions
+    accounts.py         # Account/Provision dataclasses
+    approval.py         # Generic command-approval queue (requires_approval decorator)
+    providers/          # Provisioning stubs (github_copilot, jetbrains, crowd, slack_provision)
   state_file.py        # Persistent YAML state context manager
 ```
 
@@ -337,7 +343,7 @@ Env guard: `CHEESE_DATABASE_URL` (PostgreSQL via psycopg3). Config from `data/ch
 
 Env guard: `QUESTIONNAIRE_DATABASE_URL`. Questionnaire definition loaded from `data/$QUESTIONNAIRE_FILE` (multi-document YAML). Question types: `radio`, `checkbox`, `tree`, `checktree`, `text`, `textarea`, `scale-matrix`. Subqueries: `count`, `questions`, `questions_full`, `mods`, `votes_per_day`, `q_N`, `full_replies [json]`.
 
-### Approval queue (`backend/approval.py`, `commands/onboarding.py`, `commands/approvals.py`)
+### Approval queue (`backend/approval.py`, `commands/onboarding/`, `commands/approvals.py`)
 
 Env guards: `APPROVAL_DATABASE_URL` (PostgreSQL via psycopg3; schema auto-created on first use) **and** `APPROVAL_CONFIGURATION` (path to the security YAML, under `config/` or absolute — same convention as the OpenShift commands).
 
@@ -346,11 +352,12 @@ A generic **command-approval queue**. Decorate any command with `@requires_appro
 ```python
 from backend.approval import requires_approval
 
-@gyrobot.command('onboard')
-@click.argument('name')
+@onboard.command('crowd')
+@click.argument('username')
+@click.argument('team')
 @click.pass_context
 @requires_approval(summarize=my_summary_fn, validate=my_validate_fn)
-def onboard(ctx, name):
+def onboard_crowd(ctx, username, team):
     ...  # only runs after approval
 ```
 
@@ -358,16 +365,24 @@ def onboard(ctx, name):
 - `summarize(params) -> str` builds the human-readable one-liner; `validate(params) -> str|None` rejects bad requests before queuing.
 - `execute_approved(approver_ctx, row)` rebuilds a `click.Context` for the stored command and invokes the real body, returning a result string stored on the request.
 
+`commands/onboarding/` is a **package** (`__init__.py` + `crowd.py`, `github.py`, `jetbrains.py`), not a single file. `onboard` is a group; each resource has its own subcommand with its own positional args (no `--flag` selection):
+
 | Command / Group | Description |
 |---|---|
-| `onboard "<name>" <email> [--github] [--jetbrains] [--crowd]` | Queue provisioning of any of: GitHub Copilot licence, JetBrains IntelliJ IDEA licence, Crowd entry (≥1 flag required) |
-| `offboard "<name>" <email>` | Queue removal of all licences/entries **and** Slack deactivation |
+| `onboard github <username> <email> <team>` | Queue a GitHub Copilot licence invite + team assignment; `validate` checks the GitHub user/team exist and the email domain |
+| `onboard github_check` | Manually reconcile pending GitHub invitations: auto-assigns accepted users to their team (also the target of a scheduled/manual re-check, not gated by approval) |
+| `onboard crowd <username> <team>` | Queue a Crowd entry |
+| `onboard jetbrains <email> <team_name>` | Queue a JetBrains IntelliJ IDEA licence |
+| `onboard slack <email> <member_id...>` | Queue Slack workspace membership |
+| `offboard <email>` | Queue removal of all active provisions for the account (looked up by email) **and** Slack deactivation |
 | `approvals list` | List pending requests (approvers only) |
 | `approvals show <id>` | Full detail of one request |
 | `approvals approve <id...>` / `approvals approve all` | Approve + execute requests (self-approval blocked unless `allow_self` in config) |
 | `approvals reject <id...> [-r reason]` / `approvals reject all` | Reject pending requests |
 
-Provisioning is delegated to the **stub** providers in `backend/providers/` (`github_copilot`, `jetbrains`, `crowd`, `slack_provision`), each exposing `provision/deprovision` (or `deactivate`) with a `# TODO` marking the real API integration point. `PROVIDERS` maps resource keys (`github`/`jetbrains`/`crowd`) to provider modules; `RESOURCE_LABELS` holds display names.
+Account/provisioning state is persisted to PostgreSQL via `backend/account_storage.py` (`Account`/`Provision` dataclasses defined in `backend/accounts.py`): `create_account`, `get_account(_by_email)`, `set_provision_status`, `get_active_provisions`, `get_pending_provisions`. This is what backs `offboard`'s "all active provisions" lookup and `github_check`'s invite-status polling.
+
+Provisioning itself is delegated to providers in `backend/providers/` (`github_copilot`, `jetbrains`, `crowd`, `slack_provision`), each exposing `provision/deprovision` (or `deactivate` for Slack) via `PROVIDERS` (keys `github`/`jetbrains`/`crowd`/`slack`) and `RESOURCE_LABELS`. Most are still stubs (`# TODO` marking the real integration), but `github_copilot.provision` now performs a **real** GitHub invite via `GitHubApi.invite_by_username`, and `github_provisioning.check_github_invitations()` performs real polling/team-assignment via the GitHub GraphQL API.
 
 **Security (config-driven, like `check_security`).** All permissions come from the YAML at `APPROVAL_CONFIGURATION` (core file + sibling `.permissions.yml`); only the database stays in an env var. `environments` mean *real* environments — the core `approvals.yml` picks the single active one via `environment:` (plus `allow_self`). The selected environment's permissions block in `approvals.permissions.yml` holds: `requesters` + `request_channels` (who may issue gated commands and where requests are accepted), `approvers` + `approve_channels` (who may approve/reject and where), and `notify_channel` (where new pending requests are announced). Users accept `*` / Slack id / `@group` (via `user_allowed`); channels use the display name incl. `#`/`🔒` prefix, or `*` for any. The helpers are `security_check(ctx, role, action)` and the `@check_approval_security(role=...)` decorator (role is `ROLE_REQUEST`/`ROLE_APPROVE`; reads the action label from `ctx.obj['security_text']`, like `check_security`). Example pair: `config/approvals.yml`, `config/approvals.permissions.yml`.
 
@@ -395,15 +410,27 @@ Provisioning is delegated to the **stub** providers in `backend/providers/` (`gi
 
 `check_security` decorator reads `ctx.obj['security_text'][ctx.command.name]` for the human-readable action name, then validates both user and channel before calling the wrapped function.
 
-### `backend/github_sdk.py` — GitHub API client
+### `backend/github_api.py` — GitHub API client (`GitHubApi` class)
 
-Lazy-initialised `requests.Session` using `GITHUB_TOKEN`. Provides paginated helpers:
-- `get_org_members(org)` — all members of a GitHub org
-- `get_org_teams(org)` — all teams
-- `get_org_team_members(org, team_slug)` — members of a specific team
-- `get_sso_identity(org_name, username)` — org membership + SSO login
+Lazy-initialised `requests.Session` using `GITHUB_TOKEN` + `GITHUB_ORG`. Mixes REST (v2022-11-28) and GraphQL calls. Key methods:
+- `get_org_teams()` / `get_ent_teams()` — org-level vs. enterprise-level teams
+- `get_org_team_members(team)` / `get_ent_team_members(team)` — members of a specific team
+- `get_org_members()` / `get_ent_members()` — all org/enterprise members
+- `get_org_invitations()` / `get_pending_invitations()` — pending invitations
+- `get_user_details(username)` / `get_sso_identity(username)` — user lookup + SSO identity
+- `list_enterprise_members()` / `build_member_query(...)` / `extract_verified_emails(...)` — GraphQL enterprise member listing with verified emails
+- `add_users_to_ent_team(team_name, usernames)` — assign accepted users to an enterprise team
+- `invite_by_username(username)` / `invite_by_email(email)` — send enterprise invitations (via GraphQL mutation `_run_invite_mutation`)
 
-All return full response objects from the GitHub REST API (v2022-11-28).
+Used by `commands/github/` (`github teams` — renders the enterprise team hierarchy as a tree), `commands/onboarding/github.py` (validate + invite), and `backend/github_provisioning.py` (poll invitations, auto-assign teams).
+
+### `backend/github_provisioning.py` — GitHub invitation polling
+
+`check_github_invitations()` reads `invited`-status provisions from `account_storage`, checks each against `GitHubApi.get_pending_invitations()`, and once accepted (user appears in `get_ent_members()`), calls `add_users_to_ent_team` and flips the provision status to `assigned`. Returns a summary dict (`total_pending`, `accepted_and_assigned`, `failed`, `errors`) consumed by the `onboard github_check` command.
+
+### `backend/account_storage.py` / `backend/accounts.py` — onboarding persistence
+
+`account_storage.py` is a psycopg3-backed store (env: `APPROVAL_DATABASE_URL`) for the `Account`/`Provision` dataclasses defined in `accounts.py`. Key functions: `create_account`, `get_account`, `get_account_by_email`, `get_or_create_account`, `update_account`, `set_provision_status`, `get_provision`, `get_pending_provisions(resource, status)`, `get_account_provisions`, `get_active_provisions`. Used throughout `commands/onboarding/` and `github_provisioning.py` to track multi-stage provisioning (invited → accepted → assigned / active).
 
 ### `bot_framework/praw_wrapper.py` — Reddit OAuth
 
@@ -531,6 +558,7 @@ All runtime config lives outside the repo under mounted volumes:
 | `ALT_PROXY` | HTTP proxy for `joke` command |
 | `KUDOS_DATABASE_URL` | PostgreSQL DSN for `kudos` (psycopg3) |
 | `CHEESE_DATABASE_URL` | PostgreSQL DSN for `cheese` (psycopg3) |
-| `GITHUB_TOKEN` | Bearer token for `backend/github_sdk.py` |
-| `APPROVAL_DATABASE_URL` | PostgreSQL DSN for the approval queue (psycopg3); enables `onboard`/`offboard`/`approvals` |
+| `GITHUB_TOKEN` | Bearer token for `backend/github_api.py` (`GitHubApi`); enables `commands/github/` and `onboard github`/`github_check` |
+| `GITHUB_ORG` | GitHub org/enterprise slug used by `backend/github_api.py`; required alongside `GITHUB_TOKEN` |
+| `APPROVAL_DATABASE_URL` | PostgreSQL DSN for the approval queue + account/provision storage (psycopg3); enables `onboard`/`offboard`/`approvals` |
 | `APPROVAL_CONFIGURATION` | Path to the approval security YAML (under `config/` or absolute). Selects the active `environment`; per-environment `requesters`/`approvers`, their channels, `notify_channel` live in `.permissions.yml` |
