@@ -38,7 +38,7 @@ def actuator(ctx: ExtendedContext):
 @actuator.command('refresh')
 @click.argument('namespace', type=OpenShiftNamespace(_actuator_config()))
 @click.argument('deployments', type=str, nargs=-1)
-@click.option('-f', '--format', type=TableFormat, default=TableFormat.TABLE)
+@click.option('-f', '--format', 'table_format', type=TableFormat, default=TableFormat.TABLE)
 @click.pass_context
 @check_security
 def refresh_actuator(ctx: ExtendedContext, namespace: str, deployments: list[str],
