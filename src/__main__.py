@@ -213,10 +213,10 @@ def default(line):
 
 
 def do_exit():
-    global _shutdown_done
-    if _shutdown_done:
+    global shutdown_done
+    if shutdown_done:
         return
-    _shutdown_done = True
+    shutdown_done = True
     logger.warning("Stopping...")
     shutdown_background_tasks()
     send_email_log("stopping", bot_name=bot_name)
