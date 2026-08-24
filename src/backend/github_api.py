@@ -3,7 +3,7 @@ import time
 
 import jwt
 import requests
-from ruamel.yaml import YAML
+from bot_framework.yaml_wrapper import yaml
 
 GITHUB_API_URL = "https://api.github.com"
 GRAPHQL_URL = f"{GITHUB_API_URL}/graphql"
@@ -117,7 +117,6 @@ class GitHubApi():
 
     def _load_config(self):
         config_file = pathlib.Path(f'config/github.yml')
-        yaml = YAML()
         if config_file.exists():
             with config_file.open(mode='r', encoding='utf8') as y:
                 config = dict(yaml.load(y))
