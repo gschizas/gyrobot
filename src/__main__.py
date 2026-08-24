@@ -5,8 +5,8 @@ import locale
 import logging
 import os
 import re
-import traceback
 import sys
+import traceback
 
 import click.testing
 import praw
@@ -27,6 +27,7 @@ from chat import get_chat_wrapper
 from chat.chat_wrapper import ChatWrapper, Conversation, Message
 
 locale.setlocale(locale.LC_ALL, os.environ.get('LOCALE', ''))
+
 
 def do_imports():
     import importlib
