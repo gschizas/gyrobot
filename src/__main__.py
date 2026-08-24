@@ -5,6 +5,7 @@ import locale
 import logging
 import os
 import re
+import signal
 import sys
 import traceback
 
@@ -18,6 +19,7 @@ import commands
 import commands.convert
 import commands.generic
 import commands.roll
+from backend.email_logging import send_email_log
 from background_tasks import init_background_tasks, shutdown_background_tasks
 from bot_framework.common import normalize_text
 from bot_framework.common import setup_logging
@@ -54,6 +56,7 @@ shortcut_words: dict
 bot_name: str
 runner: click.testing.CliRunner
 executor: concurrent.futures.ThreadPoolExecutor
+shutdown_done: bool
 
 
 def init():
@@ -209,17 +212,42 @@ def default(line):
             is_error=True)
 
 
+def do_exit():
+    global _shutdown_done
+    if _shutdown_done:
+        return
+    _shutdown_done = True
+    logger.warning("Stopping...")
+    shutdown_background_tasks()
+    send_email_log("stopping", bot_name=bot_name)
+
+
+def do_kill(signum, frame):
+    logger.warning(f"Received signal {signum}. Stopping...")
+    raise SystemExit(0)  # let it unwind through main()'s finally instead of calling do_exit() here too
+
+
 def main():
     global logger
+    global shutdown_done
+    shutdown_done = False
     logger = setup_logging(os.environ.get('LOG_NAME', 'unknown'), when=os.environ.get('LOG_ROLLOVER'))
     init()
+    signal.signal(signal.SIGINT, do_kill)
+    signal.signal(signal.SIGTERM, do_kill)
+    if hasattr(signal, 'SIGBREAK'):  # Windows Ctrl+Break
+        signal.signal(signal.SIGBREAK, do_kill)
     try:
         logger.debug(f"Listening for {','.join(trigger_words)}")
+        send_email_log("starting", bot_name=bot_name)
         # Initialize background tasks (GitHub checks, etc.)
         init_background_tasks()
         chat_obj.start()
+    except (KeyboardInterrupt, SystemExit) as e:
+        logger.warning(f"Exiting due to {e!r}")
+        print("Program terminated. Running cleanup...")
     finally:
-        shutdown_background_tasks()
+        do_exit()
 
 
 if __name__ == '__main__':
