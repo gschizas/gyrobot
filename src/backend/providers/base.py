@@ -1,6 +1,7 @@
 """Account record passed to provider provision/deprovision stubs."""
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
 
 
 class Role(Enum):
@@ -20,4 +21,4 @@ class Account:
     email: str
     userid: str
     team: str
-    role: Role
+    role: Optional[Role] = None
