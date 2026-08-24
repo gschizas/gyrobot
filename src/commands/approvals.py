@@ -15,6 +15,7 @@ import click
 from backend.approval import (ROLE_APPROVE, check_approval_security, execute_approved,
                               get, list_pending, set_decision, set_result,
                               _allow_self_approval)
+from backend.email_logging import send_email_log
 from commands import gyrobot, ClickAliasedGroup
 from commands.extended_context import ExtendedContext
 
@@ -128,6 +129,8 @@ def _approve_one(ctx: ExtendedContext, request_id: int) -> None:
         ctx.chat.send_text(f":white_check_mark: Request *#{request_id}* approved and executed.")
         _notify_requester(ctx, row, f":white_check_mark: Your request *#{request_id}* "
                                     f"({row['summary']}) was approved and executed.")
+        row = get(request_id)
+        send_email_log('approval', status='approved', request_id=request_id, row=row)
     except Exception as ex:
         error_text = ''.join(traceback.format_exception(type(ex), ex, ex.__traceback__))
         set_result(request_id, 'failed', error_text)
@@ -162,6 +165,8 @@ def reject(ctx: ExtendedContext, ids: tuple, reason: str):
         if reason:
             set_result(request_id, 'rejected', f"Rejected: {reason}")
         ctx.chat.send_text(f":no_entry: Request *#{request_id}* rejected.")
+        row = get(request_id)
+        send_email_log('approval', status='rejected', request_id=request_id, row=row)
         suffix = f"\nReason: {reason}" if reason else ''
         _notify_requester(ctx, row, f":no_entry: Your request *#{request_id}* "
                                     f"({row['summary']}) was rejected.{suffix}")
