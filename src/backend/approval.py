@@ -20,6 +20,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from backend.configuration import user_allowed
+from backend.email_logging import send_email_log
 from bot_framework.yaml_wrapper import yaml
 
 if 'APPROVAL_DATABASE_URL' not in os.environ:
@@ -195,7 +196,7 @@ def _notify_channel() -> Optional[str]:
     return channel or None
 
 
-def security_check(ctx, role: str, action_name: str) -> bool:
+def security_check(ctx, role: str, command_name: str, action_name: str) -> bool:
     """Validate the calling user and channel for ``role`` against the YAML config.
 
     Resembles :func:`backend.configuration.check_security`: checks the user with
@@ -209,7 +210,11 @@ def security_check(ctx, role: str, action_name: str) -> bool:
     if not user_allowed(ctx.chat.team_name, ctx.chat.user_id, allowed_users):
         ctx.chat.send_text(f"You don't have permission to {action_name}.", is_error=True)
         return False
-    allowed_channels = _SECURITY_CONFIG.get(channels_key, [])
+    allowed_channels_full = _SECURITY_CONFIG.get(channels_key, {})
+    if isinstance(allowed_channels_full, dict):
+        allowed_channels = allowed_channels_full.get(command_name, ['*'])
+    elif isinstance(allowed_channels_full, list):
+        allowed_channels = allowed_channels_full
     channel_name = ctx.chat.channel_name
     if '*' not in allowed_channels and channel_name not in allowed_channels:
         ctx.chat.send_text(f"{action_proper} commands are not allowed in {channel_name}", is_error=True)
@@ -230,7 +235,7 @@ def check_approval_security(func: Callable = None, *, role: str = None):
     @functools.wraps(func)
     def wrapper(ctx, *args, **kwargs):
         action_name = ctx.obj['security_text'][ctx.command.name]
-        if not security_check(ctx, role, action_name):
+        if not security_check(ctx, role, ctx.command.name, action_name):
             return
         return ctx.invoke(func, ctx, *args, **kwargs)
 
@@ -266,7 +271,7 @@ def requires_approval(func: Callable = None, *, summarize: Callable = None,
             return ctx.invoke(func, ctx, *args, **kwargs)
 
         command_name = func.__module__ + ':' + func.__name__
-        if not security_check(ctx, ROLE_REQUEST, f"request {command_name}"):
+        if not security_check(ctx, ROLE_REQUEST, command_name, f"request {command_name}"):
             return
 
         params = dict(ctx.params)
@@ -290,6 +295,8 @@ def requires_approval(func: Callable = None, *, summarize: Callable = None,
                 f":inbox_tray: New approval request *#{request_id}*: {summary}\n"
                 f"Use `{ctx.chat.bot_name} approvals approve {request_id}` to approve.",
                 channel=notify_channel)
+            #TODO: make this generic, maybe with another function argument
+            send_email_log('onboarding', **params)
         return None
 
     APPROVAL_COMMANDS[func.__module__ + ':' + func.__name__] = wrapper
