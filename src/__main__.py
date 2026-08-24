@@ -66,7 +66,6 @@ def init():
 
     trigger_words = os.environ['BOT_NAME'].split()
     bot_name = trigger_words[0]
-    logger.debug(f"Listening for {','.join(trigger_words)}")
     if 'SHORTCUT_WORDS' in os.environ:
         with open('data/' + os.environ['SHORTCUT_WORDS']) as sf:
             shortcut_words = dict(yaml.load(sf))
@@ -75,11 +74,6 @@ def init():
 
     chat_obj = get_chat_wrapper(logger, trigger_words[0], handle_message)
     _init_reddit()
-    
-    # Initialize background tasks (GitHub checks, etc.)
-    init_background_tasks()
-    
-    chat_obj.start()
 
 
 def _init_reddit():
@@ -219,6 +213,13 @@ def main():
     global logger
     logger = setup_logging(os.environ.get('LOG_NAME', 'unknown'), when=os.environ.get('LOG_ROLLOVER'))
     init()
+    try:
+        logger.debug(f"Listening for {','.join(trigger_words)}")
+        # Initialize background tasks (GitHub checks, etc.)
+        init_background_tasks()
+        chat_obj.start()
+    finally:
+        shutdown_background_tasks()
 
 
 if __name__ == '__main__':
