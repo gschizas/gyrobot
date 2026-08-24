@@ -1,0 +1,60 @@
+{% extends "_base.html" %}
+
+{% set approved = status == 'approved' %}
+{% set accent   = '#2e7d32' if approved else '#c62828' %}
+{% set badge_bg = '#e8f5e9' if approved else '#ffebee' %}
+{% set icon     = '✅' if approved else '❌' %}
+{% set verb     = 'Approved' if approved else 'Rejected' %}
+
+{% block title %}Request #{{ request_id }} {{ verb }}{% endblock %}
+{% block heading %}Approval Queue Decision{% endblock %}
+
+{% block content %}
+<table cellpadding="0" cellspacing="0" border="0" width="100%">
+    <tr>
+        <td style="padding-bottom:20px;">
+            <!-- Status badge -->
+            <span style="display:inline-block;background-color:{{ badge_bg }};color:{{ accent }};font-size:13px;font-weight:700;padding:4px 12px;border-radius:12px;border:1px solid {{ accent }};">
+                {{ icon }} {{ verb }}
+            </span>
+        </td>
+    </tr>
+    <tr>
+        <td style="padding-bottom:20px;">
+            <p style="color:#1e3a5f;font-size:17px;font-weight:600;margin:0 0 6px;">
+                Request #{{ request_id }}
+            </p>
+            <p style="color:#555;font-size:14px;line-height:1.6;margin:0;">{{ summary }}</p>
+        </td>
+    </tr>
+</table>
+
+<!-- Details table -->
+<table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:20px;">
+    <tr>
+        <td style="padding:8px 12px 8px 0;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;width:140px;border-bottom:1px solid #f0f2f5;">Requested by</td>
+        <td style="padding:8px 0;color:#333;font-size:14px;border-bottom:1px solid #f0f2f5;">{{ requested_by_name }}</td>
+    </tr>
+    <tr>
+        <td style="padding:8px 12px 8px 0;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #f0f2f5;">Requested at</td>
+        <td style="padding:8px 0;color:#333;font-size:14px;border-bottom:1px solid #f0f2f5;">{{ created_at }}</td>
+    </tr>
+    <tr>
+        <td style="padding:8px 12px 8px 0;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #f0f2f5;">{{ verb }} by</td>
+        <td style="padding:8px 0;color:#333;font-size:14px;border-bottom:1px solid #f0f2f5;">{{ decided_by_name }}</td>
+    </tr>
+    <tr>
+        <td style="padding:8px 12px 8px 0;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;{% if result %}border-bottom:1px solid #f0f2f5;{% endif %}">{{ verb }} at</td>
+        <td style="padding:8px 0;color:#333;font-size:14px;{% if result %}border-bottom:1px solid #f0f2f5;{% endif %}">{{ decided_at }}</td>
+    </tr>
+    {% if result %}
+    <tr>
+        <td style="padding:8px 12px 8px 0;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;vertical-align:top;">{{ 'Result' if approved else 'Reason' }}</td>
+        <td style="padding:8px 0;color:#333;font-size:14px;line-height:1.6;">{{ result }}</td>
+    </tr>
+    {% endif %}
+</table>
+
+<div style="height:1px;background-color:#e8ecf1;margin:0 0 16px;"></div>
+<p style="color:#888;font-size:12px;margin:0;">Command: <code style="background:#f4f5f7;padding:2px 6px;border-radius:3px;font-size:12px;">{{ command }}</code></p>
+{% endblock %}
