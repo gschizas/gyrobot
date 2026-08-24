@@ -1,0 +1,41 @@
+{% extends "_base.html" %}
+
+{% block title %}Onboarding — {{ username | default('New User') }}{% endblock %}
+{% block heading %}Onboarding Request{% endblock %}
+
+{% block content %}
+<h2 style="color:#1e3a5f;font-size:18px;margin-top:0;">👋 New Onboarding Request</h2>
+<p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 20px;">
+    A new onboarding request has been submitted.
+</p>
+<table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 16px;border-collapse:collapse;">
+    {% if username %}
+    <tr>
+        <td style="padding:8px 12px 8px 0;color:#888;font-size:13px;width:130px;vertical-align:top;border-bottom:1px solid #f0f2f5;">Username</td>
+        <td style="padding:8px 0;color:#333;font-size:14px;font-weight:600;border-bottom:1px solid #f0f2f5;">{{ username }}</td>
+    </tr>
+    {% endif %}
+    {% if email %}
+    <tr>
+        <td style="padding:8px 12px 8px 0;color:#888;font-size:13px;vertical-align:top;border-bottom:1px solid #f0f2f5;">Email</td>
+        <td style="padding:8px 0;color:#333;font-size:14px;border-bottom:1px solid #f0f2f5;">{{ email }}</td>
+    </tr>
+    {% endif %}
+    {% if team %}
+    <tr>
+        <td style="padding:8px 12px 8px 0;color:#888;font-size:13px;vertical-align:top;border-bottom:1px solid #f0f2f5;">Team</td>
+        <td style="padding:8px 0;color:#333;font-size:14px;border-bottom:1px solid #f0f2f5;">{{ team }}</td>
+    </tr>
+    {% endif %}
+    {% if resource %}
+    <tr>
+        <td style="padding:8px 12px 8px 0;color:#888;font-size:13px;vertical-align:top;">Resource</td>
+        <td style="padding:8px 0;color:#333;font-size:14px;">{{ resource }}</td>
+    </tr>
+    {% endif %}
+</table>
+<div style="height:1px;background-color:#e8ecf1;margin:16px 0;"></div>
+<p style="color:#888;font-size:13px;margin:0;">
+    {% block status_text %}This request is pending approval.{% endblock %}
+</p>
+{% endblock %}
