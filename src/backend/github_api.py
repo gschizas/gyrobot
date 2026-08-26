@@ -10,6 +10,9 @@ GRAPHQL_URL = f"{GITHUB_API_URL}/graphql"
 
 
 class GitHubApi():
+    _instance = None
+    _initialized = False
+
     enterprise: str
     organization: str
     client_id: str
@@ -23,6 +26,11 @@ class GitHubApi():
     _jwt_token: str | None = None
     _iat: int | None = None
     _exp: int | None = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
 
     def _ses_check_expiration(self):
         if self._iat is None or self._exp is None or self._jwt_token is None:
@@ -111,9 +119,12 @@ class GitHubApi():
         self._ses_usr.headers['X-GitHub-Api-Version'] = '2026-03-10'
 
     def __init__(self):
+        if self._initialized:
+            return
         self.enterprise_id = None
         self._load_config()
         self._init_sessions()
+        self._initialized = True
 
     def _load_config(self):
         config_file = pathlib.Path(f'config/github.yml')
