@@ -49,7 +49,7 @@ class SlackConversation(Conversation):
                 "type": "table",
                 "column_settings": [
                     {"is_wrapped": True},
-                    {"align": "right"}],
+                    {"align": "left"}],
                 "rows": [header_row] + data_rows
             }
             self.send_blocks(blocks=[table_block])
