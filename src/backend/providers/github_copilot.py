@@ -7,15 +7,10 @@ See backend/github_sdk.py for an authenticated requests.Session pattern.
 from backend.providers.base import Account
 from backend.github_api import GitHubApi
 
-github_api_client: GitHubApi | None = None
-
 def provision(ctx, account: Account) -> str:
-    global github_api_client
-    if github_api_client is None:
-        github_api_client = GitHubApi()
     # TODO: assign a Copilot seat via the GitHub Copilot billing API.
     ctx.logger.info(f"Sending Invitation to {account.userid}")
-    invitation = github_api_client.invite_by_username(account.userid)
+    invitation = GitHubApi().invite_by_username(account.userid)
     return f"Sent invitation {invitation['id']} at {invitation['createdAt']} to {account.userid}"
 
 
