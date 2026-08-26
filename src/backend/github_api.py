@@ -160,7 +160,7 @@ class GitHubApi():
                                      ent=self.enterprise, team=team)
 
     def get_org_invitations(self):
-        return self._github_api_call(f"{GITHUB_API_URL}/orgs/{{org}}/invitations", org=self.organization)
+        return self._github_api_call(self.ses_org, f"{GITHUB_API_URL}/orgs/{{org}}/invitations", org=self.organization)
 
     def get_org_members(self):
         return self._github_api_call(self.ses_org, f"{GITHUB_API_URL}/orgs/{{self.organization}}/members")
