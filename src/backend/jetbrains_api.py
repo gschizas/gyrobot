@@ -83,3 +83,40 @@ class JetBrainsApi:
             free_licenses.extend(licenses_page)
             page += 1
         return free_licenses
+
+    def assign_license(self, email: str, license_code: str):
+        """Assign a license to a user."""
+        payload = {
+            "contact": {
+                "email": email,
+                "firstName": "",
+                "lastName": ""
+            },
+            "includeOfflineActivationCode": True,
+            "license": {
+                "productCode": "II",
+                "team": 1
+            },
+            "licenseId": license_code,
+            "sendEmail": True}
+        assign_resp = self.session.post(
+            f"{BASE_URL}/customer/licenses/{license_code}/assign",
+            json=payload)
+        assign_resp.raise_for_status()
+        return assign_resp.json()
+
+    def get_team_licenses(self, team_id: str):
+        """Get all licenses for a team."""
+        team_licenses = []
+        page = 1
+        while True:
+            licenses_resp = self.session.get(
+                f"{BASE_URL}/customer/teams/{team_id}/licenses",
+                params={'perPage': 100})
+            licenses_resp.raise_for_status()
+            licenses_page = licenses_resp.json()
+            if not licenses_page:
+                break
+            team_licenses.extend(licenses_page)
+            page += 1
+        return team_licenses
