@@ -82,9 +82,6 @@ def _read_security_config() -> dict:
     }
 
 
-# Resolved security configuration for the single active environment.
-_SECURITY_CONFIG = _read_security_config()
-
 # Registry of approval-gated click commands, keyed by command name. Populated by the
 # requires_approval decorator at import time so requests can be re-invoked by name.
 APPROVAL_COMMANDS: dict = {}
@@ -188,11 +185,11 @@ def set_result(request_id: int, status: str, result: str) -> None:
 
 
 def _allow_self_approval() -> bool:
-    return bool(_SECURITY_CONFIG.get('allow_self', False))
+    return bool(_read_security_config().get('allow_self', False))
 
 
 def _notify_channel() -> Optional[str]:
-    channel = _SECURITY_CONFIG.get('notify_channel')
+    channel = _read_security_config().get('notify_channel')
     return channel or None
 
 
@@ -206,11 +203,11 @@ def security_check(ctx, role: str, command_name: str, action_name: str) -> bool:
     """
     action_proper = action_name.capitalize()
     users_key, channels_key = _ROLE_KEYS[role]
-    allowed_users = _SECURITY_CONFIG.get(users_key, [])
+    allowed_users = _read_security_config().get(users_key, [])
     if not user_allowed(ctx.chat.team_name, ctx.chat.user_id, allowed_users):
         ctx.chat.send_text(f"You don't have permission to {action_name}.", is_error=True)
         return False
-    allowed_channels_full = _SECURITY_CONFIG.get(channels_key, {})
+    allowed_channels_full = _read_security_config().get(channels_key, {})
     if isinstance(allowed_channels_full, dict):
         allowed_channels = allowed_channels_full.get(command_name, ['*'])
     elif isinstance(allowed_channels_full, list):
