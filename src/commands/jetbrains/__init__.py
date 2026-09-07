@@ -3,7 +3,6 @@ import os
 import click
 
 from backend.jetbrains_api import JetBrainsApi
-
 from commands import gyrobot, DefaultCommandGroup
 from commands.extended_context import ExtendedContext
 
@@ -24,6 +23,11 @@ def jetbrains():
 def jetbrains_teams(ctx: ExtendedContext):
     """Display JetBrains Teams"""
     teams = JetBrainsApi().get_teams()
-    ctx.chat.send_table(title='JetBrains Teams', table=[
-        {'Team ID': team.id, 'Team Name': team.name, 'Team Slug': team.slug}
+    ctx.chat.send_table(title='JetBrains Teams', table=[{
+        'Team ID': team.id,
+        'Team Name': team.name,
+        'Team Slug': team.slug}
         for team in teams])
+        #'Total Licenses': team.total_licenses,
+        #'Free Licenses': team.unassigned_licenses}
+        
