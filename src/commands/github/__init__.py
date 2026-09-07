@@ -85,3 +85,17 @@ def github_teams(ctx: ExtendedContext):
     text = tree.show(key=lambda x: x.identifier, line_type='ascii-ex', stdout=False)
 
     ctx.chat.send_text('```\n' + text + '```\n')
+
+@github.command("members")
+@click.argument("team_slug")
+@click.pass_context
+def github_team_members(ctx: ExtendedContext, team_slug: str):
+    """Display members of a GitHub Team"""
+    members = GitHubApi().get_ent_team_members(team_slug)
+
+    if not members:
+        ctx.chat.send_text(f"No members found for team {team_slug}.")
+        return
+
+    table = [{'Username': member['login'], 'Name': member.get('name', ''), 'Email': member.get('email', '')} for member in members]
+    ctx.chat.send_table(title=f'Members of {team_slug}', table=table)
