@@ -164,31 +164,35 @@ crashlytics-build.properties
 fabric.properties
 
 ### Custom files
+.idea/
 .idea/cronnable-bots.iml
 .idea/encodings.xml
 .idea/inspectionProfiles/
 .idea/misc.xml
 .idea/modules.xml
 .idea/workspace.xml
-config/
-data/
-*.refresh_token
-*.pem
-*.crt
-setup_fiddler.sh
-*.pickle
-usernotes/
-modmail_to_slack.yml
-logs/
-logs-*.7z
-logs-*.tar.gz
-usernotes-*.yml
+
 .env.d/
-.idea/
-confusables.txt
-.vscode/
-.sourcetrail/
-oc.exe
-src/requirements.txt # temporary requirements file
 .run/
 .scratch/
+.sourcetrail/
+.vscode/
+
+config/
+data/
+logs/
+usernotes/
+
+*.crt
+*.pem
+*.pickle
+*.refresh_token
+
+confusables.txt
+logs-*.7z
+logs-*.tar.gz
+modmail_to_slack.yml
+oc.exe
+setup_fiddler.sh
+src/requirements.txt # temporary requirements file
+usernotes-*.yml
