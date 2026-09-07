@@ -10,6 +10,8 @@ BASE_URL = "https://account.jetbrains.com/api/v1"
 class JetBrainsTeam:
     id: str
     name: str
+    total_licenses: int
+    unassigned_licenses: int
 
     @property
     def slug(self):
@@ -47,11 +49,12 @@ class JetBrainsApi:
 
         There's no actual way to get all teams from the JetBrains API, so we have to get all licenses and then get the teams from the licenses.
         """
-        teams = set()
         all_licenses = self.get_all_licenses()
-        for license in all_licenses:
-            if 'team' in license and license['team']:
-                teams.add(JetBrainsTeam(id=license['team']['id'], name=license['team']['name']))
+        teams_raw = [dict(items) for items in {frozenset(lic['team'].items()) for lic in all_licenses}]
+        for team in teams_raw:
+            team['total_licenses'] = sum(1 for lic in all_licenses if lic.get('team') and lic['team']['id'] == team['id'])
+            team['unassigned_licenses'] = sum(1 for lic in all_licenses if lic.get('team') and lic['team']['id'] == team['id'] and lic.get('isAvailableToAssign'))
+        teams = [JetBrainsTeam(**team) for team in teams_raw]
         return sorted(teams, key=lambda x: x.name)
 
     def get_all_licenses(self):
