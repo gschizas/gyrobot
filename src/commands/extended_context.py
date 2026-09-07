@@ -25,6 +25,14 @@ class ExtendedContext(click.Context):
         return self.obj['logger']
 
     @property
+    def security_role(self) -> str | None:
+        """The permission role matched for the current command (e.g. 'default',
+        'requester', 'approver'), set by check_security/check_approval_security
+        on successful authorization. None if the command isn't permission-gated
+        or hasn't been authorized yet."""
+        return self.obj.get('security_role')
+
+    @property
     def subreddit(self) -> praw.reddit.Subreddit:
         return self.obj['subreddit']
 

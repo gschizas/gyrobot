@@ -4,6 +4,8 @@ import pathlib
 
 from ruamel.yaml import YAML
 
+from backend import permissions
+
 # Cache for data/crowd_users.yml used by user_allowed() when resolving '@group'
 # permissions. Initialised here so the global lookup in user_allowed never hits an
 # unbound name on first use.
@@ -18,13 +20,12 @@ def truthy_env(var_name: str) -> bool:
 def read_config(env_var):
     config, config_file = _read_config_core(env_var)
     credentials = _read_config_credentials(config_file)
-    permissions = _read_config_permissions(config_file)
     kubernetes_servers = _read_config_kubernetes()
-    _inject_config_extras(config, credentials, permissions, kubernetes_servers)
+    _inject_config_extras(config, credentials, kubernetes_servers)
     return config
 
 
-def _inject_config_extras(config: dict, credentials, permissions, servers):
+def _inject_config_extras(config: dict, credentials, servers):
     for env_name, env_cfg in config.get('environments', {}).items():
         if env_cfg is None:
             env_cfg = config['environments'][env_name] = {}
@@ -33,9 +34,6 @@ def _inject_config_extras(config: dict, credentials, permissions, servers):
             if isinstance(credentials_object, str):
                 credentials_object = credentials_object.replace('\n', '')
             env_cfg['credentials'] = credentials_object
-        if env_name in permissions:
-            env_cfg['users'] = permissions[env_name]['users']
-            env_cfg['channels'] = permissions[env_name]['channels']
         if env_name in servers:
             env_cfg['url'] = servers[env_name].get('url')
             env_cfg['cert'] = servers[env_name].get('cert')
@@ -46,15 +44,6 @@ def _read_config_kubernetes() -> dict:
     with (pathlib.Path('config') / 'kubernetes_servers.yml').open(encoding='utf8') as f:
         servers = yaml.load(f)
     return servers
-
-
-def _read_config_permissions(config_file) -> dict:
-    if (permissions_config := config_file.with_suffix('.permissions.yml')).exists():
-        with permissions_config.open(encoding='utf8') as f:
-            permissions = yaml.load(f)
-    else:
-        permissions = []
-    return permissions
 
 
 def _read_config_credentials(config_file) -> dict:
@@ -96,31 +85,47 @@ def user_allowed(chat_team_name, chat_user_id, allowed_users):
     return False
 
 
-def check_security(func=None, *, config=None):
-    if func is None:
-        return functools.partial(check_security, config=config)
+def check_security(func=None):
+    """Gate a click command using the ``permission_rules`` table (see
+    ``backend/permissions.py`` and ``scripts/migrate_permissions.py``).
 
-    default_config = config
+    Looks up the rule for ``func`` (keyed by ``func.__module__:func.__name__``)
+    and the command's ``namespace`` argument if it has one (falls back to
+    ``permissions.GLOBAL_ENVIRONMENT`` for commands with no per-namespace
+    axis), role ``'default'``. Denies by default (fails closed) when no rule
+    is configured, rather than silently allowing everyone.
+    """
+    if func is None:
+        return functools.partial(check_security)
+
+    function_name = permissions.function_full_name(func)
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         ctx = args[0]
         action_name: str = ctx.obj['security_text'][ctx.command.name]
         action_name_proper = action_name.capitalize()
-        namespace = kwargs.get('namespace')
-        # default_config: dict = kwargs.pop('config', [])
-        final_config = default_config if default_config else ctx.obj['config']
-        cfg = final_config['environments'][namespace]
-        # config = ctx.obj['config'][namespace]
-        allowed_users = cfg['users']
-        if not user_allowed(ctx.chat.team_name, ctx.chat.user_id, allowed_users):
+        environment = kwargs.get('namespace', permissions.GLOBAL_ENVIRONMENT)
+
+        rule = permissions.get_rule(function_name, environment)
+        if rule is None:
+            ctx.logger.warning(
+                f"No permission_rules row for {function_name!r} environment={environment!r} "
+                f"role='default' - denying by default.")
+            ctx.chat.send_text(
+                f"No permission rule configured for this command in environment "
+                f"`{environment}`; denying by default. Ask an administrator to add one.",
+                is_error=True)
+            return
+        if not user_allowed(ctx.chat.team_name, ctx.chat.user_id, rule['users']):
             ctx.chat.send_text(f"You don't have permission to {action_name}.", is_error=True)
             return
-        allowed_channels = cfg['channels']
+        allowed_channels = rule['channels']
         channel_name = ctx.chat.channel_name
-        if channel_name not in allowed_channels:
+        if '*' not in allowed_channels and channel_name not in allowed_channels:
             ctx.chat.send_text(f"{action_name_proper} commands are not allowed in {channel_name}", is_error=True)
             return
+        ctx.obj['security_role'] = permissions.DEFAULT_ROLE
         return ctx.invoke(func, *args, **kwargs)
 
     return wrapper
@@ -131,3 +136,4 @@ yaml = YAML()
 
 def _get_chat_user_id(user, chat_team_name):
     return user.get(f'$slack-user-id.{chat_team_name}', user.get('$slack-user-id'))
+

@@ -3,8 +3,11 @@
 The ``approvals`` group lets designated approvers review and act on requests queued
 by approval-gated commands such as ``onboard`` and ``offboard``. Approving a request
 executes the original command body. Approver permissions, the channels the group may
-be used in, and the self-approval policy all come from the YAML config pointed at by
-``APPROVAL_CONFIGURATION`` (see ``backend.approval`` / ``check_security``).
+be used in, and the self-approval policy all come from the ``permission_rules`` table
+(see ``backend.permissions`` / ``scripts/migrate_permissions.py``), resolved against
+the ``backend.approval.GLOBAL_APPROVAL_FUNCTION`` sentinel row rather than any single
+approval-gated command's own name, since these commands operate the whole shared
+queue (see ``backend.approval`` / ``check_approval_security``).
 """
 import os
 import traceback
@@ -36,6 +39,7 @@ def _resolve_ids(ids: tuple) -> Optional[List[int]]:
     if len(ids) == 1 and ids[0].lower() == 'all':
         return [row['id'] for row in list_pending()]
     try:
+        #TODO: Allow for ranges of ids (e.g. 1-5) and comma-separated lists (e.g. 1,3,5)
         return [int(one_id) for one_id in ids]
     except ValueError:
         return None

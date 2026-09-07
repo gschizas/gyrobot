@@ -7,11 +7,13 @@ run the ``approvals`` command group to approve/reject pending requests; on appro
 the original command body is executed via :func:`execute_approved`.
 
 Storage is PostgreSQL (psycopg3), configured through ``APPROVAL_DATABASE_URL``.
+Permissions (who may request/approve, allowed channels, ``notify_channel``,
+``allow_self``) come from the ``permission_rules`` table via
+``backend.permissions`` (see ``scripts/migrate_permissions.py``), not from YAML.
 Only commands whose click parameters are JSON-serializable can be gated.
 """
 import functools
 import os
-import pathlib
 from typing import Callable, List, Optional
 
 import click
@@ -19,67 +21,27 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from backend import permissions
 from backend.configuration import user_allowed
 from backend.email_logging import send_email_log
-from bot_framework.yaml_wrapper import yaml
+from commands.extended_context import ExtendedContext
 
 if 'APPROVAL_DATABASE_URL' not in os.environ:
     raise ImportError('APPROVAL_DATABASE_URL not found in environment')
 
-if 'APPROVAL_CONFIGURATION' not in os.environ:
-    raise ImportError('APPROVAL_CONFIGURATION not found in environment')
+# Roles distinguished within the approval queue: who may request approval-gated
+# commands vs. who may approve them. These match the `role` column values
+# written by scripts/migrate_permissions.py.
+ROLE_REQUEST = 'requester'
+ROLE_APPROVE = 'approver'
 
-# Roles distinguished *within* the single active environment (not separate
-# environments): who may request approval-gated commands vs. who may approve them.
-ROLE_REQUEST = 'request'
-ROLE_APPROVE = 'approve'
-
-# Each role maps to (users key, channels key) in the resolved permissions block.
-_ROLE_KEYS: dict = {
-    ROLE_REQUEST: ('requesters', 'request_channels'),
-    ROLE_APPROVE: ('approvers', 'approve_channels'),
-}
-
-
-def _read_security_config() -> dict:
-    """Load the approval security config (core YAML + sibling ``.permissions.yml``).
-
-    The core file selects the single active ``environment`` and the self-approval
-    policy; the permissions file holds, per environment, ``requesters`` /
-    ``approvers`` (users), ``request_channels`` / ``approve_channels`` and the
-    ``notify_channel``. Mirrors the file-resolution convention of
-    :func:`backend.configuration.read_config`.
-    """
-    raw = os.environ['APPROVAL_CONFIGURATION']
-    config_file = pathlib.Path(raw) if raw.startswith('/') else pathlib.Path('config') / raw
-    with config_file.open(encoding='utf8') as f:
-        core = yaml.load(f) or {}
-
-    permissions = {}
-    permissions_file = config_file.with_suffix('.permissions.yml')
-    if permissions_file.exists():
-        with permissions_file.open(encoding='utf8') as f:
-            permissions = yaml.load(f) or {}
-
-    environment = core.get('environment')
-    if environment is None:
-        if len(permissions) == 1:
-            environment = next(iter(permissions))
-        else:
-            raise ValueError(
-                "Approval config must set `environment:` when the permissions file "
-                "defines more than one environment")
-    env_perms = permissions.get(environment) or {}
-
-    return {
-        'environment': environment,
-        'allow_self': bool(core.get('allow_self', False)),
-        'requesters': env_perms.get('requesters', []),
-        'request_channels': env_perms.get('request_channels', []),
-        'approvers': env_perms.get('approvers', []),
-        'approve_channels': env_perms.get('approve_channels', []),
-        'notify_channel': env_perms.get('notify_channel'),
-    }
+# Sentinel function name for the approval queue's *own* commands
+# (commands/approvals.py: list/show/approve/reject) - these gate access to the
+# whole queue, not any single approval-gated command, so they resolve against
+# a fixed row rather than their own module:function name. requires_approval's
+# per-command requester checks still resolve against the actual gated
+# function's own name (see `wrapper` below).
+GLOBAL_APPROVAL_FUNCTION = 'backend.approval:_global'
 
 
 # Registry of approval-gated click commands, keyed by command name. Populated by the
@@ -185,54 +147,63 @@ def set_result(request_id: int, status: str, result: str) -> None:
 
 
 def _allow_self_approval() -> bool:
-    return bool(_read_security_config().get('allow_self', False))
+    rule = permissions.get_rule(GLOBAL_APPROVAL_FUNCTION, permissions.GLOBAL_ENVIRONMENT, ROLE_APPROVE)
+    return bool(((rule or {}).get('extra') or {}).get('meta', {}).get('allow_self', False))
 
 
 def _notify_channel() -> Optional[str]:
-    channel = _read_security_config().get('notify_channel')
-    return channel or None
+    rule = permissions.get_rule(GLOBAL_APPROVAL_FUNCTION, permissions.GLOBAL_ENVIRONMENT, ROLE_APPROVE)
+    return ((rule or {}).get('extra') or {}).get('notify_channel') or None
 
 
-def security_check(ctx, role: str, command_name: str, action_name: str) -> bool:
-    """Validate the calling user and channel for ``role`` against the YAML config.
+def security_check(ctx: ExtendedContext, role: str, function_name: str, action_name: str) -> bool:
+    """Validate the calling user and channel for ``role`` against the
+    ``permission_rules`` table (see ``backend.permissions``).
 
     Resembles :func:`backend.configuration.check_security`: checks the user with
     :func:`user_allowed` and verifies the channel is permitted (``*`` allows any).
-    ``role`` selects requester vs. approver lists within the single active
-    environment. Sends an error message and returns ``False`` when not permitted.
+    ``role`` selects requester vs. approver rules for ``function_name``. Denies by
+    default (fails closed) when no rule is configured. On success, records the
+    matched role on ``ctx.obj['security_role']`` (see ``ExtendedContext.security_role``).
     """
+    rule = permissions.get_rule(function_name, permissions.GLOBAL_ENVIRONMENT, role)
+    if rule is None:
+        ctx.logger.warning(
+            f"No permission_rules row for {function_name!r} "
+            f"environment={permissions.GLOBAL_ENVIRONMENT!r} role={role!r} - denying by default.")
+        ctx.chat.send_text(
+            f"No permission rule configured for `{function_name}` (role `{role}`); "
+            f"denying by default. Ask an administrator to add one.", is_error=True)
+        return False
     action_proper = action_name.capitalize()
-    users_key, channels_key = _ROLE_KEYS[role]
-    allowed_users = _read_security_config().get(users_key, [])
-    if not user_allowed(ctx.chat.team_name, ctx.chat.user_id, allowed_users):
+    if not user_allowed(ctx.chat.team_name, ctx.chat.user_id, rule['users']):
         ctx.chat.send_text(f"You don't have permission to {action_name}.", is_error=True)
         return False
-    allowed_channels_full = _read_security_config().get(channels_key, {})
-    if isinstance(allowed_channels_full, dict):
-        allowed_channels = allowed_channels_full.get(command_name, ['*'])
-    elif isinstance(allowed_channels_full, list):
-        allowed_channels = allowed_channels_full
+    allowed_channels = rule['channels']
     channel_name = ctx.chat.channel_name
     if '*' not in allowed_channels and channel_name not in allowed_channels:
         ctx.chat.send_text(f"{action_proper} commands are not allowed in {channel_name}", is_error=True)
         return False
+    ctx.obj['security_role'] = role
     return True
 
 
 def check_approval_security(func: Callable = None, *, role: str = None):
-    """``check_security``-style decorator for approval commands.
+    """``check_security``-style decorator for approval-queue-management commands
+    (``commands/approvals.py``: list/show/approve/reject).
 
     Reads the human-readable action label from ``ctx.obj['security_text'][command]``
-    and gates execution on :func:`security_check` for the given ``role``. Place it
-    *below* ``@click.pass_context``.
+    and gates execution on :func:`security_check` against ``GLOBAL_APPROVAL_FUNCTION``
+    for the given ``role`` (these commands operate the shared queue as a whole, not
+    any single approval-gated command). Place it *below* ``@click.pass_context``.
     """
     if func is None:
         return functools.partial(check_approval_security, role=role)
 
     @functools.wraps(func)
-    def wrapper(ctx, *args, **kwargs):
+    def wrapper(ctx: ExtendedContext, *args, **kwargs):
         action_name = ctx.obj['security_text'][ctx.command.name]
-        if not security_check(ctx, role, ctx.command.name, action_name):
+        if not security_check(ctx, role, GLOBAL_APPROVAL_FUNCTION, action_name):
             return
         return ctx.invoke(func, ctx, *args, **kwargs)
 
@@ -263,11 +234,11 @@ def requires_approval(func: Callable = None, *, summarize: Callable = None,
         return functools.partial(requires_approval, summarize=summarize, validate=validate)
 
     @functools.wraps(func)
-    def wrapper(ctx, *args, **kwargs):
+    def wrapper(ctx: ExtendedContext, *args, **kwargs):
         if ctx.obj.get('_approved_execution'):
             return ctx.invoke(func, ctx, *args, **kwargs)
 
-        command_name = func.__module__ + ':' + func.__name__
+        command_name = permissions.function_full_name(func)
         if not security_check(ctx, ROLE_REQUEST, command_name, f"request {command_name}"):
             return
 
@@ -296,7 +267,7 @@ def requires_approval(func: Callable = None, *, summarize: Callable = None,
             send_email_log('onboarding', **params)
         return None
 
-    APPROVAL_COMMANDS[func.__module__ + ':' + func.__name__] = wrapper
+    APPROVAL_COMMANDS[permissions.function_full_name(func)] = wrapper
     wrapper._approval_callback = func
     return wrapper
 
