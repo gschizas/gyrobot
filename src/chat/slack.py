@@ -36,6 +36,9 @@ class SlackConversation(Conversation):
             username=self.bot_name)
 
     def send_table(self, title: str, table: List[Dict], table_format: TableFormat = TableFormat.TABLE) -> None:
+        def cell_value(value) -> str:
+            return '\xA0' if value == '' else str(value)
+
         if table_format == TableFormat.EXCEL or truthy_env('SEND_TABLES_AS_EXCEL'):
             excel_data = self.make_excel_table(table)
             self.send_file(excel_data, filename=f'{title}.xlsx')
@@ -44,7 +47,7 @@ class SlackConversation(Conversation):
             self.send_file(file_data=table_markdown.encode(), filename=f'{title}.txt')
         elif table_format == TableFormat.TABLE:
             header_row = [{"type": "raw_text", "text": key} for key in table[0].keys()]
-            data_rows = [[{"type": "raw_text", "text": str(value)} for value in row.values()] for row in table]
+            data_rows = [[{"type": "raw_text", "text": cell_value(value)} for value in row.values()] for row in table]
             table_block = {
                 "type": "table",
                 "column_settings": [
