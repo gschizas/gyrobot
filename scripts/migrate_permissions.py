@@ -201,6 +201,49 @@ def migrate_check_security(config_dir: pathlib.Path, result: dict, warnings: lis
         result[func_name] = {'environments': merged_envs}
 
 
+def extract_user_comments(seq, warnings: list) -> dict:
+    """Pull per-user metadata out of end-of-line comments on a ruamel
+    CommentedSeq of user ids, e.g.::
+
+        - U123456789Z  # Pikos Apikos / tg-reporters-international
+        - U234567890Z  # asfichtocheris
+
+    Returns ``{user_id: {'name': str, 'team': [str, ...]}}``. Entries with no
+    comment (or a non-string item, e.g. ``'*'`` with no annotation) are
+    omitted. This is only meaningful for approvals.permissions.yml, which is
+    hand-maintained with these annotations; the other legacy permission files
+    don't use this convention.
+    """
+    info: dict = {}
+    ca_items = getattr(seq, 'ca', None)
+    ca_items = ca_items.items if ca_items is not None else {}
+    for idx, user_id in enumerate(seq):
+        if not isinstance(user_id, str) or user_id == '*':
+            continue
+        tokens = ca_items.get(idx)
+        if not tokens or tokens[0] is None:
+            continue
+        comment = tokens[0].value.lstrip('#').strip()
+        if not comment:
+            continue
+        name_part, sep, team_part = comment.partition('/')
+        name = name_part.strip()
+        teams = [t.strip() for t in team_part.split(',') if t.strip()] if sep else []
+        if not name:
+            continue
+        entry = {'name': name}
+        if teams:
+            entry['team'] = teams
+        if user_id in info and info[user_id] != entry:
+            warnings.append(
+                f"[review] approvals.permissions.yml: user {user_id!r} appears "
+                f"more than once with conflicting comment annotations "
+                f"({info[user_id]!r} vs {entry!r}) - keeping the first one seen")
+            continue
+        info[user_id] = entry
+    return info
+
+
 def migrate_approvals(config_dir: pathlib.Path, result: dict, warnings: list):
     core = load_yaml(config_dir / 'approvals.yml', warnings) or {}
     permissions = load_yaml(config_dir / 'approvals.permissions.yml', warnings) or {}
@@ -220,6 +263,17 @@ def migrate_approvals(config_dir: pathlib.Path, result: dict, warnings: list):
     approve_channels = env_perms.get('approve_channels', [])
     notify_channel = env_perms.get('notify_channel')
     request_channels_cfg = env_perms.get('request_channels', {})
+
+    # Hand-maintained `# Display Name / team-name` (or just `# Display Name`)
+    # comments on requesters/approvers entries - not part of the YAML data
+    # model, but valuable enough to carry over into `meta.user_info` rather
+    # than silently drop on migration. Keyed by user id; requesters take
+    # precedence on conflict (see extract_user_comments).
+    user_info: dict = {}
+    for entry_id, entry in extract_user_comments(approvers, warnings).items():
+        user_info.setdefault(entry_id, entry)
+    for entry_id, entry in extract_user_comments(requesters, warnings).items():
+        user_info[entry_id] = entry
 
     default_request_channels = ['*']
     per_function_channels: dict = {}
@@ -262,6 +316,7 @@ def migrate_approvals(config_dir: pathlib.Path, result: dict, warnings: list):
             'meta': {
                 'environment': environment,
                 'allow_self': core.get('allow_self', False),
+                'user_info': user_info,
             },
         }
 
@@ -286,6 +341,7 @@ def migrate_approvals(config_dir: pathlib.Path, result: dict, warnings: list):
         'meta': {
             'environment': environment,
             'allow_self': core.get('allow_self', False),
+            'user_info': user_info,
         },
     }
 
@@ -299,7 +355,11 @@ def migrate_approvals(config_dir: pathlib.Path, result: dict, warnings: list):
                     'approver': {'users': approvers, 'channels': approve_channels},
                 },
                 'notify_channel': notify_channel,
-                'meta': {'environment': environment, 'allow_self': core.get('allow_self', False)},
+                'meta': {
+                    'environment': environment,
+                    'allow_self': core.get('allow_self', False),
+                    'user_info': user_info,
+                },
             })
 
 
