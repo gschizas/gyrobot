@@ -5,6 +5,7 @@ from treelib import Tree
 
 from commands import gyrobot, DefaultCommandGroup
 from backend.github_api import GitHubApi
+from backend.github_teams import build_team_connections
 from commands.extended_context import ExtendedContext
 
 if 'GITHUB_TOKEN' not in os.environ:
@@ -35,50 +36,8 @@ def github_teams(ctx: ExtendedContext):
         for branch_name in sorted(connections.get(node_name, []), key=lambda x: x.lower()):
             generate_tree(branch_name, parent)
 
-    def clean_slug(t):
-        return t['slug'].removeprefix('ent:')
-
     teams = GitHubApi().get_ent_teams()
-
-    connections = {}
-    all_nodes = set()
-
-    # Extract all unique path segments
-    for team in teams:
-        slug = clean_slug(team)
-        parts = slug.split('-')
-
-        # Add all intermediate paths
-        for i in range(1, len(parts) + 1):
-            node_path = '-'.join(parts[:i])
-            all_nodes.add(node_path)
-
-    # Build the tree by connecting each node to its parent
-    for node in all_nodes:
-        parts = node.split('-')
-
-        if len(parts) == 1:
-            # Root level - add to root
-            if 'root' not in connections:
-                connections['root'] = []
-            connections['root'].append(node)
-        else:
-            # Find parent path (everything except the last segment)
-            parent_path = '-'.join(parts[:-1])
-            if parent_path not in connections:
-                connections[parent_path] = []
-            connections[parent_path].append(node)
-
-    # Sort all lists
-    for key in connections:
-        connections[key] = sorted(connections[key])
-
-    if len(connections['root']) == 1:
-        root_item = connections['root'][0]
-        connections.pop('root')
-    else:
-        root_item = 'GitHub'
-        connections[root_item] = connections.pop('root')
+    connections, root_item, _slug_set = build_team_connections(teams)
 
     tree = Tree()
     generate_tree(root_item)
