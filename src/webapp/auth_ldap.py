@@ -3,10 +3,8 @@
 Authenticates a username/password pair by performing a direct LDAP simple
 bind as that user (no service account required). Configure via:
 
-* ``LDAP_SERVER_URL`` -- e.g. ``ldaps://ldap.example.com`` or ``ldap://ldap.example.com``
-* ``LDAP_BIND_DN_TEMPLATE`` -- a DN template with a ``{username}`` placeholder,
-  e.g. ``uid={username},ou=People,dc=example,dc=com`` or, for Active Directory,
-  ``{username}@example.com``.
+* ``LDAP_SERVER`` the server name
+* ``LDAP_USERNAME_PATTERN`` include the domain if needed, i.e. DOMAIN\\user
 """
 import logging
 import os
@@ -25,7 +23,7 @@ def ldap_authenticate(username: str, password: str) -> bool:
         return False
 
     server_name = os.environ['LDAP_SERVER']
-    username_pattern = os.environ['USERNAME_PATTERN']
+    username_pattern = os.environ['LDAP_USERNAME_PATTERN']
     username_with_domain = username_pattern.format(username)
 
     try:
