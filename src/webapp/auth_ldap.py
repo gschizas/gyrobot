@@ -24,22 +24,22 @@ def ldap_authenticate(username: str, password: str) -> bool:
     if not username or not password:
         return False
 
-    try:
-        server_url = os.environ['LDAP_SERVER_URL']
-        bind_dn_template = os.environ['LDAP_BIND_DN_TEMPLATE']
-    except KeyError as e:
-        raise RuntimeError(f"{e.args[0]} not set - required for LDAP authentication.")
+    server_name = os.environ['LDAP_SERVER']
+    username_pattern = os.environ['USERNAME_PATTERN']
+    username_with_domain = username_pattern.format(username)
 
-    user_dn = bind_dn_template.format(username=username)
-    use_ssl = server_url.lower().startswith('ldaps://')
+    # Print them explicitly
+    print(f"Working server: {os.getenv('LDAP_SERVER')}")
+    print(f"Non-working server: {server_name}")
+    print(f"Are they equal? {os.getenv('LDAP_SERVER') == server_name}")
 
     try:
-        server = ldap3.Server(server_url, use_ssl=use_ssl, get_info=None)
-        connection = ldap3.Connection(server, user=user_dn, password=password)
+        server = ldap3.Server(server_name, get_info=ldap3.ALL)
+        connection = ldap3.Connection(server, user=username_with_domain, password=password, authentication=ldap3.NTLM)
         if not connection.bind():
             return False
         connection.unbind()
         return True
-    except LDAPException:
+    except LDAPException as e:
         logger.warning(f"LDAP authentication failed for {username!r}", exc_info=True)
         return False
