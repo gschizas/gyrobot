@@ -28,11 +28,6 @@ def ldap_authenticate(username: str, password: str) -> bool:
     username_pattern = os.environ['USERNAME_PATTERN']
     username_with_domain = username_pattern.format(username)
 
-    # Print them explicitly
-    print(f"Working server: {os.getenv('LDAP_SERVER')}")
-    print(f"Non-working server: {server_name}")
-    print(f"Are they equal? {os.getenv('LDAP_SERVER') == server_name}")
-
     try:
         server = ldap3.Server(server_name, get_info=ldap3.ALL)
         connection = ldap3.Connection(server, user=username_with_domain, password=password, authentication=ldap3.NTLM)
