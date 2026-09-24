@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Log in - GyroBot Onboarding{% endblock %}
+{% block content %}
+<h1>Log in</h1>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+<form method="post" action="/login">
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" autocomplete="current-password" required>
+    <button type="submit">Log in</button>
+</form>
+<p style="margin-top:1rem;color:#57606a;font-size:0.9rem">Authenticated against the organization's LDAP directory.</p>
+{% endblock %}

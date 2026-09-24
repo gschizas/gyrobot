@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} - GyroBot Onboarding{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+<form method="post" action="/onboarding/{{ action }}" id="onboarding-form">
+    {% for f in fields %}
+        {% if f.type == 'team_tree' %}
+            <label for="{{ f.name }}_search">{{ f.label }}</label>
+            {% if team_tree %}
+            <input type="text" id="{{ f.name }}_search" class="tree-search" placeholder="Filter teams...">
+            <div class="tree" id="{{ f.name }}-tree" data-tree='{{ team_tree | tojson }}'></div>
+            <div id="{{ f.name }}_selected" class="tree-selected">No team selected</div>
+            <input type="hidden" id="{{ f.name }}" name="{{ f.name }}" {% if f.required %}required{% endif %}>
+            {% else %}
+            {% if team_tree_error %}<div class="error">{{ team_tree_error }}</div>{% endif %}
+            <input type="text" id="{{ f.name }}" name="{{ f.name }}" {% if f.required %}required{% endif %}>
+            {% endif %}
+        {% else %}
+            <label for="{{ f.name }}">{{ f.label }}</label>
+            <input type="text" id="{{ f.name }}" name="{{ f.name }}" {% if f.required %}required{% endif %}>
+        {% endif %}
+    {% endfor %}
+    <button type="submit">Submit</button>
+</form>
+<p><a href="/onboarding">&larr; Back to onboarding</a></p>
+
+{% if team_tree %}
+<script>
+(function () {
+    function renderTree(container, hiddenInput, selectedLabel, treeData) {
+        function makeNode(node) {
+            const li = document.createElement('li');
+            const row = document.createElement('div');
+            row.className = 'tree-row';
+
+            const hasChildren = node.children && node.children.length > 0;
+            let childrenUl = null;
+
+            const toggle = document.createElement('span');
+            toggle.className = 'tree-toggle' + (hasChildren ? '' : ' tree-toggle-empty');
+            toggle.textContent = hasChildren ? '▾' : '';
+            if (hasChildren) {
+                toggle.addEventListener('click', function () {
+                    const collapsed = childrenUl.classList.toggle('collapsed');
+                    toggle.textContent = collapsed ? '▸' : '▾';
+                });
+            }
+            row.appendChild(toggle);
+
+            const label = document.createElement('span');
+            label.textContent = node.label;
+            if (node.value) {
+                label.className = 'tree-label tree-selectable';
+                label.addEventListener('click', function () {
+                    const previous = container.querySelector('.tree-label.tree-selected-node');
+                    if (previous) previous.classList.remove('tree-selected-node');
+                    label.classList.add('tree-selected-node');
+                    hiddenInput.value = node.value;
+                    selectedLabel.textContent = 'Selected team: ' + node.value;
+                });
+            } else {
+                label.className = 'tree-label tree-folder';
+            }
+            row.appendChild(label);
+            li.appendChild(row);
+
+            if (hasChildren) {
+                childrenUl = document.createElement('ul');
+                childrenUl.className = 'tree-children';
+                node.children.forEach(function (child) { childrenUl.appendChild(makeNode(child)); });
+                li.appendChild(childrenUl);
+            }
+            return li;
+        }
+
+        const rootUl = document.createElement('ul');
+        rootUl.className = 'tree-root';
+        rootUl.appendChild(makeNode(treeData));
+        container.innerHTML = '';
+        container.appendChild(rootUl);
+    }
+
+    function filterTree(container, query) {
+        const lowerQuery = query.trim().toLowerCase();
+        const items = container.querySelectorAll('li');
+        items.forEach(function (li) {
+            if (!lowerQuery) {
+                li.style.display = '';
+                const ul = li.querySelector(':scope > ul.tree-children');
+                if (ul) ul.classList.remove('collapsed');
+                return;
+            }
+            const label = li.querySelector(':scope > .tree-row > .tree-label');
+            const text = label ? label.textContent.toLowerCase() : '';
+            const descendantMatch = Array.from(li.querySelectorAll('.tree-label')).some(function (l) {
+                return l.textContent.toLowerCase().includes(lowerQuery);
+            });
+            li.style.display = (text.includes(lowerQuery) || descendantMatch) ? '' : 'none';
+            const ul = li.querySelector(':scope > ul.tree-children');
+            if (ul && descendantMatch) ul.classList.remove('collapsed');
+        });
+    }
+
+    document.querySelectorAll('.tree').forEach(function (container) {
+        const fieldName = container.id.replace(/-tree$/, '');
+        const hiddenInput = document.getElementById(fieldName);
+        const selectedLabel = document.getElementById(fieldName + '_selected');
+        const treeData = JSON.parse(container.getAttribute('data-tree'));
+        renderTree(container, hiddenInput, selectedLabel, treeData);
+
+        const searchBox = document.getElementById(fieldName + '_search');
+        if (searchBox) {
+            searchBox.addEventListener('input', function () {
+                filterTree(container, searchBox.value);
+            });
+        }
+    });
+
+    const form = document.getElementById('onboarding-form');
+    if (form) {
+        form.addEventListener('submit', function (event) {
+            form.querySelectorAll('.tree').forEach(function (container) {
+                const fieldName = container.id.replace(/-tree$/, '');
+                const hiddenInput = document.getElementById(fieldName);
+                if (hiddenInput.hasAttribute('required') && !hiddenInput.value) {
+                    event.preventDefault();
+                    alert('Please select a team from the tree.');
+                }
+            });
+        });
+    }
+})();
+</script>
+{% endif %}
+{% endblock %}

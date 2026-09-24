@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Onboarding - GyroBot{% endblock %}
+{% block content %}
+<h1>Onboarding</h1>
+<p>Choose what to onboard/offboard a colleague for. Each request is queued for
+approval, exactly like the chat bot's <code>onboard</code>/<code>offboard</code> commands.</p>
+<ul class="actions">
+    {% for action, form in forms.items() %}
+    <li><a href="/onboarding/{{ action }}">{{ form.title }}</a></li>
+    {% endfor %}
+</ul>
+{% endblock %}

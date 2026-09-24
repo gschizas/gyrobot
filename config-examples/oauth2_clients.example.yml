@@ -1,0 +1,9 @@
+# Copy to config/oauth2_clients.yml (gitignored) and fill in real secrets, or
+# point OAUTH2_CLIENTS_CONFIGURATION at an absolute path elsewhere.
+#
+# Used by webapp.auth_oauth2 to validate REST API client_credentials requests
+# (POST /api/oauth/token) issued by machine clients calling the onboarding API.
+clients:
+  example-client-id:
+    secret: "change-me-to-a-long-random-secret"
+    description: "Example integration - replace or remove"
