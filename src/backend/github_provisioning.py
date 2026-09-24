@@ -74,9 +74,9 @@ def check_github_invitations() -> Dict[str, Any]:
                 if username not in all_user_logins:
                     results['failed'].append({
                         'username': username,
-                        'error': 'User not found in GitHub organization',
+                        'error': 'User not found in GitHub enterprise',
                     })
-                    logger.warning(f"User {username} not found in GitHub organization")
+                    logger.warning(f"User {username} not found in GitHub enterprise")
                     continue
                 logger.debug(f"Invitation for {username} has been accepted")
                 # Assign user to team
