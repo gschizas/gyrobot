@@ -8,5 +8,6 @@ approval, exactly like the chat bot's <code>onboard</code>/<code>offboard</code>
     {% for action, form in forms.items() %}
     <li><a href="{{request.url_for('onboarding_form', action=action) }}">{{ form.title }}</a></li>
     {% endfor %}
+    <li><a href="{{ request.url_for('github_bulk_form') }}">Bulk onboard: GitHub Copilot (multiple users)</a></li>
 </ul>
 {% endblock %}

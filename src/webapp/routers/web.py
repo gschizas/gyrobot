@@ -162,6 +162,48 @@ async def onboarding_submit(request: Request, action: str):
         request, 'result.html', {'user': user, 'title': form_def['title'], 'result': result})
 
 
+@router.get('/onboarding/github/bulk', include_in_schema=False)
+def github_bulk_form(request: Request):
+    if redirect := _require_login(request):
+        return redirect
+    team_tree, team_tree_error = _github_team_tree()
+    team_options = GitHubApi.flatten_team_tree(team_tree) if team_tree else None
+    return templates.TemplateResponse(request, 'bulk_github.html', {
+        'user': _current_user(request), 'team_tree': team_tree, 'team_tree_error': team_tree_error,
+        'team_options': team_options,
+    })
+
+
+@router.post('/onboarding/github/bulk', include_in_schema=False)
+async def github_bulk_submit(request: Request):
+    if redirect := _require_login(request):
+        return redirect
+
+    form_data = await request.form()
+    usernames = form_data.getlist('username')
+    emails = form_data.getlist('email')
+    teams = form_data.getlist('team')
+
+    user = _current_user(request)
+    rows = []
+    for username, email, team in zip(usernames, emails, teams):
+        username, email, team = username.strip(), email.strip(), team.strip()
+        if not (username or email or team):
+            continue  # fully blank row - silently skipped
+
+        if not (username and email and team):
+            rows.append({'username': username, 'email': email, 'team': team, 'result': None,
+                        'error': 'Missing GitHub username, email, or team.'})
+            continue
+
+        result = run_bot_command(
+            ['onboard', 'github', username, email, team], user_id=user,
+            channel_name=config.web_channel_name(), team_name=config.web_team_name())
+        rows.append({'username': username, 'email': email, 'team': team, 'result': result, 'error': None})
+
+    return templates.TemplateResponse(request, 'bulk_result.html', {'user': user, 'rows': rows})
+
+
 def _build_args(action: str, form_data) -> list[str] | None:
     if action == 'github':
         return ['onboard', 'github', form_data['username'], form_data['email'], form_data['team']]

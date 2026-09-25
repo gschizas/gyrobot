@@ -20,9 +20,9 @@ from fastapi.security import OAuth2PasswordBearer
 from webapp import config
 from webapp.auth_oauth2 import create_access_token, decode_access_token, validate_client_credentials
 from webapp.command_runner import run_bot_command
-from webapp.models import (CommandResult, CrowdOnboardRequest, GithubOnboardRequest,
-                           JetbrainsOnboardRequest, OffboardRequest, SlackOnboardRequest,
-                           TokenResponse)
+from webapp.models import (CommandResult, CrowdOnboardRequest, GithubBulkOnboardRequest,
+                           GithubOnboardRequest, JetbrainsOnboardRequest, OffboardRequest,
+                           SlackOnboardRequest, TokenResponse)
 
 router = APIRouter(prefix='/api', tags=['api'])
 
@@ -63,6 +63,18 @@ def _run(args: list[str], client_id: str) -> CommandResult:
 @router.post('/onboarding/github', response_model=CommandResult)
 def onboard_github(payload: GithubOnboardRequest, client_id: str = Depends(get_current_client)):
     return _run(['onboard', 'github', payload.username, payload.email, payload.team], client_id)
+
+
+@router.post('/onboarding/github/bulk', response_model=list[CommandResult])
+def onboard_github_bulk(payload: GithubBulkOnboardRequest, client_id: str = Depends(get_current_client)):
+    """Onboard multiple GitHub Copilot colleagues in one call.
+
+    Each item is run through the exact same ``onboard github`` command as
+    :func:`onboard_github` (including the approval queue), independently -
+    one item failing doesn't stop the rest from being processed.
+    """
+    return [_run(['onboard', 'github', item.username, item.email, item.team], client_id)
+            for item in payload.items]
 
 
 @router.post('/onboarding/crowd', response_model=CommandResult)

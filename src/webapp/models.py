@@ -10,6 +10,16 @@ class GithubOnboardRequest(BaseModel):
     team: str = Field(..., description="Enterprise team slug to assign once accepted")
 
 
+class GithubBulkOnboardItem(BaseModel):
+    username: str = Field(..., description="GitHub username to invite")
+    email: str = Field(..., description="Colleague's email address")
+    team: str = Field(..., description="Enterprise team slug to assign once accepted")
+
+
+class GithubBulkOnboardRequest(BaseModel):
+    items: List[GithubBulkOnboardItem] = Field(..., min_length=1)
+
+
 class CrowdOnboardRequest(BaseModel):
     username: str
     team: str

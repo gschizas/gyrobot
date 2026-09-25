@@ -1,0 +1,31 @@
+{% macro render_command_result(result) %}
+{% if result.success %}
+<div class="message">Command completed successfully.</div>
+{% else %}
+<div class="error">Command failed (exit code {{ result.exit_code }}){% if result.error %}: {{ result.error }}{% endif %}</div>
+{% endif %}
+
+{% for m in result.messages %}
+    {% if m.type == 'text' %}
+    <div class="message{% if m.is_error %} is-error{% endif %}">{{ m.text }}</div>
+    {% elif m.type in ('table', 'tables') %}
+    <div class="message"><strong>{{ m.title }}</strong>
+    {% if m.type == 'table' %}
+        <table>
+            {% if m.rows %}
+            <tr>{% for key in m.rows[0].keys() %}<th>{{ key }}</th>{% endfor %}</tr>
+            {% for row in m.rows %}<tr>{% for value in row.values() %}<td>{{ value }}</td>{% endfor %}</tr>{% endfor %}
+            {% endif %}
+        </table>
+    {% endif %}
+    </div>
+    {% elif m.type == 'file' %}
+    <div class="message">File generated: {{ m.filename }} ({{ m.size }} bytes)</div>
+    {% endif %}
+{% endfor %}
+
+{% if result.output %}
+<h2>Output</h2>
+<pre>{{ result.output }}</pre>
+{% endif %}
+{% endmacro %}

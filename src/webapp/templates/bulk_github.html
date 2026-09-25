@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Bulk onboard: GitHub Copilot - GyroBot Onboarding{% endblock %}
+{% block content %}
+<h1>Bulk onboard: GitHub Copilot</h1>
+<p>Add one row per colleague. GitHub username, email address, and enterprise team are
+all required per row; entirely blank rows are ignored. Type/paste a team slug directly,
+or use the browse (🌳) button to pick one from the team tree.</p>
+{% if team_tree_error %}<div class="error">{{ team_tree_error }}</div>{% endif %}
+<form method="post" action="{{ request.url_for('github_bulk_submit') }}" id="bulk-form">
+<table id="bulk-table">
+    <thead>
+        <tr><th>GitHub username</th><th>Email address</th><th>Team</th><th></th></tr>
+    </thead>
+    <tbody id="bulk-table-body"></tbody>
+</table>
+<button type="button" id="add-row">+ Add row</button>
+<button type="submit">Submit all</button>
+</form>
+<p><a href="{{ request.url_for('dashboard') }}">&larr; Back to onboarding</a></p>
+
+{% if team_options %}
+<datalist id="team-datalist">
+    {% for opt in team_options %}
+    <option value="{{ opt.value }}"></option>
+    {% endfor %}
+</datalist>
+{% endif %}
+
+<template id="row-template">
+    <tr>
+        <td><input type="text" name="username" placeholder="GitHub Login, no @, no emails"></td>
+        <td><input type="text" name="email" placeholder="your-email-here@eurobank.gr"></td>
+        <td>
+            <div class="team-cell">
+                <input type="text" name="team" class="team-input" placeholder="team-slug"
+                       {% if team_options %}list="team-datalist"{% endif %}>
+                {% if team_tree %}
+                <button type="button" class="browse-team" title="Browse teams">🌳</button>
+                {% endif %}
+            </div>
+        </td>
+        <td><button type="button" class="remove-row">&times;</button></td>
+    </tr>
+</template>
+
+{% if team_tree %}
+<div id="team-tree-modal" class="modal-overlay" hidden>
+    <div class="modal-box">
+        <div class="modal-header">
+            <h2>Select a team</h2>
+            <button type="button" id="team-tree-modal-close" aria-label="Close">&times;</button>
+        </div>
+        <input type="text" id="team-tree-modal-search" class="tree-search" placeholder="Filter teams...">
+        <div class="tree" id="team-tree-modal-tree"></div>
+    </div>
+</div>
+<div id="team-tree-data" data-tree='{{ team_tree | tojson }}' hidden></div>
+{% endif %}
+
+<script>
+(function () {
+    const template = document.getElementById('row-template');
+    const tbody = document.getElementById('bulk-table-body');
+
+    function addRow() {
+        const clone = template.content.cloneNode(true);
+        clone.querySelector('.remove-row').addEventListener('click', function (event) {
+            event.target.closest('tr').remove();
+        });
+        tbody.appendChild(clone);
+    }
+
+    document.getElementById('add-row').addEventListener('click', addRow);
+    for (let i = 0; i < 3; i++) addRow();
+
+    // --- Team tree browse modal (reuses the same tree widget as the
+    // single-entry onboarding form; see templates/form.html) ---
+    const modal = document.getElementById('team-tree-modal');
+    if (!modal) return;
+
+    const treeContainer = document.getElementById('team-tree-modal-tree');
+    const searchBox = document.getElementById('team-tree-modal-search');
+    const closeButton = document.getElementById('team-tree-modal-close');
+    const treeData = JSON.parse(document.getElementById('team-tree-data').getAttribute('data-tree'));
+    let activeInput = null;
+
+    function makeNode(node) {
+        const li = document.createElement('li');
+        const row = document.createElement('div');
+        row.className = 'tree-row';
+
+        const hasChildren = node.children && node.children.length > 0;
+        let childrenUl = null;
+
+        const toggle = document.createElement('span');
+        toggle.className = 'tree-toggle' + (hasChildren ? '' : ' tree-toggle-empty');
+        toggle.textContent = hasChildren ? '▾' : '';
+        if (hasChildren) {
+            toggle.addEventListener('click', function () {
+                const collapsed = childrenUl.classList.toggle('collapsed');
+                toggle.textContent = collapsed ? '▸' : '▾';
+            });
+        }
+        row.appendChild(toggle);
+
+        const label = document.createElement('span');
+        label.textContent = node.label;
+        if (node.value) {
+            label.className = 'tree-label tree-selectable';
+            label.addEventListener('click', function () {
+                if (activeInput) {
+                    activeInput.value = node.value;
+                    activeInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                closeModal();
+            });
+        } else {
+            label.className = 'tree-label tree-folder';
+        }
+        row.appendChild(label);
+        li.appendChild(row);
+
+        if (hasChildren) {
+            childrenUl = document.createElement('ul');
+            childrenUl.className = 'tree-children';
+            node.children.forEach(function (child) { childrenUl.appendChild(makeNode(child)); });
+            li.appendChild(childrenUl);
+        }
+        return li;
+    }
+
+    function renderTree() {
+        const rootUl = document.createElement('ul');
+        rootUl.className = 'tree-root';
+        rootUl.appendChild(makeNode(treeData));
+        treeContainer.innerHTML = '';
+        treeContainer.appendChild(rootUl);
+    }
+
+    function filterTree(query) {
+        const lowerQuery = query.trim().toLowerCase();
+        const items = treeContainer.querySelectorAll('li');
+        items.forEach(function (li) {
+            if (!lowerQuery) {
+                li.style.display = '';
+                const ul = li.querySelector(':scope > ul.tree-children');
+                if (ul) ul.classList.remove('collapsed');
+                return;
+            }
+            const label = li.querySelector(':scope > .tree-row > .tree-label');
+            const text = label ? label.textContent.toLowerCase() : '';
+            const descendantMatch = Array.from(li.querySelectorAll('.tree-label')).some(function (l) {
+                return l.textContent.toLowerCase().includes(lowerQuery);
+            });
+            li.style.display = (text.includes(lowerQuery) || descendantMatch) ? '' : 'none';
+            const ul = li.querySelector(':scope > ul.tree-children');
+            if (ul && descendantMatch) ul.classList.remove('collapsed');
+        });
+    }
+
+    function openModal(input) {
+        activeInput = input;
+        searchBox.value = '';
+        filterTree('');
+        modal.hidden = false;
+        searchBox.focus();
+    }
+
+    function closeModal() {
+        modal.hidden = true;
+        activeInput = null;
+    }
+
+    renderTree();
+    searchBox.addEventListener('input', function () { filterTree(searchBox.value); });
+    closeButton.addEventListener('click', closeModal);
+    modal.addEventListener('click', function (event) {
+        if (event.target === modal) closeModal();
+    });
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && !modal.hidden) closeModal();
+    });
+
+    // Event delegation so rows added later via "+ Add row" work automatically.
+    tbody.addEventListener('click', function (event) {
+        if (event.target.classList.contains('browse-team')) {
+            const input = event.target.closest('tr').querySelector('.team-input');
+            openModal(input);
+        }
+    });
+})();
+</script>
+{% endblock %}

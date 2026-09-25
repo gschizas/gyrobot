@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block title %}Bulk onboard: GitHub Copilot - Result{% endblock %}
+{% block content %}
+<h1>Bulk onboard: GitHub Copilot</h1>
+<p>{{ rows|length }} row(s) processed.</p>
+
+{% for row in rows %}
+<div class="bulk-row">
+    <h2>{{ row.username }}</h2>
+    <p>Email: {{ row.email }} &middot; Team: {{ row.team }}</p>
+    {% if row.error %}
+    <div class="error">{{ row.error }}</div>
+    {% else %}
+    {{ macros.render_command_result(row.result) }}
+    {% endif %}
+</div>
+{% endfor %}
+
+<p>
+    <a href="{{ request.url_for('github_bulk_form') }}">&larr; Add more</a> |
+    <a href="{{ request.url_for('dashboard') }}">Back to onboarding</a>
+</p>
+{% endblock %}

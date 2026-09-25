@@ -606,3 +606,20 @@ class GitHubApi():
             }
 
         return make_node(root_item)
+
+    @staticmethod
+    def flatten_team_tree(tree: dict) -> list:
+        """Flatten a ``build_team_tree`` result into a depth-ordered list of
+        ``{'value', 'label', 'depth'}`` dicts, one per real (assignable) team,
+        suitable for a ``<select>``/``<option>`` list where indentation
+        conveys the hierarchy that the nested tree widget shows visually."""
+        options = []
+
+        def visit(node: dict, depth: int) -> None:
+            if node.get('value'):
+                options.append({'value': node['value'], 'label': node['label'], 'depth': depth})
+            for child in node.get('children', []):
+                visit(child, depth + 1)
+
+        visit(tree, 0)
+        return options
