@@ -40,8 +40,8 @@
 </head>
 <body>
 <header>
-    <a href="/onboarding">GyroBot Onboarding</a>
-    {% if user %}<span>{{ user }} &middot; <a href="/logout">Log out</a></span>{% endif %}
+    <a href="{{request.url_for('dashboard')}}">GyroBot Onboarding</a>
+    {% if user %}<span>{{ user }} &middot; <a href="{{request.url_for('logout')}}">Log out</a></span>{% endif %}
 </header>
 <main>
 {% block content %}{% endblock %}

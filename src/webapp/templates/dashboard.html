@@ -6,7 +6,7 @@
 approval, exactly like the chat bot's <code>onboard</code>/<code>offboard</code> commands.</p>
 <ul class="actions">
     {% for action, form in forms.items() %}
-    <li><a href="/onboarding/{{ action }}">{{ form.title }}</a></li>
+    <li><a href="{{request.url_for('onboarding_form', action=action) }}">{{ form.title }}</a></li>
     {% endfor %}
 </ul>
 {% endblock %}

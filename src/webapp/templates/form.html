@@ -2,7 +2,7 @@
 {% block title %}{{ title }} - GyroBot Onboarding{% endblock %}
 {% block content %}
 <h1>{{ title }}</h1>
-<form method="post" action="/onboarding/{{ action }}" id="onboarding-form">
+<form method="post" action="{{request.url_for('onboarding_form', action=action) }}" id="onboarding-form">
     {% for f in fields %}
         {% if f.type == 'team_tree' %}
             <label for="{{ f.name }}_search">{{ f.label }}</label>
@@ -22,7 +22,7 @@
     {% endfor %}
     <button type="submit">Submit</button>
 </form>
-<p><a href="/onboarding">&larr; Back to onboarding</a></p>
+<p><a href="{{request.url_for('dashboard')}}">&larr; Back to onboarding</a></p>
 
 {% if team_tree %}
 <script>

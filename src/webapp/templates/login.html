@@ -3,7 +3,7 @@
 {% block content %}
 <h1>Log in</h1>
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
-<form method="post" action="/login">
+<form method="post" action="{{ request.url_for('login_form') }}">
     <label for="username">Username</label>
     <input type="text" id="username" name="username" autocomplete="username" required autofocus>
     <label for="password">Password</label>

@@ -76,7 +76,7 @@ def _current_user(request: Request) -> str | None:
 
 def _require_login(request: Request) -> Optional[RedirectResponse]:
     if not _current_user(request):
-        return RedirectResponse(url='/login', status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(url=request.url_for('login_form'), status_code=status.HTTP_302_FOUND)
     return None
 
 
@@ -96,13 +96,13 @@ def _github_team_tree() -> tuple[Optional[dict], Optional[str]]:
 
 @router.get('/', include_in_schema=False)
 def index(request: Request):
-    return RedirectResponse(url='/onboarding' if _current_user(request) else '/login')
+    return RedirectResponse(url=request.url_for('dashboard') if _current_user(request) else request.url_for('login_form'))
 
 
 @router.get('/login', include_in_schema=False)
 def login_form(request: Request):
     if _current_user(request):
-        return RedirectResponse(url='/onboarding', status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(url=request.url_for('dashboard'), status_code=status.HTTP_302_FOUND)
     return templates.TemplateResponse(request, 'login.html', {'error': None})
 
 
@@ -110,7 +110,7 @@ def login_form(request: Request):
 def login_submit(request: Request, username: str = Form(...), password: str = Form(...)):
     if ldap_authenticate(username, password):
         request.session['user'] = username
-        return RedirectResponse(url='/onboarding', status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(url=request.url_for('dashboard'), status_code=status.HTTP_302_FOUND)
     return templates.TemplateResponse(
         request, 'login.html', {'error': 'Invalid username or password'},
         status_code=status.HTTP_401_UNAUTHORIZED)
@@ -119,7 +119,7 @@ def login_submit(request: Request, username: str = Form(...), password: str = Fo
 @router.get('/logout', include_in_schema=False)
 def logout(request: Request):
     request.session.clear()
-    return RedirectResponse(url='/login', status_code=status.HTTP_302_FOUND)
+    return RedirectResponse(url=request.url_for('login_form'), status_code=status.HTTP_302_FOUND)
 
 
 @router.get('/onboarding', include_in_schema=False)

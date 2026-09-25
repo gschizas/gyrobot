@@ -32,5 +32,5 @@
 <pre>{{ result.output }}</pre>
 {% endif %}
 
-<p><a href="/onboarding">&larr; Back to onboarding</a></p>
+<p><a href="{{request.url_for('dashboard')}}">&larr; Back to onboarding</a></p>
 {% endblock %}
