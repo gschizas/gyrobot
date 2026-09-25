@@ -94,6 +94,18 @@ def _github_team_tree() -> tuple[Optional[dict], Optional[str]]:
         return None, f"Could not load the GitHub team list ({ex}); enter the team slug manually."
 
 
+def _github_email_placeholder() -> str:
+    """Example email address for the bulk onboarding form, derived from the
+    ``allowed_email_domains`` configured in ``config/github.yml`` (falls back
+    to a generic example if unset/unavailable)."""
+    try:
+        domains = GitHubApi().allowed_email_domains
+    except Exception:
+        domains = None
+    domain = domains[0] if domains else 'example.com'
+    return f'your-email-here@{domain}'
+
+
 @router.get('/', include_in_schema=False)
 def index(request: Request):
     return RedirectResponse(url=request.url_for('dashboard') if _current_user(request) else request.url_for('login_form'))
@@ -170,7 +182,7 @@ def github_bulk_form(request: Request):
     team_options = GitHubApi.flatten_team_tree(team_tree) if team_tree else None
     return templates.TemplateResponse(request, 'bulk_github.html', {
         'user': _current_user(request), 'team_tree': team_tree, 'team_tree_error': team_tree_error,
-        'team_options': team_options,
+        'team_options': team_options, 'email_placeholder': _github_email_placeholder(),
     })
 
 

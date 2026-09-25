@@ -50,9 +50,10 @@ def _github_validate(params: dict) -> str | None:
 
     if '@' in email:
         domain = email.split('@')[1]
-        if domain not in ('eurobank.gr', 'terrasoft.gr'):
+        allowed_domains = github_client.allowed_email_domains
+        if allowed_domains and domain not in allowed_domains:
             raise RuntimeError(f"Invalid Email Domain {domain}.")
-        if domain == 'eurobank.gr':
+        if domain in github_client.ad_check_email_domains:
             # check email with active directory
             pass
 

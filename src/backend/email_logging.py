@@ -23,7 +23,7 @@ def _load_config():
     return EmailConfig(
         mail_server=config['mail_server'],
         recipients=config['recipients'],
-        from_addr=config.get('from', 'Gyrobot <gyrobot@terrasoft.gr>')
+        from_addr=config.get('from', 'Gyrobot <gyrobot@localhost>')
     )
 
 

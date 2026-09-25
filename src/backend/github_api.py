@@ -143,6 +143,10 @@ class GitHubApi():
         self.organization = config['organization']
         self.signing_key = config['signing_key']
         self.personal_access_token = config['personal_access_token']
+        # Email domains allowed to onboard for GitHub Copilot; empty/absent means no restriction.
+        self.allowed_email_domains = config.get('allowed_email_domains', [])
+        # Subset of allowed_email_domains that require an Active Directory lookup before onboarding.
+        self.ad_check_email_domains = config.get('ad_check_email_domains', [])
 
     def _github_api_call(self, ses: requests.Session, url: str, **kwargs):
         final_url = url.format(**kwargs)
