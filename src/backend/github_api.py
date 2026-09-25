@@ -1,12 +1,18 @@
+import datetime
+import logging
 import pathlib
 import time
+from typing import Dict, Any, Iterable, Optional
 
 import jwt
 import requests
+
+from backend.account_storage import get_pending_provisions, get_account, set_provision_status
 from bot_framework.yaml_wrapper import yaml
 
 GITHUB_API_URL = "https://api.github.com"
 GRAPHQL_URL = f"{GITHUB_API_URL}/graphql"
+logger = logging.getLogger(__name__)
 
 
 class GitHubApi():
@@ -448,3 +454,155 @@ class GitHubApi():
         if self.enterprise_id is None:
             self.fill_enterprise_id()
         return self._run_invite_mutation({"email": email})
+
+    def check_github_invitations(self) -> Dict[str, Any]:
+        """Check pending GitHub invitations and auto-assign accepted users.
+
+        Returns a dict with summary of actions taken:
+        {
+            'total_pending': int,
+            'accepted_and_assigned': List[str],  # list of usernames
+            'failed': List[{username: str, error: str}],
+            'errors': List[str],
+        }
+        """
+        results = {
+            'total_pending': 0,
+            'accepted_and_assigned': [],
+            'failed': [],
+            'errors': [],
+        }
+
+        try:
+            # Get all pending GitHub invitations
+            pending = get_pending_provisions('github', 'invited')
+            results['total_pending'] = len(pending)
+            if not pending:
+                logger.debug("No pending GitHub invitations to check")
+                return results
+
+            logger.info(f"Checking {len(pending)} pending GitHub invitations")
+            for provision in pending:
+                try:
+                    # Load account metadata
+                    account = get_account(provision.account_id)
+                    if not account:
+                        results['failed'].append({
+                            'username': provision.data.get('username', 'unknown'),
+                            'error': 'Account not found',
+                        })
+                        continue
+
+                    username = provision.data.get('username')
+                    team = provision.data.get('team')
+                    if not username or not team:
+                        results['failed'].append({
+                            'username': username or 'unknown',
+                            'error': 'Missing username or team in provision data',
+                        })
+                        continue
+
+                    # Check GitHub invitation status
+                    if username in self.get_pending_invitations():
+                        logger.debug(f"Invitation for {username} is still pending")
+                        continue  # Invitation not yet accepted
+
+                    all_user_logins = {user['login'] for user in self.get_ent_members()}
+                    if username not in all_user_logins:
+                        results['failed'].append({
+                            'username': username,
+                            'error': 'User not found in GitHub enterprise',
+                        })
+                        logger.warning(f"User {username} not found in GitHub enterprise")
+                        continue
+
+                    logger.debug(f"Invitation for {username} has been accepted")
+                    # Assign user to team
+                    try:
+                        self.add_users_to_ent_team(team, [username])
+                        now = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+                        provision.data['accepted_at'] = now
+                        provision.data['assigned_at'] = now
+                        set_provision_status(provision.account_id, 'github', 'assigned', provision.data)
+                        results['accepted_and_assigned'].append(username)
+                        logger.info(f"Auto-assigned {username} to GitHub team {team}")
+                    except Exception as e:
+                        logger.exception(f"Failed to assign {username} to team {team}: {e}")
+                        results['failed'].append({'username': username, 'error': str(e)})
+                except Exception as e:
+                    logger.exception(
+                        f"Error checking invitation for {provision.data.get('username', 'unknown')}: {e}"
+                    )
+                    results['errors'].append(str(e))
+        except Exception as e:
+            logger.exception("Unexpected error during GitHub invitation check")
+            results['errors'].append(f"Unexpected error: {str(e)}")
+
+        logger.info(
+            f"GitHub invitation check complete: "
+            f"{len(results['accepted_and_assigned'])} assigned, "
+            f"{len(results['failed'])} failed, {len(results['errors'])} errors"
+        )
+        return results
+
+    @staticmethod
+    def build_team_connections(teams: Iterable[dict]) -> tuple[dict, str, set]:
+        """Reconstruct the parent -> children path map from a flat list of team dicts.
+
+        Returns ``(connections, root_item, slug_set)`` where:
+
+        * ``connections`` maps a node path (dash-joined prefix, or the sentinel
+          root item) to the sorted list of its immediate child node paths.
+        * ``root_item`` is the path of the single top-level node if there is
+          exactly one, otherwise the synthetic label ``'GitHub'`` grouping every
+          top-level node.
+        * ``slug_set`` is the set of node paths that are real, assignable team
+          slugs (as opposed to synthetic intermediate groupings).
+        """
+        slugs = [team['slug'].removeprefix('ent:') for team in teams]
+        slug_set = set(slugs)
+        connections: dict = {}
+        all_nodes = set()
+
+        for slug in slugs:
+            parts = slug.split('-')
+            for i in range(1, len(parts) + 1):
+                all_nodes.add('-'.join(parts[:i]))
+
+        for node in all_nodes:
+            parts = node.split('-')
+            parent = 'root' if len(parts) == 1 else '-'.join(parts[:-1])
+            connections.setdefault(parent, []).append(node)
+
+        for key in connections:
+            connections[key] = sorted(connections[key], key=str.lower)
+
+        if len(connections.get('root', [])) == 1:
+            root_item = connections['root'][0]
+            connections.pop('root')
+        else:
+            root_item = 'GitHub'
+            connections[root_item] = connections.pop('root', [])
+
+        return connections, root_item, slug_set
+
+    def build_team_tree(self, teams: Optional[Iterable[dict]] = None) -> dict:
+        """Build a nested ``{'label', 'value', 'children'}`` tree for the web UI.
+
+        ``value`` is the assignable team slug (the same string ``onboard github``
+        expects) if the node is a real team, or ``None`` if it's just a grouping
+        node with no corresponding team.
+        """
+        if teams is None:
+            teams = self.get_ent_teams()
+
+        connections, root_item, slug_set = self.build_team_connections(teams)
+
+        def make_node(node_path: str) -> dict:
+            return {
+                'label': node_path,
+                'value': node_path if node_path in slug_set else None,
+                'children': [make_node(child) for child in connections.get(node_path, [])],
+            }
+
+        return make_node(root_item)

@@ -16,7 +16,7 @@ from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from backend.github_teams import build_team_tree
+from backend.github_api import GitHubApi
 from webapp import config
 from webapp.auth_ldap import ldap_authenticate
 from webapp.command_runner import run_bot_command
@@ -88,7 +88,7 @@ def _github_team_tree() -> tuple[Optional[dict], Optional[str]]:
     letting the form gracefully fall back to a plain text field.
     """
     try:
-        return build_team_tree(), None
+        return GitHubApi().build_team_tree(), None
     except Exception as ex:
         logger.warning(f"Failed to build GitHub team tree: {ex!r}")
         return None, f"Could not load the GitHub team list ({ex}); enter the team slug manually."

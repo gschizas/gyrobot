@@ -5,7 +5,6 @@ from treelib import Tree
 
 from commands import gyrobot, DefaultCommandGroup
 from backend.github_api import GitHubApi
-from backend.github_teams import build_team_connections
 from commands.extended_context import ExtendedContext
 
 if 'GITHUB_TOKEN' not in os.environ:
@@ -37,7 +36,7 @@ def github_teams(ctx: ExtendedContext):
             generate_tree(branch_name, parent)
 
     teams = GitHubApi().get_ent_teams()
-    connections, root_item, _slug_set = build_team_connections(teams)
+    connections, root_item, _slug_set = GitHubApi().build_team_connections(teams)
 
     tree = Tree()
     generate_tree(root_item)

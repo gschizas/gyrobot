@@ -7,7 +7,6 @@ import requests
 from backend.account_storage import create_account, set_provision_status
 from backend.approval import requires_approval
 from backend.github_api import GitHubApi
-from backend.github_provisioning import check_github_invitations
 from backend.providers import Account as ProviderAccount, PROVIDERS, RESOURCE_LABELS
 from commands.extended_context import ExtendedContext
 
@@ -97,7 +96,7 @@ def github_check(ctx: ExtendedContext):
 
     USAGE: bot github_check
     """
-    results = check_github_invitations()
+    results = GitHubApi().check_github_invitations()
 
     summary_lines = [
         f"Total pending: {results['total_pending']}",

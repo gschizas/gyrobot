@@ -31,11 +31,11 @@ class BackgroundTaskManager:
         logger.info(f"Starting GitHub background check thread (interval: {interval_seconds}s)")
         
         def _github_check_loop():
-            from backend.github_provisioning import check_github_invitations
-            
+            from backend.github_api import GitHubApi
+
             while self.running:
                 try:
-                    results = check_github_invitations()
+                    results = GitHubApi().check_github_invitations()
                     if results['accepted_and_assigned'] or results['failed'] or results['errors']:
                         logger.info(f"GitHub check: {results['accepted_and_assigned']} assigned, "
                                    f"{len(results['failed'])} failed, {len(results['errors'])} errors")
