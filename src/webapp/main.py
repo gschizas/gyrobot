@@ -15,12 +15,18 @@ Required environment variables:
 * ``APPROVAL_DATABASE_URL`` / ``PERMISSIONS_DATABASE_URL`` -- required by the
   underlying ``onboard``/``offboard`` commands (see ``commands/onboarding``).
 """
+import subprocess
+
 from fastapi import FastAPI
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from webapp.bootstrap import ensure_commands_imported
 from webapp.config import session_secret
 from webapp.routers import api, web
+
+hostname = subprocess.check_output(["hostname"]).decode().strip()
+print(f"Starting FastAPI application on host: {hostname}...")
 
 ensure_commands_imported()
 
@@ -28,7 +34,9 @@ app = FastAPI(
     title='GyroBot Onboarding Interface',
     description='Web UI (LDAP-authenticated) and REST API (OAuth2 client-credentials) '
                'for the onboard/offboard chat bot commands.',
+    root_path="/eurobot/"
 )
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=[hostname, "localhost"])
 app.add_middleware(SessionMiddleware, secret_key=session_secret())
 
 app.include_router(web.router)
