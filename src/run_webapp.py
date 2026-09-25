@@ -26,5 +26,5 @@ if __name__ == '__main__':
         'webapp.main:app',
         host=os.environ.get('WEBAPP_HOST', '127.0.0.1'),
         port=int(os.environ.get('WEBAPP_PORT', '5709')),
-        reload=False,
+        reload=True,
     )
