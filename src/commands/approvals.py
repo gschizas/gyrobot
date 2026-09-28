@@ -35,12 +35,44 @@ _SECURITY_TEXT = {
 }
 
 
+def _parse_id_spec(spec: str) -> List[int]:
+    """Parse a single id-spec token such as ``90``, ``92-95``, or a whole
+    comma-separated combination such as ``90,92-95,99-100`` into a list of ints.
+    Raises ``ValueError`` on anything that isn't a plain integer or an
+    ascending ``start-end`` range."""
+    ids = []
+    for part in spec.split(','):
+        part = part.strip()
+        if not part:
+            continue
+        if '-' in part:
+            start_text, _, end_text = part.partition('-')
+            start, end = int(start_text), int(end_text)
+            if end < start:
+                raise ValueError(f"Invalid range {part!r}: end must not be before start.")
+            ids.extend(range(start, end + 1))
+        else:
+            ids.append(int(part))
+    return ids
+
+
 def _resolve_ids(ids: tuple) -> Optional[List[int]]:
     if len(ids) == 1 and ids[0].lower() == 'all':
         return [row['id'] for row in list_pending()]
     try:
-        #TODO: Allow for ranges of ids (e.g. 1-5) and comma-separated lists (e.g. 1,3,5)
-        return [int(one_id) for one_id in ids]
+        # Each token may itself be a comma-separated list of ids/ranges (e.g. "90,92-95,99-100"),
+        # and multiple such tokens may be passed as separate arguments (they're combined here).
+        resolved = []
+        for token in ids:
+            resolved.extend(_parse_id_spec(token))
+        # De-duplicate while preserving the requested order.
+        seen = set()
+        deduped = []
+        for one_id in resolved:
+            if one_id not in seen:
+                seen.add(one_id)
+                deduped.append(one_id)
+        return deduped
     except ValueError:
         return None
 
@@ -102,10 +134,17 @@ def show_approval(ctx: ExtendedContext, request_id: int):
 @click.pass_context
 @check_approval_security(role=ROLE_APPROVE)
 def approve(ctx: ExtendedContext, ids: tuple):
-    """Approve and execute one or more requests (use `all` for every pending request)"""
+    """Approve and execute one or more requests.
+
+    IDS accepts numeric ids, ranges (``92-95``), and comma-separated
+    combinations of both (e.g. ``90,92-95,99-100``); use `all` for every
+    pending request.
+    """
     request_ids = _resolve_ids(ids)
     if request_ids is None:
-        ctx.chat.send_text("Invalid request id(s). Use numeric ids or `all`.", is_error=True)
+        ctx.chat.send_text(
+            "Invalid request id(s). Use numeric ids, ranges (e.g. `92-95`), a "
+            "comma-separated combination (e.g. `90,92-95,99-100`), or `all`.", is_error=True)
         return
     if not request_ids:
         ctx.chat.send_text("No pending requests to approve.")
@@ -149,10 +188,17 @@ def _approve_one(ctx: ExtendedContext, request_id: int) -> None:
 @click.pass_context
 @check_approval_security(role=ROLE_APPROVE)
 def reject(ctx: ExtendedContext, ids: tuple, reason: str):
-    """Reject one or more pending requests (use `all` for every pending request)"""
+    """Reject one or more pending requests.
+
+    IDS accepts numeric ids, ranges (``92-95``), and comma-separated
+    combinations of both (e.g. ``90,92-95,99-100``); use `all` for every
+    pending request.
+    """
     request_ids = _resolve_ids(ids)
     if request_ids is None:
-        ctx.chat.send_text("Invalid request id(s). Use numeric ids or `all`.", is_error=True)
+        ctx.chat.send_text(
+            "Invalid request id(s). Use numeric ids, ranges (e.g. `92-95`), a "
+            "comma-separated combination (e.g. `90,92-95,99-100`), or `all`.", is_error=True)
         return
     if not request_ids:
         ctx.chat.send_text("No pending requests to reject.")
