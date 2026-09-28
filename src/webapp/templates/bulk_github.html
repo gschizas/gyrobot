@@ -5,6 +5,9 @@
 <p>Add one row per colleague. GitHub username, email address, and enterprise team are
 all required per row; entirely blank rows are ignored. Type/paste a team slug directly,
 or use the browse (🌳) button to pick one from the team tree.</p>
+<p class="hint">Tip: you can copy a range of cells (username / email / team columns, in that
+order) from Excel and paste it directly into any cell below &mdash; it will fill that cell and
+the following rows/columns automatically, adding rows as needed.</p>
 {% if team_tree_error %}<div class="error">{{ team_tree_error }}</div>{% endif %}
 <form method="post" action="{{ request.url_for('github_bulk_submit') }}" id="bulk-form">
 <table id="bulk-table">
@@ -61,17 +64,61 @@ or use the browse (🌳) button to pick one from the team tree.</p>
 (function () {
     const template = document.getElementById('row-template');
     const tbody = document.getElementById('bulk-table-body');
+    const columnOrder = ['username', 'email', 'team'];
 
     function addRow() {
         const clone = template.content.cloneNode(true);
         clone.querySelector('.remove-row').addEventListener('click', function (event) {
             event.target.closest('tr').remove();
         });
+        const tr = clone.querySelector('tr');
         tbody.appendChild(clone);
+        return tr;
     }
 
-    document.getElementById('add-row').addEventListener('click', addRow);
+    document.getElementById('add-row').addEventListener('click', function () { addRow(); });
     for (let i = 0; i < 3; i++) addRow();
+
+    // --- Excel-style multi-cell paste: pasting tab/newline-separated text
+    // (e.g. a range of cells copied from Excel/Google Sheets) into any
+    // username/email/team cell fills that cell and subsequent rows/columns,
+    // adding rows if the pasted data doesn't fit. A plain single-value paste
+    // (no tabs/newlines) is left alone to behave like a normal text paste.
+    tbody.addEventListener('paste', function (event) {
+        const target = event.target;
+        if (!target.matches('input[name="username"], input[name="email"], input[name="team"]')) return;
+
+        const text = (event.clipboardData || window.clipboardData).getData('text');
+        if (!/[\t\r\n]/.test(text)) return; // single value - let the default paste happen
+
+        event.preventDefault();
+
+        const lines = text.split(/\r\n|\r|\n/).filter(function (line, index, arr) {
+            return line !== '' || index < arr.length - 1; // drop a single trailing blank line
+        });
+        if (lines.length === 0) return;
+
+        const startColumn = columnOrder.indexOf(target.name);
+        let rows = Array.from(tbody.querySelectorAll('tr'));
+        let startRowIndex = rows.indexOf(target.closest('tr'));
+
+        lines.forEach(function (line, lineIndex) {
+            const rowIndex = startRowIndex + lineIndex;
+            while (rowIndex >= rows.length) {
+                rows.push(addRow());
+            }
+            const cells = line.split('\t');
+            cells.forEach(function (value, cellIndex) {
+                const columnIndex = startColumn + cellIndex;
+                if (columnIndex >= columnOrder.length) return; // ignore extra pasted columns
+                const input = rows[rowIndex].querySelector('[name="' + columnOrder[columnIndex] + '"]');
+                if (input) {
+                    input.value = value.trim();
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
+        });
+    });
 
     // --- Team tree browse modal (reuses the same tree widget as the
     // single-entry onboarding form; see templates/form.html) ---
