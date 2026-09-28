@@ -17,7 +17,7 @@ import click
 
 from backend.approval import (ROLE_APPROVE, check_approval_security, execute_approved,
                               get, list_pending, set_decision, set_result,
-                              _allow_self_approval)
+                              _allow_self_approval, _notify_channel)
 from backend.email_logging import send_email_log
 from commands import gyrobot, ClickAliasedGroup
 from commands.extended_context import ExtendedContext
@@ -231,5 +231,11 @@ def _approver_name(ctx: ExtendedContext) -> str:
 
 def _notify_requester(ctx: ExtendedContext, row: dict, text: str) -> None:
     channel = row.get('channel_id')
+    if channel and channel.startswith('$'):
+        # The request came from a non-chat interface (e.g. the web UI's "$webui" or
+        # the API's "$api" pseudo-channel, see webapp.config) - there's no real chat
+        # channel to reply in, so fall back to the configured approval notifications
+        # channel instead of trying to message the fake channel name.
+        channel = _notify_channel()
     if channel and channel != ctx.chat.channel_id:
         ctx.chat.send_text(text, channel=channel)
