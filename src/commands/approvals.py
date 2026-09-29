@@ -172,6 +172,8 @@ def _approve_one(ctx: ExtendedContext, request_id: int) -> None:
         ctx.chat.send_text(f":white_check_mark: Request *#{request_id}* approved and executed.")
         _notify_requester(ctx, row, f":white_check_mark: Your request *#{request_id}* "
                                     f"({row['summary']}) was approved and executed.")
+        _notify_approvals_channel(ctx, f":white_check_mark: Request *#{request_id}* "
+                                       f"({row['summary']}) approved by {_approver_name(ctx)}.")
         row = get(request_id)
         send_email_log('approval', status='approved', request_id=request_id, row=row)
     except Exception as ex:
@@ -220,6 +222,8 @@ def reject(ctx: ExtendedContext, ids: tuple, reason: str):
         suffix = f"\nReason: {reason}" if reason else ''
         _notify_requester(ctx, row, f":no_entry: Your request *#{request_id}* "
                                     f"({row['summary']}) was rejected.{suffix}")
+        _notify_approvals_channel(ctx, f":no_entry: Request *#{request_id}* "
+                                       f"({row['summary']}) rejected by {_approver_name(ctx)}.{suffix}")
 
 
 def _approver_name(ctx: ExtendedContext) -> str:
@@ -230,12 +234,25 @@ def _approver_name(ctx: ExtendedContext) -> str:
 
 
 def _notify_requester(ctx: ExtendedContext, row: dict, text: str) -> None:
+    """Notify the user who made the approval request.
+
+    If the request came from a non-chat interface (``$webui`` or ``$api``), this
+    sends to the approval notifications channel instead of trying to message the
+    fake pseudo-channel.
+    """
     channel = row.get('channel_id')
     if channel and channel.startswith('$'):
-        # The request came from a non-chat interface (e.g. the web UI's "$webui" or
-        # the API's "$api" pseudo-channel, see webapp.config) - there's no real chat
-        # channel to reply in, so fall back to the configured approval notifications
-        # channel instead of trying to message the fake channel name.
         channel = _notify_channel()
+    if channel and channel != ctx.chat.channel_id:
+        ctx.chat.send_text(text, channel=channel)
+
+
+def _notify_approvals_channel(ctx: ExtendedContext, text: str) -> None:
+    """Send a notification to the configured approval notifications channel.
+
+    This ensures that the approvals team is always notified of approvals/rejections,
+    regardless of where the original request came from.
+    """
+    channel = _notify_channel()
     if channel and channel != ctx.chat.channel_id:
         ctx.chat.send_text(text, channel=channel)
