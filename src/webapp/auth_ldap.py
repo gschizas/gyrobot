@@ -24,11 +24,16 @@ def ldap_authenticate(username: str, password: str) -> bool:
 
     server_name = os.environ['LDAP_SERVER']
     username_pattern = os.environ['LDAP_USERNAME_PATTERN']
+    authentication_type = os.environ.get('LDAP_AUTHENTICATION_TYPE', 'NTLM').upper()
     username_with_domain = username_pattern.format(username)
 
     try:
         server = ldap3.Server(server_name, get_info=ldap3.ALL)
-        connection = ldap3.Connection(server, user=username_with_domain, password=password, authentication=ldap3.NTLM)
+        if authentication_type == 'NTLM':
+            auth_type = ldap3.NTLM
+        else:
+            auth_type = ldap3.SIMPLE
+        connection = ldap3.Connection(server, user=username_with_domain, password=password, authentication=auth_type)
         if not connection.bind():
             return False
         connection.unbind()
