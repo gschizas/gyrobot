@@ -9,6 +9,7 @@ from typing import Dict, List
 
 from backend.constants import TableFormat
 from chat.chat_wrapper import Conversation
+from webapp.emoji import convert_slack_emoji
 
 
 class HeadlessConversation(Conversation):
@@ -31,7 +32,7 @@ class HeadlessConversation(Conversation):
         self.messages: List[dict] = []
 
     def send_text(self, text, is_error: bool = False, icon_emoji: str = None, channel=None) -> None:
-        self.messages.append({'type': 'text', 'text': text, 'is_error': is_error})
+        self.messages.append({'type': 'text', 'text': convert_slack_emoji(text), 'is_error': is_error})
 
     def send_table(self, title: str, table: List[Dict], table_format: TableFormat = TableFormat.TABLE) -> None:
         self.messages.append({'type': 'table', 'title': title, 'rows': table})
@@ -41,7 +42,7 @@ class HeadlessConversation(Conversation):
         self.messages.append({'type': 'tables', 'title': title, 'tables': tables})
 
     def send_ephemeral(self, text, blocks, is_error, icon_emoji):
-        self.messages.append({'type': 'text', 'text': text, 'is_error': is_error, 'ephemeral': True})
+        self.messages.append({'type': 'text', 'text': convert_slack_emoji(text), 'is_error': is_error, 'ephemeral': True})
 
     def send_file(self, file_data, title=None, filename=None, channel=None):
         self.messages.append({
@@ -50,7 +51,7 @@ class HeadlessConversation(Conversation):
         })
 
     def send_fields(self, text, fields):
-        self.messages.append({'type': 'fields', 'text': text, 'fields': fields})
+        self.messages.append({'type': 'fields', 'text': convert_slack_emoji(text), 'fields': fields})
 
     def send_blocks(self, blocks):
         self.messages.append({'type': 'blocks', 'blocks': blocks})
