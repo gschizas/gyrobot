@@ -16,6 +16,7 @@ Required environment variables:
   underlying ``onboard``/``offboard`` commands (see ``commands/onboarding``).
 """
 import subprocess
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -30,13 +31,17 @@ print(f"Starting FastAPI application on host: {hostname}...")
 
 ensure_commands_imported()
 
+root_path = os.environ.get('WEBAPP_ROOT_PATH', '/eurobot/')
+allowed_hosts = os.environ.get('WEBAPP_ALLOWED_HOSTS', '').split(',')
+
 app = FastAPI(
     title='GyroBot Onboarding Interface',
     description='Web UI (LDAP-authenticated) and REST API (OAuth2 client-credentials) '
                'for the onboard/offboard chat bot commands.',
-    root_path="/eurobot/"
+    root_path=root_path
 )
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=[hostname, "localhost"])
+if allowed_hosts:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=[hostname, "localhost"] + allowed_hosts)
 app.add_middleware(SessionMiddleware, secret_key=session_secret())
 
 app.include_router(web.router)
