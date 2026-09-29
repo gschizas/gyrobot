@@ -40,6 +40,10 @@ def _github_validate(params: dict) -> str | None:
     except requests.exceptions.HTTPError as r:
         return f"User {username} not found.\n" + r.args[0]
 
+    # Use the correct casing from the GitHub API response
+    if 'login' in user:
+        params['username'] = user['login']
+
     teams = github_client.get_ent_teams()
     if team not in [t['slug'] for t in teams]:
         raise RuntimeError(f"Team {team} not found.")
