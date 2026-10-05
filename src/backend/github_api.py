@@ -332,7 +332,7 @@ class GitHubApi():
         response = self.get_pending_invitations()
 
         return [inv['invitee']['login'] for inv in
-                response.json()['data']['enterprise']['ownerInfo']['pendingUnaffiliatedMemberInvitations']['nodes']]
+                response['data']['enterprise']['ownerInfo']['pendingUnaffiliatedMemberInvitations']['nodes']]
 
     # Step 1: Get all org logins in the enterprise
     # Step 2: Get all members with verified domain emails for each org login
