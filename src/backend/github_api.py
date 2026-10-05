@@ -529,6 +529,7 @@ class GitHubApi():
                 return results
 
             pending_invitation_usernames = self.get_pending_invitations_usernames()
+            all_user_logins = {user['login'] for user in self.get_ent_members()}
 
             logger.info(f"Checking {len(pending)} pending GitHub invitations")
             for provision in pending:
@@ -556,7 +557,7 @@ class GitHubApi():
                         logger.debug(f"Invitation for {username} is still pending")
                         continue  # Invitation not yet accepted
 
-                    all_user_logins = {user['login'] for user in self.get_ent_members()}
+
                     if username not in all_user_logins:
                         results['failed'].append({
                             'username': username,
@@ -566,6 +567,7 @@ class GitHubApi():
                         continue
 
                     logger.debug(f"Invitation for {username} has been accepted")
+
                     # Assign user to team
                     try:
                         self.add_users_to_ent_team(team, [username])
