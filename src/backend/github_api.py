@@ -329,7 +329,7 @@ class GitHubApi():
         return invitations
 
     def get_pending_invitations_usernames(self):
-        response = self.get_pending_invitations()
+        response = self._get_pending_invitations_raw()
 
         return [inv['invitee']['login'] for inv in
                 response['data']['enterprise']['ownerInfo']['pendingUnaffiliatedMemberInvitations']['nodes']]
@@ -528,6 +528,8 @@ class GitHubApi():
                 logger.debug("No pending GitHub invitations to check")
                 return results
 
+            pending_invitation_usernames = self.get_pending_invitations_usernames()
+
             logger.info(f"Checking {len(pending)} pending GitHub invitations")
             for provision in pending:
                 try:
@@ -550,7 +552,7 @@ class GitHubApi():
                         continue
 
                     # Check GitHub invitation status
-                    if username in self.get_pending_invitations_usernames():
+                    if username in pending_invitation_usernames:
                         logger.debug(f"Invitation for {username} is still pending")
                         continue  # Invitation not yet accepted
 
