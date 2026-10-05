@@ -252,7 +252,7 @@ class GitHubApi():
             return data.get("user", {}).get("login"), data.get("user", {}).get("sso", {}).get("login")
         return username, None
 
-    def get_pending_invitations(self):
+    def _get_pending_invitations_raw(self):
         QUERY = """
         query ListPendingUnaffiliatedInvitations($slug: String!, $cursor: String) {
           enterprise(slug: $slug) {
@@ -287,6 +287,49 @@ class GitHubApi():
                 }
             },
         )
+        return response.json()
+
+    def get_pending_invitations(self):
+        def pretty_timedelta(td):
+            if td.days > 0:
+                days = td.days
+                if days == 1:
+                    return "1 day"
+                else:
+                    return f"{td.days} days"
+            elif td.seconds > 3600:
+                hours = td.seconds // 3600
+                if hours == 1:
+                    return "1 hour"
+                else:
+                    return f"{hours} hours"
+            elif td.seconds > 60:
+                minutes = td.seconds // 60
+                if minutes == 1:
+                    return f"{minutes} minute"
+                else:
+                    return f"{minutes} minutes"
+            else:
+                seconds = td.seconds % 60
+                if seconds == 1:
+                    return f"1 second"
+                else:
+                    return f"{seconds} seconds"
+        dt = datetime.datetime.now(datetime.timezone.utc)
+        response = self._get_pending_invitations_raw()
+
+        invitations = [{
+            'login': inv['invitee']['login'],
+            'createdAt': datetime.datetime.fromisoformat(inv['createdAt']).strftime('%d/%m/%Y %H:%M'),
+            'age': pretty_timedelta(dt - datetime.datetime.fromisoformat(inv['createdAt'])),
+            'remainingTime': pretty_timedelta(
+                datetime.timedelta(days=7) - (dt - datetime.datetime.fromisoformat(inv['createdAt'])))
+        } for inv in response['data']['enterprise']['ownerInfo']['pendingUnaffiliatedMemberInvitations']['nodes']]
+
+        return invitations
+
+    def get_pending_invitations_usernames(self):
+        response = self.get_pending_invitations()
 
         return [inv['invitee']['login'] for inv in
                 response.json()['data']['enterprise']['ownerInfo']['pendingUnaffiliatedMemberInvitations']['nodes']]
@@ -507,7 +550,7 @@ class GitHubApi():
                         continue
 
                     # Check GitHub invitation status
-                    if username in self.get_pending_invitations():
+                    if username in self.get_pending_invitations_usernames():
                         logger.debug(f"Invitation for {username} is still pending")
                         continue  # Invitation not yet accepted
 

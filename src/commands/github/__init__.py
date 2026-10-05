@@ -6,6 +6,7 @@ from treelib import Tree
 from commands import gyrobot, DefaultCommandGroup
 from backend.github_api import GitHubApi
 from commands.extended_context import ExtendedContext
+import psycopg
 
 if 'GITHUB_TOKEN' not in os.environ:
     raise ImportError('GITHUB_TOKEN not found in environment')
@@ -57,3 +58,32 @@ def github_team_members(ctx: ExtendedContext, team_slug: str):
 
     table = [{'Username': member['login'], 'Name': member.get('name', ''), 'Email': member.get('email', '')} for member in members]
     ctx.chat.send_table(title=f'Members of {team_slug}', table=table)
+
+
+@github.command("pending-invitations")
+@click.pass_context
+def github_pending_invitations(ctx: ExtendedContext):
+    """Display pending invitations for the GitHub organization"""
+    invitations = GitHubApi().get_pending_invitations()
+
+    if not invitations:
+        ctx.chat.send_text("No pending invitations found.")
+        return
+
+    usernames = [invite['login'] for invite in invitations]
+
+    with psycopg.connect(os.environ['APPROVAL_DATABASE_URL'], row_factory=psycopg.rows.dict_row) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT ap.* FROM public.account_provisions AS ap WHERE data->>'username' = ANY(%s)",
+                        (usernames,))
+            db_rows = cur.fetchall()
+
+    users_by_username = {row['data']['username']: row for row in db_rows}
+    for inv in invitations:
+        user = users_by_username.get(inv['login'])
+        if not user:
+            continue
+        inv['email'] = user['data']['email']
+        inv['team'] = user['data']['team']
+
+    ctx.chat.send_table(title='Pending Invitations', table=invitations)
