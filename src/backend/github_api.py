@@ -8,6 +8,7 @@ import jwt
 import requests
 
 from backend.account_storage import get_pending_provisions, get_account, set_provision_status
+from backend.notifications import notify
 from bot_framework.yaml_wrapper import yaml
 
 GITHUB_API_URL = "https://api.github.com"
@@ -147,6 +148,8 @@ class GitHubApi():
         self.allowed_email_domains = config.get('allowed_email_domains', [])
         # Subset of allowed_email_domains that require an Active Directory lookup before onboarding.
         self.ad_check_email_domains = config.get('ad_check_email_domains', [])
+        # Days after which an invited user who never appears in the enterprise is marked 'expired'.
+        self.invitation_expiry_days = int(config.get('invitation_expiry_days', 7))
 
     def _github_api_call(self, ses: requests.Session, url: str, **kwargs):
         final_url = url.format(**kwargs)
@@ -509,6 +512,7 @@ class GitHubApi():
         {
             'total_pending': int,
             'accepted_and_assigned': List[str],  # list of usernames
+            'expired': List[str],  # invitations that expired (provision marked 'expired')
             'failed': List[{username: str, error: str}],
             'errors': List[str],
         }
@@ -516,6 +520,7 @@ class GitHubApi():
         results = {
             'total_pending': 0,
             'accepted_and_assigned': [],
+            'expired': [],
             'failed': [],
             'errors': [],
         }
@@ -559,11 +564,19 @@ class GitHubApi():
 
 
                     if username not in all_user_logins:
-                        results['failed'].append({
-                            'username': username,
-                            'error': 'User not found in GitHub enterprise',
-                        })
-                        logger.warning(f"User {username} not found in GitHub enterprise")
+                        created = provision.created_at
+                        if created.tzinfo is None:
+                            created = created.replace(tzinfo=datetime.timezone.utc)
+                        age = datetime.datetime.now(tz=datetime.timezone.utc) - created
+                        if age < datetime.timedelta(days=self.invitation_expiry_days):
+                            logger.warning(f"User {username} not found in GitHub enterprise (yet)")
+                            continue
+                        provision.data['expired_at'] = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+                        set_provision_status(provision.account_id, 'github', 'expired', provision.data)
+                        results['expired'].append(username)
+                        logger.warning(f"Invitation for {username} expired")
+                        notify(f":hourglass: GitHub invitation for *{username}* ({provision.data.get('email', 'no email')}) "
+                               f"has expired after {age.days} days. Team: {team}.")
                         continue
 
                     logger.debug(f"Invitation for {username} has been accepted")
@@ -577,9 +590,13 @@ class GitHubApi():
                         set_provision_status(provision.account_id, 'github', 'assigned', provision.data)
                         results['accepted_and_assigned'].append(username)
                         logger.info(f"Auto-assigned {username} to GitHub team {team}")
+                        notify(f":white_check_mark: *{username}* accepted the GitHub invitation "
+                               f"and was added to team {team}.")
                     except Exception as e:
                         logger.exception(f"Failed to assign {username} to team {team}: {e}")
                         results['failed'].append({'username': username, 'error': str(e)})
+                        notify(f":warning: *{username}* accepted the GitHub invitation but could not be "
+                               f"added to team {team}: {e}")
                 except Exception as e:
                     logger.exception(
                         f"Error checking invitation for {provision.data.get('username', 'unknown')}: {e}"

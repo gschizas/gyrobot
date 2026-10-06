@@ -36,8 +36,10 @@ class BackgroundTaskManager:
             while self.running:
                 try:
                     results = GitHubApi().check_github_invitations()
-                    if results['accepted_and_assigned'] or results['failed'] or results['errors']:
+                    if (results['accepted_and_assigned'] or results['expired']
+                            or results['failed'] or results['errors']):
                         logger.info(f"GitHub check: {results['accepted_and_assigned']} assigned, "
+                                   f"{results['expired']} expired, "
                                    f"{len(results['failed'])} failed, {len(results['errors'])} errors")
                 except Exception as e:
                     logger.exception(f"Unexpected error in GitHub check thread: {e}")

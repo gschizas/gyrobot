@@ -106,12 +106,16 @@ def github_check(ctx: ExtendedContext):
     summary_lines = [
         f"Total pending: {results['total_pending']}",
         f"Accepted & assigned: {len(results['accepted_and_assigned'])}",
+        f"Expired: {len(results['expired'])}",
         f"Failed: {len(results['failed'])}",
         f"Errors: {len(results['errors'])}",
     ]
 
     if results['accepted_and_assigned']:
         summary_lines.append(f"✓ Assigned: {', '.join(results['accepted_and_assigned'])}")
+
+    if results['expired']:
+        summary_lines.append(f"⌛ Expired: {', '.join(results['expired'])}")
 
     if results['failed']:
         summary_lines.append("✗ Failed:")

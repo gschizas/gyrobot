@@ -25,7 +25,7 @@ from bot_framework.common import normalize_text
 from bot_framework.common import setup_logging
 from bot_framework.praw_wrapper import praw_wrapper
 from bot_framework.yaml_wrapper import yaml
-from chat import get_chat_wrapper
+from chat import get_chat_wrapper, get_notification_sender
 from chat.chat_wrapper import ChatWrapper, Conversation, Message
 
 locale.setlocale(locale.LC_ALL, os.environ.get('LOCALE', ''))
@@ -76,6 +76,8 @@ def init():
         shortcut_words = {}
 
     chat_obj = get_chat_wrapper(logger, trigger_words[0], handle_message)
+    from backend import notifications
+    notifications.set_sender(get_notification_sender(bot_name))
     _init_reddit()
 
 

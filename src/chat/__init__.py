@@ -4,6 +4,21 @@ from typing import Callable
 from chat.chat_wrapper import ChatWrapper
 
 
+def get_notification_sender(bot_name: str) -> Callable[[str, str], None]:
+    """Return ``sender(channel, text)`` for the active chat platform (no command context needed)."""
+    if 'SLACK_APP_TOKEN' in os.environ and 'SLACK_BOT_TOKEN' in os.environ:
+        from chat.slack import SlackConversation as conversation_class
+    elif 'MATTERMOST_API_TOKEN' in os.environ:
+        from chat.mattermost import MattermostConversation as conversation_class
+    else:
+        raise NotImplementedError("Unknown chat protocol")
+
+    def sender(channel: str, text: str) -> None:
+        conversation_class(bot_name, channel, None, None).send_text(text, channel=channel)
+
+    return sender
+
+
 def get_chat_wrapper(logger, bot_name: str, message_handler: Callable) -> ChatWrapper:
     if 'SLACK_APP_TOKEN' in os.environ and 'SLACK_BOT_TOKEN' in os.environ:
         import chat.slack
