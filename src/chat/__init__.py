@@ -8,6 +8,8 @@ def get_notification_sender(bot_name: str) -> Callable[[str, str], None]:
     """Return ``sender(channel, text)`` for the active chat platform (no command context needed)."""
     if 'SLACK_APP_TOKEN' in os.environ and 'SLACK_BOT_TOKEN' in os.environ:
         from chat.slack import SlackConversation as conversation_class
+    elif 'DISCORD_API_TOKEN' in os.environ:
+        from chat.discord import DiscordConversation as conversation_class
     elif 'MATTERMOST_API_TOKEN' in os.environ:
         from chat.mattermost import MattermostConversation as conversation_class
     else:
@@ -26,7 +28,10 @@ def get_chat_wrapper(logger, bot_name: str, message_handler: Callable) -> ChatWr
         chat.slack.handle_message = message_handler
         chat.slack.logger = logger
     elif 'DISCORD_API_TOKEN' in os.environ:
-        raise NotImplementedError("Not implemented yet!")
+        import chat.discord
+        connect = chat.discord.chat_connect
+        chat.discord.handle_message = message_handler
+        chat.discord.logger = logger
     elif 'TEAMS_API_TOKEN' in os.environ:
         raise NotImplementedError("Not implemented yet!")
     elif 'TELEGRAM_API_TOKEN' in os.environ:

@@ -80,5 +80,15 @@ Compared with `chat/slack.py`:
 
 ## Other chat platforms
 
-`chat.get_notification_sender` supports Slack and Mattermost only; add Discord/Teams/Telegram
-when `get_chat_wrapper` supports them.
+- **Discord**: skeleton in `src/chat/discord.py` (`discord.py`, selected by `DISCORD_API_TOKEN`). Untested
+  against a real server. Remaining work:
+  - Enable the *Message Content* privileged intent for the bot in the Discord developer portal.
+  - `send_table`/`send_tables` ignore `table_format` (no Excel/file output); `send_blocks` raises `NotImplementedError`.
+  - `send_ephemeral` DMs the user (Discord ephemerals need slash-command interactions).
+  - `channel_name` uses `#`/`🔒` from `@everyone` view permission; permission rules written for Slack
+    channel names must be adapted; `team_id`/`team_name` map to the guild.
+  - Slack-style mention/link parsing (`kudos`, `_extract_email`, Reddit link helpers) needs Discord (`<@id>`) variants.
+  - The bot doesn't need the trigger word via mention; consider `@bot` and slash-command support.
+- Teams, Telegram: `get_chat_wrapper` still raises `NotImplementedError`; copy the Discord skeleton
+  (conversation class + `chat_connect` + a branch in `chat/__init__.py` for both `get_chat_wrapper`
+  and `get_notification_sender`).

@@ -35,6 +35,7 @@ dependencies = [
     "yfinance>=0.2.43",
     "babel>=2.16.0",
     "mattermostdriver>=7.3.2",
+    "discord.py>=2.4.0",
     "slack-bolt>=1.23.0",
     "python-dotenv>=1.1.0",
     "treelib>=1.8.0",
