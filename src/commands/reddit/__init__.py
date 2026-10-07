@@ -1,3 +1,5 @@
+PLUGIN = {'requires': ['SUBREDDIT_NAME']}
+
 import base64
 import collections
 import datetime

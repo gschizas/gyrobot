@@ -1,3 +1,5 @@
+PLUGIN = {'requires': ['GITHUB_TOKEN', 'GITHUB_ORG'], 'dependencies': ['treelib>=1.8.0']}
+
 import os
 
 import click

@@ -10,6 +10,8 @@ Channel ids are Discord snowflakes, kept as strings; ``team_id`` is the guild id
 
 Not implemented yet: see ``TODO.md``.
 """
+PLUGIN = {'requires': ['DISCORD_API_TOKEN'], 'dependencies': ['discord.py>=2.4.0'], 'priority': 20}
+
 import asyncio
 import datetime
 import io
@@ -154,3 +156,14 @@ def chat_connect(a_bot_name, a_line_handler):
     intents.message_content = True
     _client = _BotClient(intents=intents)
     _client.run(os.environ['DISCORD_API_TOKEN'])
+
+
+def setup(a_logger, message_handler):
+    """Plugin entry point (see ``plugins.py``): returns the blocking connect function."""
+    global logger, handle_message
+    logger = a_logger
+    handle_message = message_handler
+    return chat_connect
+
+
+CONVERSATION_CLASS = DiscordConversation

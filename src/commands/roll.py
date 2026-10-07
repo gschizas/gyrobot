@@ -1,3 +1,5 @@
+PLUGIN = {}
+
 import random
 import re
 

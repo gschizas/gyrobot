@@ -1,3 +1,5 @@
+PLUGIN = {'requires': ['CHEESE_DATABASE_URL']}
+
 import json
 import os
 

@@ -1,3 +1,5 @@
+PLUGIN = {'dependencies': ['durations-nlp>=1.0.1', 'word2number>=1.1']}
+
 import datetime
 import os
 

@@ -1,3 +1,5 @@
+PLUGIN = {'requires': ['OPENSHIFT_ACTUATOR_REFRESH'], 'dependencies': ['kubernetes>=30.1.0']}
+
 import json
 import os
 from typing import Callable

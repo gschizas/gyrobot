@@ -1,3 +1,5 @@
+PLUGIN = {'requires': ['OPENSHIFT_SCALEDOWN'], 'dependencies': ['kubernetes>=30.1.0']}
+
 import os
 
 import click

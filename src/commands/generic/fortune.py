@@ -1,3 +1,5 @@
+PLUGIN = {}
+
 import os
 import subprocess
 

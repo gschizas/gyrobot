@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+PLUGIN = {'requires': ['DOCKER_DEPLOY_CONFIGURATION'], 'dependencies': ['docker>=7.1.0']}
 # -*- coding: utf-8 -*-
 """ocp-deployer.py: Deployment script for OpenShift Container Platform"""
 import os

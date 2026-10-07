@@ -1,3 +1,5 @@
+PLUGIN = {'requires': ['KUDOS_DATABASE_URL'], 'dependencies': ['imageio[ffmpeg]>=2.35.1', 'numpy>=1.26']}
+
 import html
 import io
 import os

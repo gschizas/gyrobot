@@ -1,3 +1,5 @@
+PLUGIN = {}
+
 import json
 
 import click

@@ -1,3 +1,5 @@
+PLUGIN = {'requires': ['QUESTIONNAIRE_DATABASE_URL']}
+
 import io
 import json
 import os

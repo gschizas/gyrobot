@@ -8,6 +8,8 @@ provisioning runs. Provisioning itself is delegated to the provider stubs in
 Account metadata and provisioning state are persisted to PostgreSQL via account_storage
 for tracking and deprovisioning workflows.
 """
+PLUGIN = {'requires': ['APPROVAL_DATABASE_URL']}
+
 import os
 
 import click
@@ -23,7 +25,6 @@ from commands import gyrobot
 from commands.extended_context import ExtendedContext
 
 
-print("onboarding.__init__")
 
 if 'APPROVAL_DATABASE_URL' not in os.environ:
     raise ImportError('APPROVAL_DATABASE_URL not found in environment')

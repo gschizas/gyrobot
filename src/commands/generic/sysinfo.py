@@ -1,3 +1,5 @@
+PLUGIN = {'dependencies': ['psutil>=6.0.0', 'humanfriendly>=10.0']}
+
 import collections
 import ctypes
 import datetime

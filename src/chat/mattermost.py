@@ -1,3 +1,5 @@
+PLUGIN = {'requires': ['MATTERMOST_API_TOKEN'], 'dependencies': ['mattermostdriver>=7.3.2'], 'priority': 50}
+
 import datetime
 import json
 import logging
@@ -172,6 +174,17 @@ def chat_connect(a_bot_name, a_line_handler):
     mattermost_client.login()
     # print(mattermost_client.users.get_user_by_username('gschizas'))
     mattermost_client.init_websocket(handler)
+
+
+def setup(a_logger, message_handler):
+    """Plugin entry point (see ``plugins.py``): returns the blocking connect function."""
+    global logger, handle_message
+    logger = a_logger
+    handle_message = message_handler
+    return chat_connect
+
+
+CONVERSATION_CLASS = MattermostConversation
 
 
 def tests():

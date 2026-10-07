@@ -11,6 +11,8 @@ Notes:
 
 Not implemented yet: see ``TODO.md``.
 """
+PLUGIN = {'requires': ['TELEGRAM_API_TOKEN'], 'dependencies': ['pyTelegramBotAPI>=4.14.0'], 'priority': 40}
+
 import datetime
 import html
 import io
@@ -128,3 +130,14 @@ def chat_connect(a_bot_name, a_line_handler):
     global bot_name
     bot_name = a_bot_name
     bot.infinity_polling()
+
+
+def setup(a_logger, message_handler):
+    """Plugin entry point (see ``plugins.py``): returns the blocking connect function."""
+    global logger, handle_message
+    logger = a_logger
+    handle_message = message_handler
+    return chat_connect
+
+
+CONVERSATION_CLASS = TelegramConversation

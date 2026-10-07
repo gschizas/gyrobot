@@ -6,6 +6,8 @@ first use; edits made directly in the database are not picked up until the
 cache is invalidated. ``permissions reload`` does that manually - there is no
 automatic TTL/expiry by design (see ``backend/permissions.py``).
 """
+PLUGIN = {}
+
 import click
 
 from backend import permissions

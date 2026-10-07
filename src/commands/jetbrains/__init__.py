@@ -1,3 +1,5 @@
+PLUGIN = {'requires': ['JETBRAINS_TOKEN', 'JETBRAINS_CUSTOMER_CODE']}
+
 import os
 
 import click

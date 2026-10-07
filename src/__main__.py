@@ -16,9 +16,6 @@ from dotenv import load_dotenv
 
 import chat.chat_wrapper
 import commands
-import commands.convert
-import commands.generic
-import commands.roll
 from backend.email_logging import send_email_log
 from background_tasks import init_background_tasks, shutdown_background_tasks
 from bot_framework.common import normalize_text
@@ -32,17 +29,8 @@ locale.setlocale(locale.LC_ALL, os.environ.get('LOCALE', ''))
 
 
 def do_imports():
-    import importlib
-    from glob import glob
-    for module_filename in glob('src/commands/**/*.py', recursive=True):
-        module_without_folder = module_filename.removeprefix('src/')
-        module_without_extension = os.path.splitext(module_without_folder)[0]
-        module_name = module_without_extension.replace(os.path.sep, '.')
-        print(module_name)
-        try:
-            importlib.import_module(module_name)
-        except Exception as e:
-            print(f"Error importing {module_name}: {e}")
+    import plugins
+    plugins.load_command_plugins()
 
 
 logger: logging.Logger

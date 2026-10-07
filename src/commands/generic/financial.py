@@ -1,5 +1,6 @@
-import re
+PLUGIN = {'dependencies': ['yfinance>=0.2.43']}
 
+import re
 import click
 import requests
 

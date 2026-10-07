@@ -1,3 +1,5 @@
+PLUGIN = {}
+
 import datetime
 import json
 

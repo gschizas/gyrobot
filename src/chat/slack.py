@@ -1,3 +1,5 @@
+PLUGIN = {'requires': ['SLACK_APP_TOKEN', 'SLACK_BOT_TOKEN'], 'dependencies': ['slack-bolt>=1.23.0'], 'priority': 10}
+
 import datetime
 import logging
 import os
@@ -123,6 +125,17 @@ def chat_connect(a_bot_name, a_line_handler):
     bot_name = a_bot_name
     line_handler = a_line_handler
     SocketModeHandler(app, os.environ["SLACK_APP_TOKEN"]).start()
+
+
+def setup(a_logger, message_handler):
+    """Plugin entry point (see ``plugins.py``): returns the blocking connect function."""
+    global logger, handle_message
+    logger = a_logger
+    handle_message = message_handler
+    return chat_connect
+
+
+CONVERSATION_CLASS = SlackConversation
 
 
 def _slack_user_info(user_id):

@@ -1,3 +1,5 @@
+PLUGIN = {'requires': ['REDDIT_ALT_USER']}
+
 import os
 
 import click

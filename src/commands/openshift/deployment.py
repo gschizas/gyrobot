@@ -1,3 +1,5 @@
+PLUGIN = {'requires': ['OPENSHIFT_DEPLOYMENT'], 'dependencies': ['kubernetes>=30.1.0']}
+
 import os
 from typing import Dict, List
 

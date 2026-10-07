@@ -17,6 +17,8 @@ notification channel only needs to have been addressed (e.g. by ``@mention``) on
 
 Not implemented yet: see ``TODO.md``.
 """
+PLUGIN = {'requires': ['TEAMS_APP_ID'], 'dependencies': ['botbuilder-integration-aiohttp>=4.16.0'], 'priority': 30}
+
 import asyncio
 import logging
 import os
@@ -183,3 +185,14 @@ def chat_connect(a_bot_name, a_line_handler):
     app.router.add_post('/api/messages', _messages)
     app.on_startup.append(_on_startup)
     web.run_app(app, host='0.0.0.0', port=int(os.environ.get('TEAMS_PORT', 3978)))
+
+
+def setup(a_logger, message_handler):
+    """Plugin entry point (see ``plugins.py``): returns the blocking connect function."""
+    global logger, handle_message
+    logger = a_logger
+    handle_message = message_handler
+    return chat_connect
+
+
+CONVERSATION_CLASS = TeamsConversation

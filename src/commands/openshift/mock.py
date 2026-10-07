@@ -1,3 +1,5 @@
+PLUGIN = {'requires': ['MOCK_CONFIGURATION']}
+
 import os
 import subprocess
 from string import Template

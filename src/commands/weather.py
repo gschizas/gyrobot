@@ -1,3 +1,5 @@
+PLUGIN = {'requires_any': ['WEGO_EXE', 'WEATHER_URL'], 'dependencies': ['pyte>=0.8.2']}
+
 import io
 import os
 import urllib.parse

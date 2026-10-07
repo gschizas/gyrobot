@@ -1,3 +1,5 @@
+PLUGIN = {'requires': ['GYROBOT_DATABASE_URL']}
+
 import os
 
 import click

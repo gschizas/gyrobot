@@ -1,3 +1,5 @@
+PLUGIN = {'requires': ['OPENSHIFT_CRONJOB'], 'dependencies': ['kubernetes>=30.1.0', 'cron-descriptor>=1.4.5']}
+
 import datetime
 import locale
 import os
