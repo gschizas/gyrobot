@@ -42,6 +42,20 @@ CREATE TABLE IF NOT EXISTS account_provisions (
 
 CREATE INDEX IF NOT EXISTS idx_account_provisions_resource_status 
     ON account_provisions(resource, status);
+
+-- Append-only audit trail: one row per provision status write
+CREATE TABLE IF NOT EXISTS account_provision_history (
+    id BIGSERIAL PRIMARY KEY,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    resource TEXT NOT NULL,
+    previous_status TEXT,
+    status TEXT NOT NULL,
+    data JSONB NOT NULL DEFAULT '{}'::jsonb,
+    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_provision_history_account
+    ON account_provision_history(account_id, resource, recorded_at);
 """
 
 
@@ -161,6 +175,18 @@ def set_provision_status(account_id: UUID, resource: str, status: str, data: dic
     with _connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
+                "SELECT status FROM account_provisions WHERE account_id = %s AND resource = %s;",
+                (str(account_id), resource),
+            )
+            previous = cur.fetchone()
+            cur.execute(
+                """
+                INSERT INTO account_provision_history (account_id, resource, previous_status, status, data)
+                VALUES (%s, %s, %s, %s, %s);
+                """,
+                (str(account_id), resource, previous['status'] if previous else None, status, Jsonb(data)),
+            )
+            cur.execute(
                 """
                 INSERT INTO account_provisions (id, account_id, resource, status, data, created_at, updated_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -200,6 +226,19 @@ def get_provision(account_id: UUID, resource: str) -> Optional[Provision]:
     if not row:
         return None
     return Provision.from_dict(row)
+
+
+def get_provision_history(account_id: UUID, resource: Optional[str] = None) -> List[dict]:
+    """Audit trail of provision status changes for an account, oldest first."""
+    query = "SELECT * FROM account_provision_history WHERE account_id = %s"
+    params: list = [str(account_id)]
+    if resource:
+        query += " AND resource = %s"
+        params.append(resource)
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query + " ORDER BY recorded_at, id;", params)
+            return cur.fetchall()
 
 
 def get_pending_provisions(resource: str, status: str) -> List[Provision]:
