@@ -37,6 +37,47 @@ accepted/expired are not visible in the web UI or API. Options:
 9. **Single notification sender**: `backend.notifications.set_sender` supports only one sender
    and the web process has none (see the notifications section above).
 
+## Mattermost gaps (`src/chat/mattermost.py`)
+
+Compared with `chat/slack.py`:
+
+**Breaks approval-gated / secured commands (highest priority)**
+- `channel_name` is not implemented on `MattermostConversation` (abstract attribute only), so
+  `check_security`, `security_check` and `requires_approval` fail with `AttributeError`.
+  Needs a `channels.get_channel` lookup (+ cache) returning a display name with the `#`/`🔒`/`🧑`
+  prefix convention used by the permission rules.
+- `get_team_info()` returns `None`, so `Conversation.team_name` (`get_team_info()['name']`) raises
+  `TypeError`; `requires_approval` calls it when enqueuing a request.
+- `get_user_info()` returns `None`: `_approver_name`/`_requester_name` fall back to the raw user id,
+  and anything reading `real_name` etc. gets nothing. Use `users.get_user` (+ `users_cache`).
+- `send_ephemeral` signature differs from Slack (`text, blocks, is_error, icon_emoji` all required,
+  no defaults), so calls like `send_ephemeral(text=...)` fail.
+
+**Stubs (`pass`)**
+- `send_file` (used by `send_table` on Slack, `unicode`, `kudos view`, Excel exports): use
+  `files.upload_file` then a post with `file_ids`.
+- `send_fields` (used by `usernotes`) and `send_blocks`: map to message attachments / Markdown.
+
+**Partial / incorrect**
+- `send_table` and `send_tables` ignore `table_format` (no Excel/zip/Markdown file output,
+  `SEND_TABLES_AS_EXCEL` is ignored) and post to `self.channel_id` only; no `channel=` support.
+  Large tables may exceed Mattermost's post size limit (16383 chars) and need splitting/file upload.
+- `send_text` ignores `is_error` and `icon_emoji` (no error styling).
+- `permalink` is always empty (`Message.permalink`), so error reports ("Exception caused by ...") have no link.
+- `handler` ignores `post`, `status_change` etc. events by design, but also: no filtering of the bot's
+  own posts (risk of reply loops), no filtering of edited/system posts, and uses `print()` instead of `logger`.
+- `chat_connect` hardcodes `'scheme': 'http'` (should be configurable/https), and `MATTERMOST_API_URL`
+  is passed as the host (no port/basepath options).
+- Leftover dev artifacts: the hardcoded `"eurobot test"` message, the `tests()` function with a
+  hardcoded server URL/team/channel IDs, and `"Authorization": f"******"` placeholders (broken).
+- `_mattermost_team_info`/`_preload` are unused; `users_cache`/`teams_cache`/`channels_cache` are never populated.
+- Mattermost `@mention` and user-id formats differ from Slack's `<@U123|name>`; `kudos` (`EXTRACT_SLACK_ID`),
+  `_extract_email` (`<mailto:...|...>` in `commands/onboarding/github.py`) and Reddit link parsing
+  (`extract_username`) assume Slack formatting.
+- `get_notification_sender` (`chat/__init__.py`) builds `MattermostConversation(bot_name, channel, None, None)`;
+  works for `send_text`, but untested.
+- Emoji shortcodes (`:white_check_mark:`) render natively in Mattermost, but custom Slack-only ones won't.
+
 ## Other chat platforms
 
 `chat.get_notification_sender` supports Slack and Mattermost only; add Discord/Teams/Telegram
