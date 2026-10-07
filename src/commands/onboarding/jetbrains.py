@@ -2,7 +2,7 @@ import os
 
 import click
 
-from backend.account_storage import create_account, set_provision_status
+from backend.account_storage import get_or_create_account, set_provision_status
 from backend.approval import requires_approval
 from backend.providers import Account as ProviderAccount, PROVIDERS, RESOURCE_LABELS
 from commands.extended_context import ExtendedContext
@@ -30,7 +30,7 @@ def onboard_jetbrains(ctx: ExtendedContext, email: str, team_name: str):
     account_obj = ProviderAccount(name=email, email=email)
     message = PROVIDERS['jetbrains'].provision(ctx, account_obj)
 
-    account = create_account(name=email, primary_email=email)
+    account = get_or_create_account(primary_email=email, name=email)
     set_provision_status(account.id, 'jetbrains', 'active', provision_data)
 
     result = [{'Resource': RESOURCE_LABELS['jetbrains'], 'Result': message}]

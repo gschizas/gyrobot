@@ -15,7 +15,7 @@ import os
 import click
 
 from backend.account_storage import (
-    create_account, get_account_by_email, set_provision_status, get_active_provisions
+    get_or_create_account, get_account_by_email, set_provision_status, get_active_provisions
 )
 from backend.approval import requires_approval
 from backend.providers import PROVIDERS, RESOURCE_LABELS
@@ -63,7 +63,7 @@ def onboard_slack(ctx: ExtendedContext, email: str, member_ids: tuple):
     account_obj = ProviderAccount(name=email, email=email)
     message = PROVIDERS['slack'].provision(ctx, account_obj)
 
-    account = create_account(name=email, primary_email=email)
+    account = get_or_create_account(primary_email=email, name=email)
     set_provision_status(account.id, 'slack', 'active', provision_data)
 
     result = [{'Resource': RESOURCE_LABELS['slack'], 'Result': message}]

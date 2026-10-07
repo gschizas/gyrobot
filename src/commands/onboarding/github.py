@@ -4,7 +4,7 @@ import re
 import click
 import requests
 
-from backend.account_storage import create_account, set_provision_status
+from backend.account_storage import get_or_create_account, set_provision_status
 from backend.approval import requires_approval
 from backend.github_api import GitHubApi
 from backend.providers import Account as ProviderAccount, PROVIDERS, RESOURCE_LABELS
@@ -83,7 +83,7 @@ def onboard_github(ctx: ExtendedContext, username: str, email: str, team: str):
     message = PROVIDERS['github'].provision(ctx, account_obj)
 
     # Store account and provision status
-    account = create_account(name=username, primary_email=email)
+    account = get_or_create_account(primary_email=email, name=username)
     set_provision_status(account.id, 'github', 'invited', provision_data)
 
     result = [{'Resource': RESOURCE_LABELS['github'], 'Result': message}]

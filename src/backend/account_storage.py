@@ -165,7 +165,7 @@ def set_provision_status(account_id: UUID, resource: str, status: str, data: dic
                 INSERT INTO account_provisions (id, account_id, resource, status, data, created_at, updated_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (account_id, resource) 
-                DO UPDATE SET status = %s, data = %s, updated_at = %s;
+                DO UPDATE SET status = %s, data = %s, created_at = %s, updated_at = %s;
                 """,
                 (
                     str(provision.id),
@@ -177,6 +177,7 @@ def set_provision_status(account_id: UUID, resource: str, status: str, data: dic
                     provision.updated_at.isoformat(),
                     status,
                     Jsonb(data),
+                    provision.created_at.isoformat(),
                     datetime.utcnow().isoformat(),
                 ),
             )

@@ -2,7 +2,7 @@ import os
 
 import click
 
-from backend.account_storage import create_account, set_provision_status
+from backend.account_storage import get_or_create_account, set_provision_status
 from backend.approval import requires_approval
 from backend.providers import Account as ProviderAccount, PROVIDERS, RESOURCE_LABELS
 from commands.extended_context import ExtendedContext
@@ -30,7 +30,7 @@ def onboard_crowd(ctx: ExtendedContext, username: str, team: str):
     account_obj = ProviderAccount(name=username, email=username)
     message = PROVIDERS['crowd'].provision(ctx, account_obj)
 
-    account = create_account(name=username, primary_email=username)
+    account = get_or_create_account(primary_email=username, name=username)
     set_provision_status(account.id, 'crowd', 'active', provision_data)
 
     result = [{'Resource': RESOURCE_LABELS['crowd'], 'Result': message}]
