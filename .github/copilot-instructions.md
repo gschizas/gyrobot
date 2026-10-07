@@ -10,6 +10,8 @@ A multi-platform chat bot (Slack/Mattermost) that integrates with Reddit for sub
 ```sh
 git submodule update --init   # bot_framework is a submodule
 uv sync
+# plugin-specific libraries are declared by the plugins themselves; install those for the current env:
+uv run python src/plugins.py requirements <env-name> | uv pip install -r -   # see INSTALLATION.md
 ```
 
 **Run locally** (loads `.env.d/<name>.env`):
@@ -35,7 +37,7 @@ src/
     chat_wrapper.py    # Abstract base: ChatWrapper, Conversation, Message
     slack.py           # Slack implementation
     mattermost.py      # Mattermost implementation
-    __init__.py        # Platform selection via env vars
+    __init__.py        # get_chat_wrapper / get_notification_sender (platform chosen by plugins.py)
   commands/            # Click command definitions (all auto-imported at startup)
     __init__.py        # Defines `gyrobot` root group + ClickAliasedGroup, DefaultCommandGroup
     extended_context.py  # Typed click.Context subclass
@@ -61,13 +63,13 @@ src/
 
 **Command dispatch flow:** Chat message → `handle_message()` → `parse_shortcuts()` → `handle_line()` → `click.testing.CliRunner.invoke(gyrobot, args)` (in a thread pool, `max_workers=10`).
 
-**CWD requirement:** Must be run from the **repo root** (not from `src/`). `do_imports()` globs `src/commands/**/*.py` and commands read config from `config/`, `data/`, etc. relative to CWD.
+**CWD requirement:** Must be run from the **repo root** (not from `src/`). `plugins.py` scans `src/chat` and `src/commands`, and commands read config from `config/`, `data/`, etc. relative to CWD.
 
 **`help` keyword rewriting:** When the first argument after the trigger word is `help`, it is moved to the end as `--help`. So `bot help command` is equivalent to `bot command --help`.
 
-**Platform selection** (`chat/__init__.py`): Based on env vars — `SLACK_APP_TOKEN`+`SLACK_BOT_TOKEN` for Slack, `MATTERMOST_API_TOKEN` for Mattermost.
+**Platform selection** (`plugins.py`): each `chat/<name>.py` declares its own env vars (`PLUGIN['requires']`) and `priority`; `chat: auto` (default, `config/plugins.yml`) picks the first available by priority, or name one explicitly. A platform module exposes `setup(logger, message_handler)` and `CONVERSATION_CLASS`.
 
-**Command self-registration:** `do_imports()` in `__main__.py` dynamically imports every `src/commands/**/*.py`, which triggers module-level `@gyrobot.command(...)` decorators to register each command.
+**Command self-registration:** `do_imports()` in `__main__.py` calls `plugins.load_command_plugins()`, which imports each command module that declares a `PLUGIN` dict whose requirements are met; the module-level `@gyrobot.command(...)` decorators then register the commands.
 
 ## Key Conventions
 
@@ -115,14 +117,20 @@ ctx.chat.send_fields("header", [{"color": "#f00", "text": "..."}])
 
 Output written to `stdout` (e.g., `print()`) is automatically sent back as a code block.
 
-### Optional command modules (env-gated)
+### Plugins (`PLUGIN` declaration)
 
-Modules that require specific env vars should raise `ImportError` at module level to skip gracefully:
+`plugins.py` knows nothing about individual plugins. A command module (or package `__init__`) or chat platform opts in with a **literal** dict at the top of the file, read via `ast` without importing it:
 
 ```python
-if 'SUBREDDIT_NAME' not in os.environ:
-    raise ImportError('SUBREDDIT_NAME not found in environment')
+PLUGIN = {
+    'requires': ['SUBREDDIT_NAME'],                 # all env vars must be set
+    'requires_any': ['WEGO_EXE', 'WEATHER_URL'],    # at least one
+    'dependencies': ['yfinance>=0.2.43'],           # pip libs private to this plugin
+    'priority': 10,                                 # chat platforms only (chat: auto order)
+}
 ```
+
+Submodules inherit their parent package's declaration. Files without `PLUGIN` are helpers. `config/plugins.yml` can set `chat:` and `commands: {enable: [...], disable: [...]}` (a name covers its submodules). Libraries used by only one plugin belong in its `dependencies`, not `pyproject.toml`. The old in-module `ImportError` env checks are now redundant with `requires`.
 
 ### Persistent state
 
