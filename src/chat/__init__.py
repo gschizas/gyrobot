@@ -10,6 +10,8 @@ def get_notification_sender(bot_name: str) -> Callable[[str, str], None]:
         from chat.slack import SlackConversation as conversation_class
     elif 'DISCORD_API_TOKEN' in os.environ:
         from chat.discord import DiscordConversation as conversation_class
+    elif 'TELEGRAM_API_TOKEN' in os.environ:
+        from chat.telegram import TelegramConversation as conversation_class
     elif 'MATTERMOST_API_TOKEN' in os.environ:
         from chat.mattermost import MattermostConversation as conversation_class
     else:
@@ -35,7 +37,10 @@ def get_chat_wrapper(logger, bot_name: str, message_handler: Callable) -> ChatWr
     elif 'TEAMS_API_TOKEN' in os.environ:
         raise NotImplementedError("Not implemented yet!")
     elif 'TELEGRAM_API_TOKEN' in os.environ:
-        raise NotImplementedError("Not implemented yet!")
+        import chat.telegram
+        connect = chat.telegram.chat_connect
+        chat.telegram.handle_message = message_handler
+        chat.telegram.logger = logger
     elif 'MATTERMOST_API_TOKEN' in os.environ:
         import chat.mattermost
         connect = chat.mattermost.chat_connect

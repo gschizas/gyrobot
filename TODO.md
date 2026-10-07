@@ -89,6 +89,18 @@ Compared with `chat/slack.py`:
     channel names must be adapted; `team_id`/`team_name` map to the guild.
   - Slack-style mention/link parsing (`kudos`, `_extract_email`, Reddit link helpers) needs Discord (`<@id>`) variants.
   - The bot doesn't need the trigger word via mention; consider `@bot` and slash-command support.
-- Teams, Telegram: `get_chat_wrapper` still raises `NotImplementedError`; copy the Discord skeleton
+- **Telegram**: skeleton in `src/chat/telegram.py` (`pyTelegramBotAPI`, selected by `TELEGRAM_API_TOKEN`).
+  Untested against the real API. Remaining work:
+  - Disable *privacy mode* in @BotFather, or the bot won't see normal group messages.
+  - Text is sent as HTML (Slack ``` blocks and `*bold*` converted); other Slack mrkdwn (links `<url|text>`,
+    `_italic_`, `~strike~`) isn't converted.
+  - `send_table`/`send_tables` ignore `table_format` (no Excel/file output); `send_blocks` raises `NotImplementedError`.
+  - `send_ephemeral` DMs the user (only works if they've started the bot); `send_fields` drops colours.
+  - No workspace concept: `team_id` is empty and `team_name` is always `Telegram`; permission rules must
+    use `#title`/`🔒title`/`🧑name <username@id>` channel names (or `*`).
+  - `channel_name`/`get_user_info` do API calls (cached, never invalidated); user lookup via `get_chat_member` fails in DMs of other users.
+  - Slack-style mention/link parsing (`kudos`, `_extract_email`, Reddit link helpers) needs Telegram variants.
+  - Polling only (`infinity_polling`); no webhook mode.
+- Teams: `get_chat_wrapper` still raises `NotImplementedError`; copy the Discord/Telegram skeleton
   (conversation class + `chat_connect` + a branch in `chat/__init__.py` for both `get_chat_wrapper`
   and `get_notification_sender`).
