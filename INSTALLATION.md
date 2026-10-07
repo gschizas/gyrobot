@@ -84,6 +84,37 @@ Migrating from the old hand-made `slack-bot-<name>.service` units: stop and disa
 (`systemctl disable --now slack-bot-<name>`), delete the files and the `.service.d` directories
 from `/etc/systemd/system`, then enable the new units.
 
+## Running as Windows services (WinSW)
+
+The Windows equivalent of the `systemd` units uses [WinSW](https://github.com/winsw/winsw), which
+wraps a command as a real Windows service (auto-restart, rolling log files). `deploy/windows/`
+contains one XML template (`service.xml`) and an installer. Prerequisites: `uv` on the `PATH`, and
+steps 1–3 of "Installing on a server" done in the checkout.
+
+From an **elevated** PowerShell in the repository root:
+
+```powershell
+deploy\windows\install_services.ps1 -Instance myinstance            # the bot
+deploy\windows\install_services.ps1 -Instance myinstance -Web       # the bot and the web UI/API
+```
+
+This creates the services `gyrobot-myinstance` and `gyrobot-web-myinstance`, using the same names
+as the Linux units. It downloads WinSW (v3, needed for the pre-start hook) into `.winsw\` on first
+use, generates `.winsw\<service>.exe` and `.xml` (git-ignored), installs them and starts them.
+
+- Like the Linux units, each service installs the instance's plugin libraries before starting.
+- `-Credential (Get-Credential)` runs the services as a specific account. The default,
+  LocalSystem, usually cannot see a per-user `uv` installation, so use the account that owns the
+  checkout.
+- Logs: WinSW's own `.out.log`/`.err.log`/`.wrapper.log` go to `logs\`, next to the bot's logs.
+  `PYTHONUTF8=1` is set so emoji don't break the console encoding.
+- Manage them with the normal tools: `Get-Service gyrobot-*`, `Restart-Service gyrobot-myinstance`,
+  or `.winsw\gyrobot-myinstance.exe status|restart|stop`.
+- After `git pull`: run `uv sync`, then `Restart-Service gyrobot-myinstance` (and the web one).
+- `-RenderOnly` only generates the files, for review; `-Uninstall` removes the services.
+- To make the services depend on something (e.g. a local database), add `<depend>` entries to
+  `deploy\windows\service.xml` and rerun the installer.
+
 ## `config/plugins.yml` (optional)
 
 ```yaml

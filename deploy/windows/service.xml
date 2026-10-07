@@ -1,0 +1,19 @@
+<!-- WinSW service definition template; rendered by install_services.ps1 -->
+<service>
+  <id>@ID@</id>
+  <name>@NAME@</name>
+  <description>@NAME@ - instance @INSTANCE@</description>
+  <executable>@UV@</executable>
+  <arguments>run python src\@SCRIPT@ @INSTANCE@</arguments>
+  <workingdirectory>@DIR@</workingdirectory>
+  <env name="PYTHONUTF8" value="1"/>
+  <!-- Install the libraries of the plugins this instance enables (see INSTALLATION.md) -->
+  <prestart>
+    <executable>cmd.exe</executable>
+    <arguments>/c &quot;&quot;@UV@&quot; run python src\plugins.py requirements @INSTANCE@ | &quot;@UV@&quot; pip install -r -&quot;</arguments>
+  </prestart>
+  <onfailure action="restart" delay="10 sec"/>
+  <logpath>@DIR@\logs</logpath>
+  <log mode="roll"/>
+  <hidewindow>true</hidewindow>
+</service>

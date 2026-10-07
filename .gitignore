@@ -181,6 +181,7 @@ fabric.properties
 config/
 data/
 logs/
+.winsw/
 usernotes/
 
 *.crt
