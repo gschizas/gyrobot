@@ -1,0 +1,17 @@
+[Unit]
+Description=Gyrobot chat bot (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@DIR@
+# Install the libraries of the plugins this instance enables (see INSTALLATION.md)
+ExecStartPre=/bin/sh -c '@UV@ run python src/plugins.py requirements %i | @UV@ pip install -r -'
+ExecStart=@UV@ run python src/__main__.py %i
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

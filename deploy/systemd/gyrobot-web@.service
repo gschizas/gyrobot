@@ -1,0 +1,16 @@
+[Unit]
+Description=Gyrobot onboarding web UI and REST API (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@DIR@
+ExecStartPre=/bin/sh -c '@UV@ run python src/plugins.py requirements %i | @UV@ pip install -r -'
+ExecStart=@UV@ run python src/run_webapp.py %i
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
