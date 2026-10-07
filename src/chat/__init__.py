@@ -12,6 +12,8 @@ def get_notification_sender(bot_name: str) -> Callable[[str, str], None]:
         from chat.discord import DiscordConversation as conversation_class
     elif 'TELEGRAM_API_TOKEN' in os.environ:
         from chat.telegram import TelegramConversation as conversation_class
+    elif 'TEAMS_APP_ID' in os.environ:
+        from chat.teams import TeamsConversation as conversation_class
     elif 'MATTERMOST_API_TOKEN' in os.environ:
         from chat.mattermost import MattermostConversation as conversation_class
     else:
@@ -34,8 +36,11 @@ def get_chat_wrapper(logger, bot_name: str, message_handler: Callable) -> ChatWr
         connect = chat.discord.chat_connect
         chat.discord.handle_message = message_handler
         chat.discord.logger = logger
-    elif 'TEAMS_API_TOKEN' in os.environ:
-        raise NotImplementedError("Not implemented yet!")
+    elif 'TEAMS_APP_ID' in os.environ:
+        import chat.teams
+        connect = chat.teams.chat_connect
+        chat.teams.handle_message = message_handler
+        chat.teams.logger = logger
     elif 'TELEGRAM_API_TOKEN' in os.environ:
         import chat.telegram
         connect = chat.telegram.chat_connect

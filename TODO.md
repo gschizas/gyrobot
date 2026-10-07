@@ -101,6 +101,22 @@ Compared with `chat/slack.py`:
   - `channel_name`/`get_user_info` do API calls (cached, never invalidated); user lookup via `get_chat_member` fails in DMs of other users.
   - Slack-style mention/link parsing (`kudos`, `_extract_email`, Reddit link helpers) needs Telegram variants.
   - Polling only (`infinity_polling`); no webhook mode.
-- Teams: `get_chat_wrapper` still raises `NotImplementedError`; copy the Discord/Telegram skeleton
-  (conversation class + `chat_connect` + a branch in `chat/__init__.py` for both `get_chat_wrapper`
-  and `get_notification_sender`).
+- **Teams**: skeleton in `src/chat/teams.py` (`botbuilder-integration-aiohttp`, selected by `TEAMS_APP_ID`;
+  also `TEAMS_APP_PASSWORD`, optional `TEAMS_APP_TENANT_ID`, `TEAMS_APP_TYPE`, `TEAMS_PORT`). Untested against
+  a real Azure Bot registration. Remaining work:
+  - Needs a public HTTPS endpoint for `POST /api/messages` (reverse proxy/tunnel) and an Azure Bot
+    registration + Teams app manifest; this differs from the other platforms, which connect outbound.
+  - Proactive messages (including approvals notifications) need a stored `ConversationReference`, which is
+    only captured when someone messages the bot in that conversation; persisted in
+    `data/teams_conversations-<LOG_NAME>.yml`. Consider pre-seeding the `notify_channel` or using
+    `create_conversation` to post into a configured Teams channel by id.
+  - `send_file` raises `NotImplementedError` (needs the file-consent flow or SharePoint/OneDrive); `send_blocks` too
+    (use Adaptive Cards); tables are code blocks (ignore `table_format`, no Excel).
+  - `send_ephemeral` replies visibly in the conversation.
+  - Slack mrkdwn (`*bold*`) renders differently in Teams Markdown (`**bold**`); only the bot-authored titles use `**`.
+  - `get_user_info` only knows users seen in incoming messages; no Graph API lookup (emails, real names, `@group` mapping).
+  - Server binds `0.0.0.0` on plain HTTP; no health endpoint; BotFramework auth is handled by the adapter.
+  - Uses `CloudAdapter` from `botbuilder-*` (Microsoft's newer replacement is the Microsoft 365 Agents SDK).
+  - `team_id` is the Teams team id (or tenant id outside a team); `channel_name` uses `#channel`/`🔒group chat`/`🧑name`.
+- Other platforms: copy the Discord/Telegram/Teams skeleton (conversation class + `chat_connect` + a branch in
+  `chat/__init__.py` for both `get_chat_wrapper` and `get_notification_sender`).

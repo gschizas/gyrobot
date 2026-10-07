@@ -37,6 +37,7 @@ dependencies = [
     "mattermostdriver>=7.3.2",
     "discord.py>=2.4.0",
     "pyTelegramBotAPI>=4.14.0",
+    "botbuilder-integration-aiohttp>=4.16.0",
     "slack-bolt>=1.23.0",
     "python-dotenv>=1.1.0",
     "treelib>=1.8.0",
