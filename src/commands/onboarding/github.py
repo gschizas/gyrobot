@@ -6,6 +6,7 @@ import requests
 
 from backend.account_storage import get_or_create_account, set_provision_status
 from backend.approval import requires_approval
+from backend.email_logging import send_email
 from backend.github_api import GitHubApi
 from backend.providers import Account as ProviderAccount, PROVIDERS, RESOURCE_LABELS
 from commands.extended_context import ExtendedContext
@@ -19,6 +20,27 @@ def _github_summary(params: dict) -> str:
 
 
 github_client: GitHubApi | None = None
+
+
+def _send_invitation_email(ctx: ExtendedContext, username: str, email: str, team: str) -> str:
+    """Email the invitee a bilingual note with the direct acceptance link.
+
+    Never raises: the invitation was already sent, so a mail problem is only reported in the result text.
+    """
+    api = GitHubApi()
+    if not api.send_invitation_email:
+        return ''
+    try:
+        send_email(
+            'github_invitation', to=email,
+            subject='GitHub invitation / Πρόσκληση GitHub',
+            bot_name=os.environ.get('BOT_NAME', 'Gyrobot').split()[0],
+            username=username, team=team, expiry_days=api.invitation_expiry_days,
+            invitation_url=f"https://github.com/enterprises/{api.enterprise}/member_invitation")
+    except Exception as e:
+        ctx.logger.warning(f"Could not send invitation email to {email}: {e!r}")
+        return f" (invitation email to {email} FAILED: {e})"
+    return f" (invitation email sent to {email})"
 
 def _extract_email(email: str) -> str | None:
     if match := re.match(r'<mailto:(?P<email>[-._\w]+@(?:\w+\.?)*)\|\1>', email):
@@ -85,6 +107,8 @@ def onboard_github(ctx: ExtendedContext, username: str, email: str, team: str):
     # Store account and provision status
     account = get_or_create_account(primary_email=email, name=username)
     set_provision_status(account.id, 'github', 'invited', provision_data)
+
+    message += _send_invitation_email(ctx, username, email, team)
 
     result = [{'Resource': RESOURCE_LABELS['github'], 'Result': message}]
     ctx.chat.send_table(title=f'Onboarded {username}', table=result)

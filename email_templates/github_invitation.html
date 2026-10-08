@@ -1,0 +1,36 @@
+{% extends "_base.html" %}
+
+{% block title %}GitHub invitation / Πρόσκληση GitHub{% endblock %}
+{% block heading %}GitHub Copilot{% endblock %}
+
+{% block content %}
+<h2 style="color:#1e3a5f;font-size:18px;margin-top:0;">👋 Welcome{% if username %}, {{ username }}{% endif %}!</h2>
+<p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 16px;">
+    You have been invited to our GitHub enterprise{% if team %} (team <b>{{ team }}</b>){% endif %}.
+    You will have received an email from <b>support@github.com</b> at the primary email address you have set up in GitHub.
+    But there is no need to wait for that email: you can just go to the link below and accept the invitation.
+</p>
+<p style="margin:0 0 24px;text-align:center;">
+    <a href="{{ invitation_url }}" style="background-color:#1e3a5f;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-size:15px;font-weight:600;">Accept the invitation</a>
+</p>
+<p style="color:#888;font-size:13px;margin:0 0 16px;">
+    If the button does not work, copy this address into your browser: <a href="{{ invitation_url }}">{{ invitation_url }}</a>
+    <br>The invitation expires after {{ expiry_days }} days.
+</p>
+
+<div style="height:1px;background-color:#e8ecf1;margin:24px 0;"></div>
+
+<h2 style="color:#1e3a5f;font-size:18px;margin-top:0;">👋 Καλώς ήρθες{% if username %}, {{ username }}{% endif %}!</h2>
+<p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 16px;">
+    Έχεις προσκληθεί στο enterprise μας στο GitHub{% if team %} (ομάδα <b>{{ team }}</b>){% endif %}.
+    Θα πρέπει να έχεις λάβει ένα email από το <b>support@github.com</b> στην κύρια διεύθυνση email που έχεις ορίσει στο GitHub.
+    Δεν χρειάζεται όμως να περιμένεις εκείνο το email: μπορείς να πας απευθείας στον παρακάτω σύνδεσμο και να αποδεχτείς την πρόσκληση.
+</p>
+<p style="margin:0 0 24px;text-align:center;">
+    <a href="{{ invitation_url }}" style="background-color:#1e3a5f;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-size:15px;font-weight:600;">Αποδοχή πρόσκλησης</a>
+</p>
+<p style="color:#888;font-size:13px;margin:0;">
+    Αν το κουμπί δεν λειτουργεί, αντίγραψε αυτή τη διεύθυνση στον περιηγητή σου: <a href="{{ invitation_url }}">{{ invitation_url }}</a>
+    <br>Η πρόσκληση λήγει σε {{ expiry_days }} ημέρες.
+</p>
+{% endblock %}

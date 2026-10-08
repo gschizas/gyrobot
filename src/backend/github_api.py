@@ -150,6 +150,8 @@ class GitHubApi():
         self.ad_check_email_domains = config.get('ad_check_email_domains', [])
         # Days after which an invited user who never appears in the enterprise is marked 'expired'.
         self.invitation_expiry_days = int(config.get('invitation_expiry_days', 7))
+        # Email the invitee the direct acceptance link when they are invited (needs config/email.yml).
+        self.send_invitation_email = bool(config.get('send_invitation_email', True))
 
     def _github_api_call(self, ses: requests.Session, url: str, **kwargs):
         final_url = url.format(**kwargs)
