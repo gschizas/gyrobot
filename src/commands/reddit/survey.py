@@ -29,7 +29,7 @@ from "Answers"
 where code = 'q_{0}'
 group by 1
 order by 2 desc"""
-SQL_SURVEY_SCALE_MATRIX = """select answer[3] AS AnswerCode, answer_value AS AnswerValue, count(vote_id) AS VoteCount
+SQL_SURVEY_SCALE_MATRIX = r"""select answer[3] AS AnswerCode, answer_value AS AnswerValue, count(vote_id) AS VoteCount
 from (select regexp_split_to_array(code, '_') AS answer_parts, *
       from "Answers"
       where code like 'q\_{0}\_%') AS dt(answer)
