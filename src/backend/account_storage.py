@@ -161,8 +161,12 @@ def update_account(account_id: UUID, **updates) -> Optional[Account]:
     return account
 
 
-def set_provision_status(account_id: UUID, resource: str, status: str, data: dict) -> Provision:
-    """Create or update provision status for an account + resource combo."""
+def set_provision_status(account_id: UUID, resource: str, status: str, data: dict,
+                         created_at=None) -> Provision:
+    """Create or update provision status for an account + resource combo.
+
+    ``created_at`` backdates the provision (used when importing pre-existing users).
+    """
     from datetime import datetime
     
     provision = Provision(
@@ -171,6 +175,8 @@ def set_provision_status(account_id: UUID, resource: str, status: str, data: dic
         status=status,
         data=data,
     )
+    if created_at is not None:
+        provision.created_at = created_at
     
     with _connect() as conn:
         with conn.cursor() as cur:
