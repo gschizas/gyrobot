@@ -34,6 +34,9 @@ accepted/expired are not visible in the web UI or API. Options:
 7. **`.gitignore`**: `[Ss]cripts` ignores `scripts/`; add `!/scripts/`.
 8. **Single notification sender**: `backend.notifications.set_sender` supports only one sender
    and the web process has none (see the notifications section above).
+9. The **`bot github pending-invitations`** command seems to only show the first 100 pending invitations (the GitHub API paginates at 100). Use `get_paginated` to fetch all pages.
+10. **`bot github pending-invitations`**: the command shows the `login` of the invited user, but not the `email` (which is often more useful to identify them). Since these are already from the bot, use the database to fill in the email.
+11. `bot github members` shows the `login` of the member, but sometimes no email exists on GitHub. Use the database to fill in the email. Add maybe a column that shows the source of the email (if it's from GitHub, or from the bot's database).
 
 ## Other chat platforms
 
