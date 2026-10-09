@@ -66,7 +66,7 @@ def version(ctx: ExtendedContext):
     ctx.chat.send_text(f"Version: {_version}")
 
 @gyrobot.command('planets')
-@click.option('-f', '--format', type=TableFormat, default=TableFormat.TABLE)
+@click.option('-f', '--format', 'table_format', type=TableFormat, default=TableFormat.TABLE)
 @click.pass_context
 def show_planets(ctx: ExtendedContext, table_format: TableFormat=TableFormat.TABLE):
     """Test table"""
