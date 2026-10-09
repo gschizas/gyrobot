@@ -41,7 +41,7 @@ class SlackConversation(Conversation):
         def cell_value(value) -> str:
             return '\xA0' if value == '' else str(value)
 
-        if len(table) > 100 and table_format == TableFormat.TABLE and not truthy_env('SEND_TABLES_AS_EXCEL'):
+        if len(table) >= 100 and table_format == TableFormat.TABLE and not truthy_env('SEND_TABLES_AS_EXCEL'):
             self.send_text(text=f"Table too large to display in Slack ({len(table)} rows). Sending as Excel instead.")
             table_format = TableFormat.EXCEL
 
