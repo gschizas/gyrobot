@@ -197,3 +197,4 @@ oc.exe
 setup_fiddler.sh
 src/requirements.txt # temporary requirements file
 usernotes-*.yml
+!/scripts/
