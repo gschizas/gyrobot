@@ -245,9 +245,9 @@ class GitHubApi():
         return all_members
 
     def get_user_details(self, username):
-        resp = requests.get(f"{GITHUB_API_URL}/users/{username}")
+        resp = self.ses_ent.get(f"{GITHUB_API_URL}/users/{username}")
         resp.raise_for_status()
-        return self.ses_ent.get(f"{GITHUB_API_URL}/users/{username}").json()
+        return resp.json()
 
     def get_sso_identity(self, username):
         url = f"{GITHUB_API_URL}/orgs/{self.organization}/memberships/{username}"
