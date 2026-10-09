@@ -10,10 +10,13 @@ permission checks, matched against the ``$webui`` pseudo-channel).
 import json
 import logging
 import pathlib
+import re
 from typing import Optional
 
+import requests
 from fastapi import APIRouter, Form, HTTPException, Request, status
-from fastapi.responses import RedirectResponse
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from backend.github_api import GitHubApi
@@ -22,6 +25,10 @@ from webapp.auth_ldap import ldap_authenticate
 from webapp.command_runner import run_bot_command
 
 logger = logging.getLogger('webapp.routers.web')
+
+MAX_VALIDATE_USERNAMES = 100
+# Alphanumerics or single hyphens, not starting/ending with a hyphen, max 39 chars
+GITHUB_LOGIN_RE = re.compile(r'(?=.{1,39}$)[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*')
 
 router = APIRouter(tags=['web'])
 templates = Jinja2Templates(directory=str(pathlib.Path(__file__).parent.parent / 'templates'))
@@ -172,6 +179,52 @@ async def onboarding_submit(request: Request, action: str):
                              team_name=config.web_team_name())
     return templates.TemplateResponse(
         request, 'result.html', {'user': user, 'title': form_def['title'], 'result': result})
+
+
+@router.post('/onboarding/github/validate-users', include_in_schema=False)
+async def github_validate_users(request: Request):
+    """Server-side check that GitHub usernames exist, for the onboarding forms' JS validation.
+
+    Body: ``{"usernames": [...]}``. Returns ``{"results": {<input>: {"status": "ok"|"not_found"|"invalid"|"error",
+    "login": <canonical login>, "message": ...}}}``. ``error`` means the lookup itself failed (e.g. rate limit),
+    so the form shouldn't treat the username as wrong.
+    """
+    if not _current_user(request):
+        return JSONResponse({'error': 'Not logged in'}, status_code=status.HTTP_401_UNAUTHORIZED)
+    try:
+        usernames = (await request.json())['usernames']
+        if not isinstance(usernames, list) or not all(isinstance(u, str) for u in usernames):
+            raise ValueError
+    except (ValueError, KeyError, TypeError):
+        return JSONResponse({'error': 'Expected {"usernames": [...]}'}, status_code=status.HTTP_400_BAD_REQUEST)
+    unique = list(dict.fromkeys(u.strip() for u in usernames if u.strip()))
+    if len(unique) > MAX_VALIDATE_USERNAMES:
+        return JSONResponse({'error': f'At most {MAX_VALIDATE_USERNAMES} usernames per request'},
+                            status_code=status.HTTP_400_BAD_REQUEST)
+    results = await run_in_threadpool(_check_github_usernames, unique)
+    return {'results': results}
+
+
+def _check_github_usernames(usernames: list[str]) -> dict[str, dict]:
+    results: dict[str, dict] = {}
+    github = GitHubApi()
+    for username in usernames:
+        # Also guards the URL built from the username in GitHubApi.get_user_details
+        if not GITHUB_LOGIN_RE.fullmatch(username):
+            results[username] = {'status': 'invalid', 'message': 'Not a valid GitHub username (no @, no email)'}
+            continue
+        try:
+            results[username] = {'status': 'ok', 'login': github.get_user_details(username).get('login', username)}
+        except requests.HTTPError as ex:
+            if ex.response is not None and ex.response.status_code == 404:
+                results[username] = {'status': 'not_found', 'message': 'GitHub user not found'}
+            else:
+                logger.warning(f"GitHub lookup failed for {username}: {ex}")
+                results[username] = {'status': 'error', 'message': f'Could not check: {ex}'}
+        except Exception as ex:
+            logger.warning(f"GitHub lookup failed for {username}: {ex!r}")
+            results[username] = {'status': 'error', 'message': f'Could not check: {ex}'}
+    return results
 
 
 @router.get('/onboarding/github/bulk', include_in_schema=False)

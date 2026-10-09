@@ -60,7 +60,10 @@ the following rows/columns automatically, adding rows as needed.</p>
 <div id="team-tree-data" data-tree='{{ team_tree | tojson }}' hidden></div>
 {% endif %}
 
+{% include "_validate_users.html" %}
 <script>
+attachGithubUserValidation(document.getElementById('bulk-form'),
+                           "{{ request.url_for('github_validate_users') }}");
 (function () {
     const template = document.getElementById('row-template');
     const tbody = document.getElementById('bulk-table-body');

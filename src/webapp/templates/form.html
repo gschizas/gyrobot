@@ -24,6 +24,14 @@
 </form>
 <p><a href="{{request.url_for('dashboard')}}">&larr; Back to onboarding</a></p>
 
+{% if action == 'github' %}
+{% include "_validate_users.html" %}
+<script>
+attachGithubUserValidation(document.getElementById('onboarding-form'),
+                           "{{ request.url_for('github_validate_users') }}");
+</script>
+{% endif %}
+
 {% if team_tree %}
 <script>
 (function () {

@@ -1,0 +1,127 @@
+<style>
+    .user-status { display: block; font-size: 0.85rem; margin-top: 0.15rem; }
+    .user-status.ok { color: #1a7f37; }
+    .user-status.not_found { color: #cf222e; }
+    .user-status.invalid { color: #bc4c00; }
+    .user-status.error { color: #9a6700; }
+    .user-status.pending { color: #57606a; }
+</style>
+<script>
+// Server-side GitHub username validation: the usernames are POSTed to a backend
+// route, which checks them against GitHub. Use attachGithubUserValidation(form, url).
+//
+// Statuses returned by the server:
+//   ok         - the account exists
+//   invalid    - not a well-formed GitHub username (e.g. an email or an @mention); GitHub was not asked
+//   not_found  - well-formed, but GitHub has no such account
+//   error      - the lookup itself failed (e.g. rate limit); says nothing about the username
+function attachGithubUserValidation(form, url) {
+    const SELECTOR = 'input[name="username"]';
+    const ICONS = { ok: '✔ ', invalid: '⛔ ', not_found: '✖ ', error: '⚠ ' };
+    const state = new WeakMap(); // input -> {value, status}
+
+    function marker(input) {
+        let span = input.parentElement.querySelector(':scope > .user-status');
+        if (!span) {
+            span = document.createElement('span');
+            span.className = 'user-status';
+            input.insertAdjacentElement('afterend', span);
+        }
+        return span;
+    }
+
+    function show(input, status, text) {
+        const span = marker(input);
+        span.className = 'user-status ' + status;
+        span.textContent = status === 'pending' ? 'Checking...' : ICONS[status] + text;
+    }
+
+    function clear(input) {
+        const span = input.parentElement.querySelector(':scope > .user-status');
+        if (span) span.remove();
+        state.delete(input);
+    }
+
+    async function validate(inputs) {
+        const targets = inputs.filter(function (input) {
+            const value = input.value.trim();
+            if (!value) { clear(input); return false; }
+            const known = state.get(input);
+            return !(known && known.value === value && known.status !== 'error');
+        });
+        if (!targets.length) return;
+        targets.forEach(function (input) { show(input, 'pending'); });
+
+        let results = {};
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ usernames: targets.map(function (i) { return i.value.trim(); }) }),
+            });
+            if (!response.ok) throw new Error((await response.json()).error || response.statusText);
+            results = (await response.json()).results;
+        } catch (err) {
+            targets.forEach(function (input) { show(input, 'error', 'Could not check: ' + err.message); });
+            return;
+        }
+        targets.forEach(function (input) {
+            const value = input.value.trim();
+            const result = results[value];
+            if (!result) { clear(input); return; }
+            state.set(input, { value: value, status: result.status });
+            let text = result.message;
+            if (result.status === 'ok') {
+                text = result.login && result.login !== value ? 'Exists (' + result.login + ')' : 'Exists';
+            }
+            show(input, result.status, text);
+        });
+    }
+
+    // 'change' fires on blur/Enter (not per keystroke), and also for each programmatic edit made by the
+    // bulk paste handler; queue them so a paste of N rows results in one request, not N.
+    let queued = new Set();
+    let timer = null;
+    form.addEventListener('change', function (event) {
+        if (!event.target.matches(SELECTOR)) return;
+        queued.add(event.target);
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+            const batch = Array.from(queued);
+            queued = new Set();
+            validate(batch);
+        }, 300);
+    });
+    form.addEventListener('input', function (event) {
+        if (event.target.matches(SELECTOR)) clear(event.target);
+    });
+
+    // Block submission when a username is known to be wrong; lookup errors (rate limit) don't block
+    // because the backend validates again on submit.
+    form.addEventListener('submit', async function (event) {
+        if (form.dataset.userChecked) return;
+        event.preventDefault();
+        const inputs = Array.from(form.querySelectorAll(SELECTOR));
+        await validate(inputs);
+        const withStatus = function (status) {
+            return inputs.filter(function (input) {
+                const known = state.get(input);
+                return known && known.status === status;
+            });
+        };
+        const invalid = withStatus('invalid');
+        const notFound = withStatus('not_found');
+        if (invalid.length || notFound.length) {
+            const lines = [];
+            if (invalid.length) lines.push(invalid.length + ' invalid username(s) (wrong format).');
+            if (notFound.length) lines.push(notFound.length + ' username(s) not found on GitHub.');
+            (invalid[0] || notFound[0]).focus();
+            alert(lines.join('\n') + '\nPlease fix them and resubmit.');
+            return;
+        }
+        form.dataset.userChecked = '1';
+        form.requestSubmit();
+        delete form.dataset.userChecked; // submit event is synchronous; re-check if another handler cancelled it
+    });
+}
+</script>
