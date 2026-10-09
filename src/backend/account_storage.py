@@ -19,6 +19,9 @@ if 'APPROVAL_DATABASE_URL' not in os.environ:
 
 _schema_ready = False
 
+# Provision statuses meaning the resource is held or an invitation is outstanding
+LIVE_STATUSES = ('pending', 'invited', 'accepted', 'assigned', 'active')
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS accounts (
     id UUID PRIMARY KEY,
@@ -258,6 +261,29 @@ def get_pending_provisions(resource: str, status: str) -> List[Provision]:
                 ORDER BY created_at;
                 """,
                 (resource, status),
+            )
+            rows = cur.fetchall()
+    return [Provision.from_dict(row) for row in rows]
+
+
+def find_provisions_by_username(resource: str, usernames: List[str],
+                                statuses: tuple[str, ...] = LIVE_STATUSES) -> List[Provision]:
+    """Provisions of a resource whose stored ``username`` matches any of the given names (case-insensitive).
+
+    By default only provisions that still hold, or are about to hold, the resource are returned
+    (not ``expired``, ``failed`` or ``deprovisioned`` ones).
+    """
+    if not usernames:
+        return []
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT * FROM account_provisions
+                WHERE resource = %s AND status = ANY(%s) AND lower(data->>'username') = ANY(%s)
+                ORDER BY created_at;
+                """,
+                (resource, list(statuses), [u.lower() for u in usernames]),
             )
             rows = cur.fetchall()
     return [Provision.from_dict(row) for row in rows]

@@ -4,7 +4,7 @@ import re
 import click
 import requests
 
-from backend.account_storage import get_or_create_account, set_provision_status
+from backend.account_storage import find_provisions_by_username, get_or_create_account, set_provision_status
 from backend.approval import requires_approval
 from backend.email_logging import send_email
 from backend.github_api import GitHubApi
@@ -65,6 +65,11 @@ def _github_validate(params: dict) -> str | None:
     # Use the correct casing from the GitHub API response
     if 'login' in user:
         params['username'] = user['login']
+
+    if existing := find_provisions_by_username('github', [params['username']]):
+        current = existing[0]
+        return (f"User {params['username']} is already onboarded to GitHub "
+                f"(status: {current.status}, email: {current.data.get('email', 'unknown')}).")
 
     teams = github_client.get_ent_teams()
     if team not in [t['slug'] for t in teams]:

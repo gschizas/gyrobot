@@ -19,6 +19,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from backend.account_storage import find_provisions_by_username
 from backend.github_api import GitHubApi
 from webapp import config
 from webapp.auth_ldap import ldap_authenticate
@@ -224,6 +225,19 @@ def _check_github_usernames(usernames: list[str]) -> dict[str, dict]:
         except Exception as ex:
             logger.warning(f"GitHub lookup failed for {username}: {ex!r}")
             results[username] = {'status': 'error', 'message': f'Could not check: {ex}'}
+
+    # Accounts that exist on GitHub but are already onboarded (per our database)
+    found = [u for u, r in results.items() if r['status'] == 'ok']
+    try:
+        existing = {p.data.get('username', '').lower(): p for p in find_provisions_by_username('github', found)}
+    except Exception as ex:
+        logger.warning(f"Database lookup of existing provisions failed: {ex!r}")
+        existing = {}
+    for username in found:
+        if provision := existing.get(results[username]['login'].lower()) or existing.get(username.lower()):
+            results[username] = {
+                'status': 'already_onboarded', 'login': results[username]['login'],
+                'message': f"Already onboarded ({provision.status}, {provision.data.get('email', 'unknown email')})"}
     return results
 
 

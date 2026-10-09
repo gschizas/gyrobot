@@ -3,6 +3,7 @@
     .user-status.ok { color: #1a7f37; }
     .user-status.not_found { color: #cf222e; }
     .user-status.invalid { color: #bc4c00; }
+    .user-status.already_onboarded { color: #8250df; }
     .user-status.error { color: #9a6700; }
     .user-status.pending { color: #57606a; }
 </style>
@@ -14,10 +15,11 @@
 //   ok         - the account exists
 //   invalid    - not a well-formed GitHub username (e.g. an email or an @mention); GitHub was not asked
 //   not_found  - well-formed, but GitHub has no such account
+//   already_onboarded - the account exists and our database already has a live GitHub provision for it
 //   error      - the lookup itself failed (e.g. rate limit); says nothing about the username
 function attachGithubUserValidation(form, url) {
     const SELECTOR = 'input[name="username"]';
-    const ICONS = { ok: '✔ ', invalid: '⛔ ', not_found: '✖ ', error: '⚠ ' };
+    const ICONS = { ok: '✔ ', invalid: '⛔ ', not_found: '✖ ', already_onboarded: '🚫 ', error: '⚠ ' };
     const state = new WeakMap(); // input -> {value, status}
 
     function marker(input) {
@@ -111,11 +113,13 @@ function attachGithubUserValidation(form, url) {
         };
         const invalid = withStatus('invalid');
         const notFound = withStatus('not_found');
-        if (invalid.length || notFound.length) {
+        const already = withStatus('already_onboarded');
+        if (invalid.length || notFound.length || already.length) {
             const lines = [];
             if (invalid.length) lines.push(invalid.length + ' invalid username(s) (wrong format).');
             if (notFound.length) lines.push(notFound.length + ' username(s) not found on GitHub.');
-            (invalid[0] || notFound[0]).focus();
+            if (already.length) lines.push(already.length + ' user(s) already onboarded.');
+            (invalid[0] || notFound[0] || already[0]).focus();
             alert(lines.join('\n') + '\nPlease fix them and resubmit.');
             return;
         }
