@@ -33,8 +33,7 @@ accepted/expired are not visible in the web UI or API. Options:
    `datetime.now(timezone.utc)` (also removes the naive/aware mix).
 7. **Single notification sender**: `backend.notifications.set_sender` supports only one sender
    and the web process has none (see the notifications section above).
-8. The **`bot github pending-invitations`** command seems to only show the first 100 pending invitations (the GitHub API paginates at 100). Follow `pageInfo.endCursor` in `_get_pending_invitations_raw` (GraphQL, so `_github_api_call` doesn't apply).
-9. `bot github members` (now GraphQL-based) shows no email when none exists on GitHub. Use the database to fill in the email. Add maybe a column that shows the source of the email (if it's from GitHub, or from the bot's database).
+8. `bot github members` (now GraphQL-based) shows no email when none exists on GitHub. Use the database to fill in the email. Add maybe a column that shows the source of the email (if it's from GitHub, or from the bot's database).
 
 ## Other chat platforms
 

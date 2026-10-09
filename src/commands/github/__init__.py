@@ -64,9 +64,10 @@ def github_team_members(ctx: ExtendedContext, team_slug: str):
 
 
 @github.command("pending-invitations")
+@click.argument("team_prefix", required=False)
 @click.pass_context
-def github_pending_invitations(ctx: ExtendedContext):
-    """Display pending invitations for the GitHub organization"""
+def github_pending_invitations(ctx: ExtendedContext, team_prefix: str | None):
+    """Display pending invitations, optionally only for teams starting with TEAM_PREFIX"""
     invitations = GitHubApi().get_pending_invitations()
 
     if not invitations:
@@ -89,4 +90,13 @@ def github_pending_invitations(ctx: ExtendedContext):
         inv['email'] = user['data']['email']
         inv['team'] = user['data']['team']
 
-    ctx.chat.send_table(title='Pending Invitations', table=invitations)
+    if team_prefix:
+        prefix = team_prefix.lower().removeprefix('ent:')
+        # Only invitations made through the bot have a team on record
+        invitations = [inv for inv in invitations if inv.get('team', '').lower().removeprefix('ent:').startswith(prefix)]
+        if not invitations:
+            ctx.chat.send_text(f"No pending invitations found for teams starting with {team_prefix}.")
+            return
+
+    title = 'Pending Invitations' + (f' (teams starting with {team_prefix})' if team_prefix else '')
+    ctx.chat.send_table(title=title, table=invitations)

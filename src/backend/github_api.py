@@ -314,18 +314,15 @@ class GitHubApi():
         }
         """
         cursor = None
+        nodes = []
 
-        response = self.ses_usr.post(
-            GRAPHQL_URL,
-            json={
-                "query": QUERY,
-                "variables": {
-                    "slug": self.enterprise,
-                    "cursor": cursor
-                }
-            },
-        )
-        return response.json()
+        while True:
+            data = self._graphql(self.ses_usr, QUERY, {"slug": self.enterprise, "cursor": cursor})
+            invitations = data["enterprise"]["ownerInfo"]["pendingUnaffiliatedMemberInvitations"]
+            nodes.extend(invitations["nodes"])
+            if not invitations["pageInfo"]["hasNextPage"]:
+                return nodes
+            cursor = invitations["pageInfo"]["endCursor"]
 
     def get_pending_invitations(self):
         def pretty_timedelta(td):
@@ -354,23 +351,18 @@ class GitHubApi():
                 else:
                     return f"{seconds} seconds"
         dt = datetime.datetime.now(datetime.timezone.utc)
-        response = self._get_pending_invitations_raw()
-
         invitations = [{
             'login': inv['invitee']['login'],
             'createdAt': datetime.datetime.fromisoformat(inv['createdAt']).strftime('%d/%m/%Y %H:%M'),
             'age': pretty_timedelta(dt - datetime.datetime.fromisoformat(inv['createdAt'])),
             'remainingTime': pretty_timedelta(
                 datetime.timedelta(days=7) - (dt - datetime.datetime.fromisoformat(inv['createdAt'])))
-        } for inv in response['data']['enterprise']['ownerInfo']['pendingUnaffiliatedMemberInvitations']['nodes']]
+        } for inv in self._get_pending_invitations_raw()]
 
         return invitations
 
     def get_pending_invitations_usernames(self):
-        response = self._get_pending_invitations_raw()
-
-        return [inv['invitee']['login'] for inv in
-                response['data']['enterprise']['ownerInfo']['pendingUnaffiliatedMemberInvitations']['nodes']]
+        return [inv['invitee']['login'] for inv in self._get_pending_invitations_raw()]
 
     # Step 1: Get all org logins in the enterprise
     # Step 2: Get all members with verified domain emails for each org login
