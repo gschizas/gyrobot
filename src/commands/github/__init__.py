@@ -51,15 +51,16 @@ def github_teams(ctx: ExtendedContext):
 @click.argument("team_slug")
 @click.pass_context
 def github_team_members(ctx: ExtendedContext, team_slug: str):
-    """Display members of a GitHub Team"""
-    members = GitHubApi().get_ent_team_members(team_slug)
+    """Display members (login, email, team) of enterprise teams whose slug starts with TEAM_SLUG"""
+    members = GitHubApi().get_ent_team_members_by_prefix(team_slug)
 
     if not members:
-        ctx.chat.send_text(f"No members found for team {team_slug}.")
+        ctx.chat.send_text(f"No members found for teams starting with {team_slug}.")
         return
 
-    table = [{'Username': member['login'], 'Name': member.get('name', ''), 'Email': member.get('email', '')} for member in members]
-    ctx.chat.send_table(title=f'Members of {team_slug}', table=table)
+    table = [{'Username': m['login'], 'Email': ', '.join(m['emails']), 'Team': m['team']}
+             for m in sorted(members, key=lambda m: (m['team'], m['login'].lower()))]
+    ctx.chat.send_table(title=f'Members of teams starting with {team_slug}', table=table)
 
 
 @github.command("pending-invitations")

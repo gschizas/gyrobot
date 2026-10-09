@@ -480,6 +480,92 @@ class GitHubApi():
 
         return all_members
 
+    def _graphql(self, ses: requests.Session, query: str, variables: dict) -> dict:
+        response = ses.post(GRAPHQL_URL, json={"query": query, "variables": variables})
+        response.raise_for_status()
+        data = response.json()
+        if "errors" in data:
+            raise RuntimeError(f"GraphQL errors: {data['errors']}")
+        return data["data"]
+
+    def get_verified_emails(self, logins: list[str], ses: requests.Session | None = None) -> dict[str, list[str]]:
+        """Map lowercased login -> verified-domain emails (across all organizations) for just the given users."""
+        ses = ses or self.ses_usr
+        org_logins = self.get_org_logins(ses)
+        emails: dict[str, list[str]] = {}
+        batch_size = 25
+        for start in range(0, len(logins), batch_size):
+            batch = logins[start:start + batch_size]
+            # Values go through variables (never interpolated); only org logins from GitHub are inlined
+            org_fields = "\n".join(f'org_{i}: organizationVerifiedDomainEmails(login: "{org}")'
+                                   for i, org in enumerate(org_logins))
+            declarations = ", ".join(f"$l{i}: String!" for i in range(len(batch)))
+            fields = "\n".join(f"u{i}: user(login: $l{i}) {{ login {org_fields} }}" for i in range(len(batch)))
+            data = self._graphql(ses, f"query({declarations}) {{ {fields} }}",
+                                 {f"l{i}": login for i, login in enumerate(batch)})
+            for i, login in enumerate(batch):
+                user = data.get(f"u{i}") or {}
+                emails[login.lower()] = self.extract_verified_emails(user, len(org_logins))
+        return emails
+
+    def get_ent_team_members_by_prefix(self, prefix: str, ses: requests.Session | None = None) -> list[dict]:
+        """Members of every enterprise team whose slug starts with ``prefix`` (case-insensitive, ``ent:`` optional).
+
+        Returns ``[{"login", "team", "emails"}]`` with one entry per user per matching team.
+        Only the matching teams' members, and only those members' emails, are fetched.
+        """
+        ses = ses or self.ses_usr
+        prefix = prefix.lower().removeprefix("ent:")
+
+        teams_query = """
+        query($slug: String!, $cursor: String) {
+          enterprise(slug: $slug) {
+            enterpriseTeams(first: 100, after: $cursor) {
+              nodes { slug }
+              pageInfo { hasNextPage endCursor }
+            }
+          }
+        }
+        """
+        members_query = """
+        query($slug: String!, $team: String!, $cursor: String) {
+          enterprise(slug: $slug) {
+            enterpriseTeam(slug: $team) {
+              enterpriseTeamMembers(first: 100, after: $cursor) {
+                nodes { login }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          }
+        }
+        """
+
+        matching, cursor = [], None
+        while True:
+            teams = self._graphql(ses, teams_query, {"slug": self.enterprise, "cursor": cursor}
+                                  )["enterprise"]["enterpriseTeams"]
+            matching.extend(t["slug"] for t in teams["nodes"] if t["slug"].lower().removeprefix("ent:").startswith(prefix))
+            if not teams["pageInfo"]["hasNextPage"]:
+                break
+            cursor = teams["pageInfo"]["endCursor"]
+
+        rows = []
+        for slug in sorted(matching):
+            cursor = None
+            while True:
+                members = self._graphql(ses, members_query, {"slug": self.enterprise, "team": slug, "cursor": cursor}
+                                        )["enterprise"]["enterpriseTeam"]["enterpriseTeamMembers"]
+                rows.extend({"login": m["login"], "team": slug.removeprefix("ent:")}
+                            for m in members["nodes"] if m and m.get("login"))
+                if not members["pageInfo"]["hasNextPage"]:
+                    break
+                cursor = members["pageInfo"]["endCursor"]
+
+        emails = self.get_verified_emails(sorted({r["login"] for r in rows}), ses)
+        for row in rows:
+            row["emails"] = emails.get(row["login"].lower(), [])
+        return rows
+
     def get_ent_team_logins(self, ses: requests.Session | None = None) -> dict[str, list[str]]:
         """Map lowercased login -> enterprise team slugs (without the ``ent:`` prefix), via GraphQL."""
         ses = ses or self.ses_ent
