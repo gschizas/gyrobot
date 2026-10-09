@@ -405,7 +405,8 @@ class GitHubApi():
             }}
             """
 
-    def get_org_logins(self) -> list[str]:
+    def get_org_logins(self, ses: requests.Session | None = None) -> list[str]:
+        ses = ses or self.ses_ent
         ORG_QUERY = """
         query GetEnterpriseOrgs($slug: String!, $cursor: String) {
           enterprise(slug: $slug) {
@@ -419,7 +420,7 @@ class GitHubApi():
         cursor = None
         logins = []
         while True:
-            response = self.ses_ent.post(
+            response = ses.post(
                 GRAPHQL_URL,
                 json={"query": ORG_QUERY, "variables": {"slug": self.enterprise, "cursor": cursor}},
             )
@@ -441,8 +442,10 @@ class GitHubApi():
             all_emails.extend(node.get(f"org_{i}") or [])
         return list(dict.fromkeys(all_emails))  # deduplicate, preserve order
 
-    def list_enterprise_members(self) -> list[dict]:
-        org_logins = self.get_org_logins()
+    def list_enterprise_members(self, ses: requests.Session | None = None) -> list[dict]:
+        """Enterprise members with their verified-domain emails across all of the enterprise's organizations."""
+        ses = ses or self.ses_ent
+        org_logins = self.get_org_logins(ses)
         if not org_logins:
             raise RuntimeError("No organizations found in enterprise.")
 
@@ -451,7 +454,7 @@ class GitHubApi():
         all_members = []
 
         while True:
-            response = self.ses_ent.post(
+            response = ses.post(
                 GRAPHQL_URL,
                 json={"query": query, "variables": {"slug": self.enterprise, "cursor": cursor}},
             )
@@ -476,6 +479,69 @@ class GitHubApi():
             cursor = members_data["pageInfo"]["endCursor"]
 
         return all_members
+
+    def get_ent_team_logins(self, ses: requests.Session | None = None) -> dict[str, list[str]]:
+        """Map lowercased login -> enterprise team slugs (without the ``ent:`` prefix), via GraphQL."""
+        ses = ses or self.ses_ent
+        teams_query = """
+        query($slug: String!, $cursor: String) {
+          enterprise(slug: $slug) {
+            enterpriseTeams(first: 100, after: $cursor) {
+              nodes {
+                slug
+                enterpriseTeamMembers(first: 100) {
+                  nodes { login }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }
+              pageInfo { hasNextPage endCursor }
+            }
+          }
+        }
+        """
+        # Only needed for teams with more than 100 members
+        members_query = """
+        query($slug: String!, $team: String!, $cursor: String) {
+          enterprise(slug: $slug) {
+            enterpriseTeam(slug: $team) {
+              enterpriseTeamMembers(first: 100, after: $cursor) {
+                nodes { login }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          }
+        }
+        """
+
+        def run(query: str, variables: dict) -> dict:
+            response = ses.post(GRAPHQL_URL, json={"query": query, "variables": variables})
+            response.raise_for_status()
+            data = response.json()
+            if "errors" in data:
+                raise RuntimeError(f"GraphQL errors: {data['errors']}")
+            return data["data"]["enterprise"]
+
+        teams_by_login: dict[str, list[str]] = {}
+
+        def add(slug: str, nodes: list[dict]) -> None:
+            for node in nodes:
+                if node and node.get("login"):
+                    teams_by_login.setdefault(node["login"].lower(), []).append(slug.removeprefix("ent:"))
+
+        cursor = None
+        while True:
+            teams = run(teams_query, {"slug": self.enterprise, "cursor": cursor})["enterpriseTeams"]
+            for team in teams["nodes"]:
+                slug, members = team["slug"], team["enterpriseTeamMembers"]
+                add(slug, members["nodes"])
+                while members["pageInfo"]["hasNextPage"]:
+                    members = run(members_query, {"slug": self.enterprise, "team": slug,
+                                                  "cursor": members["pageInfo"]["endCursor"]}
+                                  )["enterpriseTeam"]["enterpriseTeamMembers"]
+                    add(slug, members["nodes"])
+            if not teams["pageInfo"]["hasNextPage"]:
+                return teams_by_login
+            cursor = teams["pageInfo"]["endCursor"]
 
     def add_users_to_ent_team(self, team_name: str, usernames: list[str]) -> list[dict]:
         result = self.ses_ent.post(

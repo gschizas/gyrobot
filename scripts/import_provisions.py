@@ -6,7 +6,7 @@ Usage (from the repository root; reads APPROVAL_DATABASE_URL from .env.d/<env-na
     uv run python tools/import_provisions.py <env-name> users.csv            # preview only
     uv run python tools/import_provisions.py <env-name> users.xlsx --apply   # write to the database
 
-Columns (header row required, case-insensitive):
+Columns (header row required, case-insensitive; CSV may be comma- or semicolon-separated, auto-detected):
 
     email       required  account primary email
     resource    required  github | jetbrains | crowd | slack
@@ -43,7 +43,10 @@ def read_rows(path: pathlib.Path) -> list[dict]:
         rows = frame.to_dict('records')
     else:
         with path.open(newline='', encoding='utf-8-sig') as f:
-            rows = list(csv.DictReader(f))
+            header = f.readline()
+            f.seek(0)
+            delimiter = ';' if header.count(';') > header.count(',') else ','
+            rows = list(csv.DictReader(f, delimiter=delimiter))
     return [{str(k).strip().lower(): str(v).strip() for k, v in row.items()} for row in rows]
 
 
