@@ -16,6 +16,39 @@ GRAPHQL_URL = f"{GITHUB_API_URL}/graphql"
 logger = logging.getLogger(__name__)
 
 
+def _rate_limit_info(response: requests.Response) -> str:
+    headers = {k: v for k, v in response.headers.items()
+               if k.lower().startswith('x-ratelimit-') or k.lower() == 'retry-after'}
+    reset = headers.get('x-ratelimit-reset') or headers.get('X-RateLimit-Reset')
+    if reset and reset.isdigit():
+        reset_at = datetime.datetime.fromtimestamp(int(reset), datetime.timezone.utc)
+        headers['resets_at_utc'] = reset_at.strftime('%Y-%m-%d %H:%M:%S')
+    return ', '.join(f"{k}: {v}" for k, v in headers.items())
+
+
+def _rate_limit_hook(response: requests.Response, *args, **kwargs) -> requests.Response:
+    """Make raise_for_status() include the X-RateLimit-* headers in the error message."""
+    original = response.raise_for_status
+
+    def raise_for_status():
+        try:
+            original()
+        except requests.HTTPError as e:
+            info = _rate_limit_info(response)
+            if info:
+                raise requests.HTTPError(f"{e} [{info}]", response=response, request=e.request) from e
+            raise
+
+    response.raise_for_status = raise_for_status
+    return response
+
+
+def _new_session() -> requests.Session:
+    session = requests.session()
+    session.hooks['response'].append(_rate_limit_hook)
+    return session
+
+
 class GitHubApi():
     _instance = None
     _initialized = False
@@ -91,7 +124,7 @@ class GitHubApi():
         self._jwt_token = jwt.encode(payload, self.signing_key, algorithm='RS256')
         assert self._jwt_token is not None
 
-        self._ses_inst = requests.session()
+        self._ses_inst = _new_session()
         assert self._ses_inst is not None
 
         self._ses_inst.headers['Accept'] = 'application/vnd.github+json'
@@ -106,20 +139,20 @@ class GitHubApi():
         access_tokens_org = self.ses_inst.post(f"{GITHUB_API_URL}/app/installations/{org_inst_id}/access_tokens")
 
         token_ent = access_tokens_ent.json()['token']
-        self._ses_ent = requests.session()
+        self._ses_ent = _new_session()
         assert self._ses_ent is not None
         self._ses_ent.headers['Accept'] = 'application/vnd.github+json'
         self._ses_ent.headers['Authorization'] = 'Bearer ' + token_ent
         self._ses_ent.headers['X-GitHub-Api-Version'] = '2026-03-10'
 
         token_org = access_tokens_org.json()['token']
-        self._ses_org = requests.session()
+        self._ses_org = _new_session()
         assert self._ses_org is not None
         self._ses_org.headers['Accept'] = 'application/vnd.github+json'
         self._ses_org.headers['Authorization'] = 'Bearer ' + token_org
         self._ses_org.headers['X-GitHub-Api-Version'] = '2026-03-10'
 
-        self._ses_usr = requests.session()
+        self._ses_usr = _new_session()
         assert self._ses_usr is not None
         self._ses_usr.headers['Accept'] = 'application/vnd.github+json'
         self._ses_usr.headers['Authorization'] = 'Bearer ' + self.personal_access_token
