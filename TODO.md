@@ -25,16 +25,14 @@ accepted/expired are not visible in the web UI or API. Options:
    compare lowercased on both sides (older provisions may have the wrong casing).
 3. **Approvals-channel notification on failure**: the exception path in `_approve_one`
    (`commands/approvals.py`) should also notify the approvals channel.
-4. **`GitHubApi.get_user_details` makes two calls**: an unauthenticated `requests.get`
-   (60/hour per IP limit, easily hit by bulk onboarding), then the authenticated one. Drop the first.
-5. **Inconsistent validation errors** in `_github_validate`: user-not-found returns a message, but
+4. **Inconsistent validation errors** in `_github_validate`: user-not-found returns a message, but
    bad team / email domain raise `RuntimeError`. Return strings for all.
-6. **No tests**: add pytest coverage for `_parse_id_spec`, `convert_slack_emoji`,
+5. **No tests**: add pytest coverage for `_parse_id_spec`, `convert_slack_emoji`,
    `flatten_team_tree` and the invitation expiry decision.
-7. **Deprecated `datetime.utcnow()`** in `account_storage.py` / `accounts.py`: use
+6. **Deprecated `datetime.utcnow()`** in `account_storage.py` / `accounts.py`: use
    `datetime.now(timezone.utc)` (also removes the naive/aware mix).
-8. **`.gitignore`**: `[Ss]cripts` ignores `scripts/`; add `!/scripts/`.
-9. **Single notification sender**: `backend.notifications.set_sender` supports only one sender
+7. **`.gitignore`**: `[Ss]cripts` ignores `scripts/`; add `!/scripts/`.
+8. **Single notification sender**: `backend.notifications.set_sender` supports only one sender
    and the web process has none (see the notifications section above).
 
 ## Mattermost gaps (`src/chat/mattermost.py`)
