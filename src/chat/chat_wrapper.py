@@ -12,6 +12,7 @@ import pandas as pd
 from tabulate import tabulate
 
 from backend.constants import TableFormat
+from backend.excel import write_excel_table
 
 
 class Conversation(ABC):
@@ -75,7 +76,8 @@ class Conversation(ABC):
             table_df = pd.DataFrame(table)
             Conversation.localize_datetime(table_df)
             # noinspection PyTypeChecker
-            table_df.reset_index(drop=True).to_excel(table_output)
+            with pd.ExcelWriter(table_output, engine='xlsxwriter') as writer:
+                write_excel_table(writer, table_df, 'Sheet1', 'Table1')
             excel_data = table_output.getvalue()
         return excel_data
 
@@ -123,7 +125,7 @@ class Conversation(ABC):
             # noinspection PyTypeChecker
             with pd.ExcelWriter(excel_output, engine='xlsxwriter') as writer:
                 long_sheet_names = []
-                for table_name, table in tables.items():
+                for table_index, (table_name, table) in enumerate(tables.items(), start=1):
                     if len(table_name) <= 31:
                         sheet_name = table_name
                     else:
@@ -131,10 +133,9 @@ class Conversation(ABC):
                         long_sheet_names.append({'Original Name': table_name, 'Translated Name': sheet_name})
                     table_df = pd.DataFrame(table)
                     Conversation.localize_datetime(table_df)
-                    table_df.reset_index(drop=True).to_excel(writer, sheet_name=sheet_name)
+                    write_excel_table(writer, table_df, sheet_name, f'Table{table_index}_{table_name}')
                 if long_sheet_names:
-                    table_sheet_names = pd.DataFrame(long_sheet_names)
-                    table_sheet_names.reset_index(drop=True).to_excel(writer, sheet_name='__LongNames')
+                    write_excel_table(writer, pd.DataFrame(long_sheet_names), '__LongNames', 'LongNames')
             excel_output.seek(0)
             excel_data = excel_output.read()
         return excel_data
