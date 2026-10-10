@@ -289,6 +289,45 @@ def find_provisions_by_username(resource: str, usernames: List[str],
     return [Provision.from_dict(row) for row in rows]
 
 
+def get_provisions(resource: str) -> List[Provision]:
+    """All provisions of a resource, whatever their status."""
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM account_provisions WHERE resource = %s ORDER BY created_at;", (resource,))
+            rows = cur.fetchall()
+    return [Provision.from_dict(row) for row in rows]
+
+
+def find_provisions_by_github_id(github_id: int, statuses: tuple[str, ...] = LIVE_STATUSES) -> List[Provision]:
+    """GitHub provisions stored with the given numeric GitHub user id (survives username changes)."""
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT * FROM account_provisions
+                WHERE resource = 'github' AND status = ANY(%s) AND data->>'github_id' = %s
+                ORDER BY created_at;
+                """,
+                (list(statuses), str(github_id)),
+            )
+            rows = cur.fetchall()
+    return [Provision.from_dict(row) for row in rows]
+
+
+def merge_provision_data(account_id: UUID, resource: str, extra: dict) -> None:
+    """Add/overwrite keys in a provision's data without touching its status or created_at."""
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE account_provisions SET data = data || %s, updated_at = now()
+                WHERE account_id = %s AND resource = %s;
+                """,
+                (Jsonb(extra), str(account_id), resource),
+            )
+        conn.commit()
+
+
 def get_account_provisions(account_id: UUID) -> List[Provision]:
     """Get all provisions for an account (across all resources)."""
     with _connect() as conn:

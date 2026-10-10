@@ -4,7 +4,8 @@ import re
 import click
 import requests
 
-from backend.account_storage import find_provisions_by_username, get_or_create_account, set_provision_status
+from backend.account_storage import (find_provisions_by_github_id, find_provisions_by_username,
+                                     get_or_create_account, set_provision_status)
 from backend.approval import requires_approval
 from backend.email_logging import send_email
 from backend.github_api import GitHubApi
@@ -66,7 +67,11 @@ def _github_validate(params: dict) -> str | None:
     if 'login' in user:
         params['username'] = user['login']
 
-    if existing := find_provisions_by_username('github', [params['username']]):
+    existing = find_provisions_by_username('github', [params['username']])
+    if not existing and user.get('id'):
+        # The account may have been onboarded under a previous username
+        existing = find_provisions_by_github_id(user['id'])
+    if existing:
         current = existing[0]
         return (f"User {params['username']} is already onboarded to GitHub "
                 f"(status: {current.status}, email: {current.data.get('email', 'unknown')}).")
@@ -103,6 +108,11 @@ def onboard_github(ctx: ExtendedContext, username: str, email: str, team: str):
     USAGE: bot onboard github <username> <email> <team>
     """
     provision_data = {'username': username, 'email': email, 'team': team}
+    try:
+        provision_data['github_id'] = GitHubApi().get_user_details(username)['id']
+    except Exception as e:
+        # Not fatal: scripts/backfill_github_ids.py can fill it in later
+        ctx.logger.warning(f"Could not look up GitHub id of {username}: {e}")
 
     # For now, provision via the stub (using email for ProviderAccount)
     # In real integration, the provider will populate node_id, login, enterprise_user_id
