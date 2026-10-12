@@ -8,7 +8,7 @@ Type=simple
 User=@USER@
 WorkingDirectory=@DIR@
 ExecStartPre=/bin/sh -c '@UV@ run python src/plugins.py requirements %i | @UV@ pip install -r -'
-ExecStart=@UV@ run python src/run_webapp.py %i
+ExecStart=@UV@ run src/run_webapp.py %i
 Restart=on-failure
 RestartSec=10
 
