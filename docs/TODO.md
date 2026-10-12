@@ -41,7 +41,8 @@ accepted/expired are not visible in the web UI or API. Options:
    **Do not write any Crowd onboarding code until the existing scripts have been pasted.** They mostly validate
    that the account exists in AD/LDAP before adding it, and then assign the proper team. `onboard crowd` and
    `backend/providers/crowd.py` are currently stubs.
-2. **Secrets storage**: plain-text files holding passwords/tokens are not good enough. The server runs on Linux, so
+2. **Secrets storage**: (options and trade-offs are in `SECRETS-OPTIONS.md`; systemd credentials need systemd 250+,
+   so they're parked until the server leaves Ubuntu 22.04; see `SYSTEMD-CREDENTIALS.md`.) Plain-text files holding passwords/tokens are not good enough. The server runs on Linux, so
    there is no DPAPI equivalent. Evaluate alternatives (e.g. systemd credentials, an OS keyring or secret service,
    Vault or another secrets manager, or encrypting at rest with a key kept outside the config directory).
 3. **`accounts.name` column**: it is not used properly (currently the GitHub username is written there), and it may
