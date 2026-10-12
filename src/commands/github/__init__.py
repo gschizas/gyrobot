@@ -6,6 +6,7 @@ import click
 from treelib import Tree
 
 from commands import gyrobot, DefaultCommandGroup
+from backend.constants import TableFormat
 from backend.github_api import GitHubApi
 from commands.extended_context import ExtendedContext
 import psycopg
@@ -49,8 +50,9 @@ def github_teams(ctx: ExtendedContext):
 
 @github.command("members")
 @click.argument("team_slug")
+@click.option('-x', '--excel', 'as_excel', is_flag=True, help='Send the result as an Excel file')
 @click.pass_context
-def github_team_members(ctx: ExtendedContext, team_slug: str):
+def github_team_members(ctx: ExtendedContext, team_slug: str, as_excel: bool):
     """Display members (login, email, team) of enterprise teams whose slug starts with TEAM_SLUG"""
     members = GitHubApi().get_ent_team_members_by_prefix(team_slug)
 
@@ -60,13 +62,15 @@ def github_team_members(ctx: ExtendedContext, team_slug: str):
 
     table = [{'Username': m['login'], 'Email': ', '.join(m['emails']), 'Team': m['team']}
              for m in sorted(members, key=lambda m: (m['team'], m['login'].lower()))]
-    ctx.chat.send_table(title=f'Members of teams starting with {team_slug}', table=table)
+    ctx.chat.send_table(title=f'Members of teams starting with {team_slug}', table=table,
+                        table_format=TableFormat.EXCEL if as_excel else TableFormat.TABLE)
 
 
 @github.command("pending-invitations")
 @click.argument("team_prefix", required=False)
+@click.option('-x', '--excel', 'as_excel', is_flag=True, help='Send the result as an Excel file')
 @click.pass_context
-def github_pending_invitations(ctx: ExtendedContext, team_prefix: str | None):
+def github_pending_invitations(ctx: ExtendedContext, team_prefix: str | None, as_excel: bool):
     """Display pending invitations, optionally only for teams starting with TEAM_PREFIX"""
     invitations = GitHubApi().get_pending_invitations()
 
@@ -99,4 +103,5 @@ def github_pending_invitations(ctx: ExtendedContext, team_prefix: str | None):
             return
 
     title = 'Pending Invitations' + (f' (teams starting with {team_prefix})' if team_prefix else '')
-    ctx.chat.send_table(title=title, table=invitations)
+    ctx.chat.send_table(title=title, table=invitations,
+                        table_format=TableFormat.EXCEL if as_excel else TableFormat.TABLE)
