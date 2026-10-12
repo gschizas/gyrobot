@@ -60,6 +60,10 @@ is true on Linux: nothing here stops someone who can run code as the bot's own u
 - Pros: the key cannot be copied off the machine.
 - Cons: complex and tied to specific hardware; usually unjustified for a bot.
 
+## Azure Key Vault
+
+Details, authentication options and questions for the Azure admins are in `AZURE-KEY-VAULT.md`.
+
 ## Recommendation
 
 - **Now:** option 1 (tight permissions), plus option 2 under systemd once the OS allows it, or option 3 under Docker.
