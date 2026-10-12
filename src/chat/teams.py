@@ -15,7 +15,7 @@ incoming messages and persisted in ``data/teams_conversations-<LOG_NAME>.yml``, 
 notification channel only needs to have been addressed (e.g. by ``@mention``) once.
 ``channel_id`` is the Teams conversation id.
 
-Not implemented yet: see ``TODO.md``.
+Not implemented yet: see ``docs/TODO.md``.
 """
 PLUGIN = {'requires': ['TEAMS_APP_ID'], 'dependencies': ['botbuilder-integration-aiohttp>=4.16.0'], 'priority': 30}
 

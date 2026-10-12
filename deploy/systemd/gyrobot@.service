@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=simple
 User=@USER@
 WorkingDirectory=@DIR@
-# Install the libraries of the plugins this instance enables (see INSTALLATION.md)
+# Install the libraries of the plugins this instance enables (see docs/INSTALLATION.md)
 ExecStartPre=/bin/sh -c '@UV@ run python src/plugins.py requirements %i | @UV@ pip install -r -'
 ExecStart=@UV@ run python src %i
 Restart=on-failure

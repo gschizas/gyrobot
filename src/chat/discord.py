@@ -8,7 +8,7 @@ Never call :func:`_run` from the loop thread itself (it would deadlock).
 Requires the *Message Content* privileged intent to be enabled for the bot.
 Channel ids are Discord snowflakes, kept as strings; ``team_id`` is the guild id.
 
-Not implemented yet: see ``TODO.md``.
+Not implemented yet: see ``docs/TODO.md``.
 """
 PLUGIN = {'requires': ['DISCORD_API_TOKEN'], 'dependencies': ['discord.py>=2.4.0'], 'priority': 20}
 

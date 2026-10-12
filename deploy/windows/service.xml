@@ -7,7 +7,7 @@
   <arguments>run python src\@SCRIPT@ @INSTANCE@</arguments>
   <workingdirectory>@DIR@</workingdirectory>
   <env name="PYTHONUTF8" value="1"/>
-  <!-- Install the libraries of the plugins this instance enables (see INSTALLATION.md) -->
+  <!-- Install the libraries of the plugins this instance enables (see docs/INSTALLATION.md) -->
   <prestart>
     <executable>cmd.exe</executable>
     <arguments>/c &quot;&quot;@UV@&quot; run python src\plugins.py requirements @INSTANCE@ | &quot;@UV@&quot; pip install -r -&quot;</arguments>

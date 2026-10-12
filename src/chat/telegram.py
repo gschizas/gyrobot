@@ -9,7 +9,7 @@ Notes:
 * In groups the bot only sees all messages if *privacy mode* is disabled in @BotFather.
 * Outgoing text is sent as HTML: Slack-style ``` code blocks and ``*bold*`` are converted.
 
-Not implemented yet: see ``TODO.md``.
+Not implemented yet: see ``docs/TODO.md``.
 """
 PLUGIN = {'requires': ['TELEGRAM_API_TOKEN'], 'dependencies': ['pyTelegramBotAPI>=4.14.0'], 'priority': 40}
 

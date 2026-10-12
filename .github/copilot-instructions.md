@@ -11,7 +11,7 @@ A multi-platform chat bot (Slack/Mattermost) that integrates with Reddit for sub
 git submodule update --init   # bot_framework is a submodule
 uv sync
 # plugin-specific libraries are declared by the plugins themselves; install those for the current env:
-uv run python src/plugins.py requirements <env-name> | uv pip install -r -   # see INSTALLATION.md
+uv run python src/plugins.py requirements <env-name> | uv pip install -r -   # see docs/INSTALLATION.md
 ```
 
 **Run locally** (loads `.env.d/<name>.env`):
