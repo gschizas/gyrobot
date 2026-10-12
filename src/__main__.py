@@ -12,7 +12,7 @@ import traceback
 import click.testing
 import praw
 import requests
-from dotenv import load_dotenv
+from backend.secret_store import load_environment
 
 import chat.chat_wrapper
 import commands
@@ -241,6 +241,6 @@ def main():
 
 
 if __name__ == '__main__':
-    load_dotenv(dotenv_path=f'.env.d/{sys.argv[1]}.env', override=True)
+    load_environment(sys.argv[1])
     do_imports()
     main()

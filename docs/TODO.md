@@ -41,7 +41,10 @@ accepted/expired are not visible in the web UI or API. Options:
    **Do not write any Crowd onboarding code until the existing scripts have been pasted.** They mostly validate
    that the account exists in AD/LDAP before adding it, and then assign the proper team. `onboard crowd` and
    `backend/providers/crowd.py` are currently stubs.
-2. **Secrets storage**: (options and trade-offs are in `SECRETS-OPTIONS.md`; systemd credentials need systemd 250+,
+2. **Secrets storage**: a pluggable secret store now exists (`backend/secret_store`, see `SECRET-STORE.md`) with
+   systemd, directory, `pass`, keyring and Azure Key Vault backends; remaining work is choosing a backend, moving the
+   real secrets, and routing the `config/*.credentials.yml` files through it.
+   (Options and trade-offs are in `SECRETS-OPTIONS.md`; systemd credentials need systemd 250+,
    so they're parked until the server leaves Ubuntu 22.04; see `SYSTEMD-CREDENTIALS.md`.) Plain-text files holding passwords/tokens are not good enough. The server runs on Linux, so
    there is no DPAPI equivalent. Evaluate alternatives (e.g. systemd credentials, an OS keyring or secret service,
    Vault or another secrets manager, or encrypting at rest with a key kept outside the config directory).

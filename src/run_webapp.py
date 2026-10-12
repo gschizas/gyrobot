@@ -14,11 +14,11 @@ import os
 import sys
 
 import uvicorn
-from dotenv import load_dotenv
+from backend.secret_store import load_environment
 
 if __name__ == '__main__':
     if len(sys.argv) > 1:
-        load_dotenv(dotenv_path=f'.env.d/{sys.argv[1]}.env', override=True)
+        load_environment(sys.argv[1])
     else:
         print("Usage: python src/run_webapp.py <env-name>")
         sys.exit(1)

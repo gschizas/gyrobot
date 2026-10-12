@@ -250,8 +250,8 @@ if __name__ == '__main__':
     import sys
     if len(sys.argv) in (2, 3) and sys.argv[1] == 'requirements':
         if len(sys.argv) == 3:
-            from dotenv import load_dotenv
-            load_dotenv(dotenv_path=f'.env.d/{sys.argv[2]}.env', override=True)
+            from backend.secret_store import load_environment
+            load_environment(sys.argv[2])
         print('\n'.join(required_packages()))
     else:
         sys.exit("usage: python src/plugins.py requirements [env-name]")
