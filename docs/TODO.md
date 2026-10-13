@@ -52,6 +52,17 @@ accepted/expired are not visible in the web UI or API. Options:
    not be needed at all. The GitHub username (login) should not live there; if anything it should be a calculated
    column derived from the account's GitHub provision (`data->>'username'`, or looked up by the stored `github_id`
    so that it survives renames). Decide whether to drop `name` or give it a proper meaning (the person's real name).
+4. **Cancel an approved GitHub onboarding**: add a command that marks an `invited` provision `cancelled` (so
+   `check_github_invitations` ignores it and the user can be re-onboarded). The invitation id is now stored in the
+   provision data for new onboardings; check whether GitHub has an API to withdraw an enterprise member invitation,
+   otherwise it must be withdrawn by hand. Existing rows lack `invitation_id` (and some lack `github_id`): backfill
+   from the pending invitations if needed.
+5. **`ProvisionRequest` cleanup** (`backend/providers/base.py`, formerly `Account`):
+   - `userid` and `team` are required, but `onboard slack`, `onboard crowd`, `onboard jetbrains` and `offboard`
+     build it with only `name` and `email`, which raises `TypeError`. Give both a default of `''`.
+   - Rename the `provision_data` field to `result_data`, and the `account` parameter of the provider functions to
+     `request`.
+   - Tidy the old `Account as ProviderAccount` import aliases.
 
 ## Other chat platforms
 
