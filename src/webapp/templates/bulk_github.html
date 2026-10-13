@@ -12,7 +12,7 @@ the following rows/columns automatically, adding rows as needed.</p>
 <form method="post" action="{{ request.url_for('github_bulk_submit') }}" id="bulk-form">
 <table id="bulk-table">
     <thead>
-        <tr><th>GitHub username</th><th>Email address</th><th>Team</th><th></th></tr>
+        <tr><th>GitHub username</th><th></th><th>Email address</th><th>Team</th><th></th></tr>
     </thead>
     <tbody id="bulk-table-body"></tbody>
 </table>
@@ -32,6 +32,7 @@ the following rows/columns automatically, adding rows as needed.</p>
 <template id="row-template">
     <tr>
         <td><input type="text" name="username" placeholder="GitHub Login, no @, no emails"></td>
+        <td class="status-cell"></td>
         <td><input type="text" name="email" placeholder="{{ email_placeholder }}"></td>
         <td>
             <div class="team-cell">

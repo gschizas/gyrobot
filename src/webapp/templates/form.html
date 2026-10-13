@@ -28,7 +28,8 @@
 {% include "_validate_users.html" %}
 <script>
 attachGithubUserValidation(document.getElementById('onboarding-form'),
-                           "{{ request.url_for('github_validate_users') }}");
+                           "{{ request.url_for('github_validate_users') }}",
+                           function () { return typeof teamsSelected !== 'function' || teamsSelected(); });
 </script>
 {% endif %}
 
@@ -124,20 +125,25 @@ attachGithubUserValidation(document.getElementById('onboarding-form'),
         }
     });
 
-    const form = document.getElementById('onboarding-form');
-    if (form) {
-        form.addEventListener('submit', function (event) {
-            form.querySelectorAll('.tree').forEach(function (container) {
-                const fieldName = container.id.replace(/-tree$/, '');
-                const hiddenInput = document.getElementById(fieldName);
-                if (hiddenInput.hasAttribute('required') && !hiddenInput.value) {
-                    event.preventDefault();
-                    alert('Please select a team from the tree.');
-                }
-            });
-        });
-    }
 })();
+
+// True when every required team tree has a selection; alerts otherwise.
+function teamsSelected() {
+    const trees = Array.from(document.querySelectorAll('#onboarding-form .tree'));
+    const missing = trees.some(function (container) {
+        const hiddenInput = document.getElementById(container.id.replace(/-tree$/, ''));
+        return hiddenInput.hasAttribute('required') && !hiddenInput.value;
+    });
+    if (missing) alert('Please select a team from the tree.');
+    return !missing;
+}
+
+// The github action wires this check into its async validation; other actions use a plain listener.
+{% if action != 'github' %}
+document.getElementById('onboarding-form').addEventListener('submit', function (event) {
+    if (!teamsSelected()) event.preventDefault();
+});
+{% endif %}
 </script>
 {% endif %}
 {% endblock %}
