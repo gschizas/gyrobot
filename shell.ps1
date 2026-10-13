@@ -13,4 +13,4 @@ docker run -it  `
     --env-file $EnvironmentFile `
     eurobot
 
-#    --env-file .env.d/reddit-greece-test.env `
+#    --env-file .env.d/greece-test.env `
