@@ -5,7 +5,7 @@ Each resource provider exposes ``provision(ctx, account)`` and
 implementations here are stubs that log the intended action and return a message;
 the real API integrations belong where the ``# TODO`` markers are.
 """
-from backend.providers.base import Account
+from backend.providers.base import ProvisionRequest
 from backend.providers import crowd, github_copilot, jetbrains, slack_provision
 
 # Resource key -> provider module (must expose provision/deprovision).
@@ -24,4 +24,4 @@ RESOURCE_LABELS = {
     'slack': 'Slack membership',
 }
 
-__all__ = ['Account', 'PROVIDERS', 'RESOURCE_LABELS', 'slack_provision']
+__all__ = ['ProvisionRequest', 'PROVIDERS', 'RESOURCE_LABELS', 'slack_provision']

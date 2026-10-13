@@ -388,7 +388,7 @@ def onboard_crowd(ctx, username, team):
 | `approvals approve <id...>` / `approvals approve all` | Approve + execute requests (self-approval blocked unless `allow_self` in config) |
 | `approvals reject <id...> [-r reason]` / `approvals reject all` | Reject pending requests |
 
-Account/provisioning state is persisted to PostgreSQL via `backend/account_storage.py` (`Account`/`Provision` dataclasses defined in `backend/accounts.py`): `create_account`, `get_account(_by_email)`, `set_provision_status`, `get_active_provisions`, `get_pending_provisions`. This is what backs `offboard`'s "all active provisions" lookup and `github_check`'s invite-status polling.
+Account/provisioning state is persisted to PostgreSQL via `backend/account_storage.py` (`ProvisionRequest`/`Provision` dataclasses defined in `backend/accounts.py`): `create_account`, `get_account(_by_email)`, `set_provision_status`, `get_active_provisions`, `get_pending_provisions`. This is what backs `offboard`'s "all active provisions" lookup and `github_check`'s invite-status polling.
 
 Provisioning itself is delegated to providers in `backend/providers/` (`github_copilot`, `jetbrains`, `crowd`, `slack_provision`), each exposing `provision/deprovision` (or `deactivate` for Slack) via `PROVIDERS` (keys `github`/`jetbrains`/`crowd`/`slack`) and `RESOURCE_LABELS`. Most are still stubs (`# TODO` marking the real integration), but `github_copilot.provision` now performs a **real** GitHub invite via `GitHubApi.invite_by_username`, and `github_provisioning.check_github_invitations()` performs real polling/team-assignment via the GitHub GraphQL API.
 
@@ -438,7 +438,7 @@ Used by `commands/github/` (`github teams` — renders the enterprise team hiera
 
 ### `backend/account_storage.py` / `backend/accounts.py` — onboarding persistence
 
-`account_storage.py` is a psycopg3-backed store (env: `APPROVAL_DATABASE_URL`) for the `Account`/`Provision` dataclasses defined in `accounts.py`. Key functions: `create_account`, `get_account`, `get_account_by_email`, `get_or_create_account`, `update_account`, `set_provision_status`, `get_provision`, `get_pending_provisions(resource, status)`, `get_account_provisions`, `get_active_provisions`. Used throughout `commands/onboarding/` and `github_provisioning.py` to track multi-stage provisioning (invited → accepted → assigned / active).
+`account_storage.py` is a psycopg3-backed store (env: `APPROVAL_DATABASE_URL`) for the `ProvisionRequest`/`Provision` dataclasses defined in `accounts.py`. Key functions: `create_account`, `get_account`, `get_account_by_email`, `get_or_create_account`, `update_account`, `set_provision_status`, `get_provision`, `get_pending_provisions(resource, status)`, `get_account_provisions`, `get_active_provisions`. Used throughout `commands/onboarding/` and `github_provisioning.py` to track multi-stage provisioning (invited → accepted → assigned / active).
 
 ### `bot_framework/praw_wrapper.py` — Reddit OAuth
 

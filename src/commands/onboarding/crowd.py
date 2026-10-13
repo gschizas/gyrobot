@@ -4,7 +4,7 @@ import click
 
 from backend.account_storage import get_or_create_account, set_provision_status
 from backend.approval import requires_approval
-from backend.providers import Account as ProviderAccount, PROVIDERS, RESOURCE_LABELS
+from backend.providers import ProvisionRequest, PROVIDERS, RESOURCE_LABELS
 from commands.extended_context import ExtendedContext
 
 if 'APPROVAL_DATABASE_URL' not in os.environ:
@@ -27,7 +27,7 @@ def onboard_crowd(ctx: ExtendedContext, username: str, team: str):
     """
     provision_data = {'username': username, 'team': team}
 
-    account_obj = ProviderAccount(name=username, email=username)
+    account_obj = ProvisionRequest(name=username, email=username)
     message = PROVIDERS['crowd'].provision(ctx, account_obj)
 
     account = get_or_create_account(primary_email=username, name=username)

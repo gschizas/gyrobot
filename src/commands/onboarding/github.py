@@ -9,7 +9,7 @@ from backend.account_storage import (find_provisions_by_github_id, find_provisio
 from backend.approval import requires_approval
 from backend.email_logging import send_email
 from backend.github_api import GitHubApi
-from backend.providers import Account as ProviderAccount, PROVIDERS, RESOURCE_LABELS
+from backend.providers import ProvisionRequest, PROVIDERS, RESOURCE_LABELS
 from commands.extended_context import ExtendedContext
 
 if 'APPROVAL_DATABASE_URL' not in os.environ:
@@ -116,7 +116,7 @@ def onboard_github(ctx: ExtendedContext, username: str, email: str, team: str):
 
     # For now, provision via the stub (using email for ProviderAccount)
     # In real integration, the provider will populate node_id, login, enterprise_user_id
-    account_obj = ProviderAccount(name=email.split('@')[0], userid=username, email=email, team=team)
+    account_obj = ProvisionRequest(name=email.split('@')[0], userid=username, email=email, team=team)
     message = PROVIDERS['github'].provision(ctx, account_obj)
 
     # Store account and provision status

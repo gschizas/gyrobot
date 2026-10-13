@@ -20,7 +20,7 @@ from backend.account_storage import (
 from backend.approval import requires_approval
 from backend.providers import PROVIDERS, RESOURCE_LABELS
 from backend.providers import slack_provision
-from backend.providers.base import Account as ProviderAccount
+from backend.providers.base import ProvisionRequest
 from commands import gyrobot
 from commands.extended_context import ExtendedContext
 
@@ -60,7 +60,7 @@ def onboard_slack(ctx: ExtendedContext, email: str, member_ids: tuple):
     """
     provision_data = {'email': email, 'member_ids': list(member_ids)}
 
-    account_obj = ProviderAccount(name=email, email=email)
+    account_obj = ProvisionRequest(name=email, email=email)
     message = PROVIDERS['slack'].provision(ctx, account_obj)
 
     account = get_or_create_account(primary_email=email, name=email)
@@ -96,7 +96,7 @@ def offboard(ctx: ExtendedContext, email: str):
     provisions = get_active_provisions(account.id)
 
     # Create a ProviderAccount for compatibility with deprovision stubs
-    account_obj = ProviderAccount(name=account.name or email, email=email)
+    account_obj = ProvisionRequest(name=account.name or email, email=email)
 
     # Deprovision each active resource
     for provision in provisions:

@@ -16,7 +16,7 @@ class Role(Enum):
 
 
 @dataclass
-class Account:
+class ProvisionRequest:
     name: str
     email: str
     userid: str

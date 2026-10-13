@@ -4,17 +4,17 @@ Real integration target: JetBrains Account / Licenses API for organizations
     https://account.jetbrains.com/ (assign/revoke a subscription seat).
 """
 from backend.jetbrains_api import JetBrainsApi
-from backend.providers.base import Account
+from backend.providers.base import ProvisionRequest
 
 
-def provision(ctx, account: Account) -> str:
+def provision(ctx, account: ProvisionRequest) -> str:
     # TODO: assign a JetBrains IntelliJ IDEA licence seat via the JetBrains API.
     JetBrainsApi().assign_license(account.email)
     ctx.logger.info(f"[stub] Assign JetBrains IntelliJ IDEA licence to {account.email}")
     return f"JetBrains IntelliJ IDEA licence would be assigned to {account.email} (stub)"
 
 
-def deprovision(ctx, account: Account) -> str:
+def deprovision(ctx, account: ProvisionRequest) -> str:
     # TODO: revoke the JetBrains IntelliJ IDEA licence seat via the JetBrains API.
     ctx.logger.info(f"[stub] Remove JetBrains IntelliJ IDEA licence from {account.email}")
     return f"JetBrains IntelliJ IDEA licence would be removed from {account.email} (stub)"
