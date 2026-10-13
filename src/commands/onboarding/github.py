@@ -119,6 +119,8 @@ def onboard_github(ctx: ExtendedContext, username: str, email: str, team: str):
     account_obj = ProvisionRequest(name=email.split('@')[0], userid=username, email=email, team=team)
     message = PROVIDERS['github'].provision(ctx, account_obj)
 
+    provision_data.update(account_obj.provision_data)
+
     # Store account and provision status
     account = get_or_create_account(primary_email=email, name=username)
     set_provision_status(account.id, 'github', 'invited', provision_data)

@@ -11,6 +11,8 @@ def provision(ctx, account: ProvisionRequest) -> str:
     # TODO: assign a Copilot seat via the GitHub Copilot billing API.
     ctx.logger.info(f"Sending Invitation to {account.userid}")
     invitation = GitHubApi().invite_by_username(account.userid)
+    account.provision_data['invitation_id'] = invitation['id']
+    account.provision_data['invited_at'] = invitation['createdAt']
     return f"Sent invitation {invitation['id']} at {invitation['createdAt']} to {account.userid}"
 
 

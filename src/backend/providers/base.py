@@ -1,5 +1,5 @@
 """Account record passed to provider provision/deprovision stubs."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
@@ -22,3 +22,5 @@ class ProvisionRequest:
     userid: str
     team: str
     role: Optional[Role] = None
+    # Extra values a provider wants persisted with the provision (e.g. an invitation id)
+    provision_data: dict = field(default_factory=dict)
