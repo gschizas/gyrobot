@@ -10,4 +10,10 @@ approval, exactly like the chat bot's <code>onboard</code>/<code>offboard</code>
     {% endfor %}
     <li><a href="{{ request.url_for('github_bulk_form') }}">Bulk onboard: GitHub Copilot (multiple users)</a></li>
 </ul>
+<h2>Administration</h2>
+<p>After editing permission rules in the database, reload them here (this affects the web UI/API process only;
+use <code>permissions reload</code> in chat for the bot).</p>
+<form method="post" action="{{ request.url_for('reload_permissions') }}">
+    <button type="submit">Reload permissions</button>
+</form>
 {% endblock %}

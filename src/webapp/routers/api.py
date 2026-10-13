@@ -100,3 +100,9 @@ def offboard(payload: OffboardRequest, client_id: str = Depends(get_current_clie
 @router.post('/onboarding/github_check', response_model=CommandResult)
 def github_check(client_id: str = Depends(get_current_client)):
     return _run(['onboard', 'github_check'], client_id)
+
+
+@router.post('/admin/permissions/reload', response_model=CommandResult)
+def reload_permissions(client_id: str = Depends(get_current_client)):
+    """Invalidate this process's permission cache (subject to the same permission check as chat)."""
+    return _run(['permissions', 'reload'], client_id)

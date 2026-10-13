@@ -149,6 +149,18 @@ def dashboard(request: Request):
     return templates.TemplateResponse(request, 'dashboard.html', {'user': _current_user(request), 'forms': FORMS})
 
 
+@router.post('/admin/reload-permissions', include_in_schema=False)
+def reload_permissions(request: Request):
+    """Invalidate this web process's permission cache (the chat bot has its own, in another process)."""
+    if redirect := _require_login(request):
+        return redirect
+    user = _current_user(request)
+    result = run_bot_command(['permissions', 'reload'], user_id=user, channel_name=config.web_channel_name(),
+                             team_name=config.web_team_name())
+    return templates.TemplateResponse(
+        request, 'result.html', {'user': user, 'title': 'Reload permissions', 'result': result})
+
+
 @router.get('/onboarding/{action}', include_in_schema=False)
 def onboarding_form(request: Request, action: str):
     if redirect := _require_login(request):
