@@ -65,7 +65,7 @@ CREATE INDEX IF NOT EXISTS idx_account_provision_history_account
 def _connect() -> psycopg.Connection:
     """Establish database connection and initialize schema if needed."""
     global _schema_ready
-    conn = psycopg.connect(os.environ['APPROVAL_DATABASE_URL'], row_factory=dict_row)
+    conn = psycopg.connect(os.environ['APPROVAL_DATABASE_URL'], row_factory=dict_row, connect_timeout=10)
     _schema_ready = True
     return conn
     #if not _schema_ready:

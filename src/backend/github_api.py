@@ -278,7 +278,7 @@ class GitHubApi():
         return all_members
 
     def get_user_details(self, username):
-        resp = self.ses_ent.get(f"{GITHUB_API_URL}/users/{username}")
+        resp = self.ses_ent.get(f"{GITHUB_API_URL}/users/{username}", timeout=15)
         resp.raise_for_status()
         return resp.json()
 
