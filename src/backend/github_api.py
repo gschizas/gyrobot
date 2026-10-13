@@ -364,6 +364,26 @@ class GitHubApi():
     def get_pending_invitations_usernames(self):
         return [inv['invitee']['login'] for inv in self._get_pending_invitations_raw()]
 
+    def find_pending_invitations(self, identifier: str) -> list[dict]:
+        """Pending enterprise invitations whose id, invitee login or email equals ``identifier`` (case-insensitive)."""
+        wanted = identifier.strip().lower()
+        return [inv for inv in self._get_pending_invitations_raw()
+                if wanted in {(inv['id'] or '').lower(),
+                              ((inv.get('invitee') or {}).get('login') or '').lower(),
+                              (inv.get('email') or '').lower()}]
+
+    def cancel_invitation(self, invitation_id: str) -> str:
+        """Withdraw a pending enterprise member invitation. Returns GitHub's confirmation message."""
+        mutation = """
+        mutation CancelEnterpriseMemberInvitation($input: CancelEnterpriseMemberInvitationInput!) {
+          cancelEnterpriseMemberInvitation(input: $input) {
+            message
+          }
+        }
+        """
+        data = self._graphql(self.ses_ent, mutation, {"input": {"invitationId": invitation_id}})
+        return data["cancelEnterpriseMemberInvitation"].get("message") or "Invitation cancelled"
+
     # Step 1: Get all org logins in the enterprise
     # Step 2: Get all members with verified domain emails for each org login
     # organizationVerifiedDomainEmails is called once per org inline via an alias

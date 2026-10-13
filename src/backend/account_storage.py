@@ -351,7 +351,7 @@ def get_active_provisions(account_id: UUID) -> List[Provision]:
             cur.execute(
                 """
                 SELECT * FROM account_provisions 
-                WHERE account_id = %s AND status != 'deprovisioned'
+                WHERE account_id = %s AND status NOT IN ('deprovisioned', 'cancelled', 'expired')
                 ORDER BY resource;
                 """,
                 (str(account_id),),

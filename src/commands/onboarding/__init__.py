@@ -137,5 +137,6 @@ def offboard(ctx: ExtendedContext, email: str):
 
 onboard.add_command(github.onboard_github)
 onboard.add_command(github.github_check)
+onboard.add_command(github.github_cancel)
 onboard.add_command(crowd.onboard_crowd)
 onboard.add_command(jetbrains.onboard_jetbrains)
