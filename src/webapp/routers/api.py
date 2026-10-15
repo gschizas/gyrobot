@@ -99,7 +99,7 @@ def offboard(payload: OffboardRequest, client_id: str = Depends(get_current_clie
 
 @router.post('/onboarding/github_check', response_model=CommandResult)
 def github_check(client_id: str = Depends(get_current_client)):
-    return _run(['onboard', 'github_check'], client_id)
+    return _run(['onboard', 'github', 'check'], client_id)
 
 
 @router.post('/admin/permissions/reload', response_model=CommandResult)

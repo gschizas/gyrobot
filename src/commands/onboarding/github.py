@@ -13,6 +13,7 @@ from backend.approval import requires_approval
 from backend.email_logging import send_email
 from backend.github_api import GitHubApi
 from backend.providers import ProvisionRequest, PROVIDERS, RESOURCE_LABELS
+from commands import DefaultCommandGroup
 from commands.extended_context import ExtendedContext
 
 if 'APPROVAL_DATABASE_URL' not in os.environ:
@@ -99,7 +100,15 @@ def _github_validate(params: dict) -> str | None:
     return None
 
 
-@click.command('github')
+@click.group('github', cls=DefaultCommandGroup)
+def github_group():
+    """Onboard a colleague for GitHub Copilot, or check/cancel pending invitations.
+
+    Without a subcommand this is "add": bot onboard github <username> <email> <team>
+    """
+
+
+@github_group.command('add', default_command=True)
 @click.argument('username')
 @click.argument('email')
 @click.argument('team')
@@ -108,7 +117,7 @@ def _github_validate(params: dict) -> str | None:
 def onboard_github(ctx: ExtendedContext, username: str, email: str, team: str):
     """Onboard a colleague for GitHub Copilot.
 
-    USAGE: bot onboard github <username> <email> <team>
+    USAGE: bot onboard github [add] <username> <email> <team>
     """
     provision_data = {'username': username, 'email': email, 'team': team}
     try:
@@ -182,7 +191,7 @@ def _github_cancel_validate(params: dict) -> str | None:
     return _resolve_cancellation(params['identifier'])[2]
 
 
-@click.command('github_cancel')
+@github_group.command('cancel')
 @click.argument('identifier')
 @click.pass_context
 @requires_approval(summarize=_github_cancel_summary, validate=_github_cancel_validate)
@@ -191,7 +200,7 @@ def github_cancel(ctx: ExtendedContext, identifier: str):
 
     IDENTIFIER is the GitHub login, the email address or the invitation id.
 
-    USAGE: bot onboard github_cancel <login|email|invitation_id>
+    USAGE: bot onboard github cancel <login|email|invitation_id>
     """
     invitation, provision, error = _resolve_cancellation(identifier)
     if error:
@@ -216,7 +225,7 @@ def github_cancel(ctx: ExtendedContext, identifier: str):
     return message
 
 
-@click.command('github_check')
+@github_group.command('check')
 @click.pass_context
 def github_check(ctx: ExtendedContext):
     """Manually check pending GitHub invitations and auto-assign accepted users.
@@ -224,7 +233,7 @@ def github_check(ctx: ExtendedContext):
     This checks all pending GitHub provisioning invitations and attempts to assign
     users to their teams if their invitations have been accepted.
 
-    USAGE: bot github_check
+    USAGE: bot onboard github check
     """
     results = GitHubApi().check_github_invitations()
 

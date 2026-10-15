@@ -377,8 +377,9 @@ def onboard_crowd(ctx, username, team):
 
 | Command / Group | Description |
 |---|---|
-| `onboard github <username> <email> <team>` | Queue a GitHub Copilot licence invite + team assignment; `validate` checks the GitHub user/team exist and the email domain |
-| `onboard github_check` | Manually reconcile pending GitHub invitations: auto-assigns accepted users to their team (also the target of a scheduled/manual re-check, not gated by approval) |
+| `onboard github [add] <username> <email> <team>` | Queue a GitHub Copilot licence invite + team assignment; `add` is the default subcommand of the `onboard github` group; `validate` checks the GitHub user/team exist and the email domain |
+| `onboard github check` | Manually reconcile pending GitHub invitations: auto-assigns accepted users to their team (also the target of a scheduled/manual re-check, not gated by approval); hidden alias `onboard github_check` |
+| `onboard github cancel <login\|email\|invitation_id>` | Queue withdrawal of a pending GitHub invitation (approval-gated); hidden alias `onboard github_cancel` |
 | `onboard crowd <username> <team>` | Queue a Crowd entry |
 | `onboard jetbrains <email> <team_name>` | Queue a JetBrains IntelliJ IDEA licence |
 | `onboard slack <email> <member_id...>` | Queue Slack workspace membership |

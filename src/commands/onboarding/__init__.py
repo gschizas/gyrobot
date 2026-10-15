@@ -10,6 +10,7 @@ for tracking and deprovisioning workflows.
 """
 PLUGIN = {'requires': ['APPROVAL_DATABASE_URL']}
 
+import copy
 import os
 
 import click
@@ -135,9 +136,12 @@ def offboard(ctx: ExtendedContext, email: str):
     return '\n'.join(f"{row['Resource']}: {row['Result']}" for row in results)
 
 
-onboard.add_command(github.onboard_github)
-onboard.add_command(github.github_check)
-onboard.add_command(github.github_cancel)
+onboard.add_command(github.github_group)
+# Old top-level names, kept (hidden) for existing habits and scripts
+for _old_name, _command in (('github_check', github.github_check), ('github_cancel', github.github_cancel)):
+    _alias = copy.copy(_command)
+    _alias.hidden = True
+    onboard.add_command(_alias, _old_name)
 onboard.add_command(team.onboard_move)
 onboard.add_command(crowd.onboard_crowd)
 onboard.add_command(jetbrains.onboard_jetbrains)
