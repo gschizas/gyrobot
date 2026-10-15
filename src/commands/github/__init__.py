@@ -79,7 +79,7 @@ def github_team_members(ctx: ExtendedContext, team_slug: str, as_excel: bool):
         if m['emails']:
             email, source = ', '.join(m['emails']), 'github'
         elif m['login'].lower() in fallback:
-            email, source = fallback[m['login'].lower()], 'gyrobot'
+            email, source = fallback[m['login'].lower()], os.environ.get('BOT_NAME', 'Gyrobot').split()[0]
         else:
             email, source = '', ''
         table.append({'Username': m['login'], 'Email': email, 'Email source': source, 'Team': m['team']})
