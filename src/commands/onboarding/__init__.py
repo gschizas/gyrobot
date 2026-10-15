@@ -29,7 +29,7 @@ from commands.extended_context import ExtendedContext
 if 'APPROVAL_DATABASE_URL' not in os.environ:
     raise ImportError('APPROVAL_DATABASE_URL not found in environment')
 
-from commands.onboarding import crowd,github,jetbrains
+from commands.onboarding import crowd,github,jetbrains,team
 
 
 def _slack_summary(params: dict) -> str:
@@ -138,5 +138,6 @@ def offboard(ctx: ExtendedContext, email: str):
 onboard.add_command(github.onboard_github)
 onboard.add_command(github.github_check)
 onboard.add_command(github.github_cancel)
+onboard.add_command(team.onboard_move)
 onboard.add_command(crowd.onboard_crowd)
 onboard.add_command(jetbrains.onboard_jetbrains)

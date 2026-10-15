@@ -13,6 +13,7 @@ class Account:
         id: Unique account identifier (UUID)
         name: Account holder's name (optional)
         primary_email: Primary email address (used as key for lookups)
+        team: Core team (the GitHub enterprise team slug, without ``ent:``); each resource maps it to its own team
         created_at: Account creation timestamp
         updated_at: Last update timestamp
         metadata: Additional flexible data (dict)
@@ -23,6 +24,7 @@ class Account:
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    team: Optional[str] = None
 
     def to_dict(self) -> dict:
         """Convert account to dictionary for storage."""
@@ -30,6 +32,7 @@ class Account:
             'id': str(self.id),
             'name': self.name,
             'primary_email': self.primary_email,
+            'team': self.team,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat(),
             'metadata': self.metadata,
@@ -42,6 +45,7 @@ class Account:
             id=UUID(data['id']) if isinstance(data['id'], str) else data['id'],
             name=data.get('name'),
             primary_email=data.get('primary_email'),
+            team=data.get('team'),
             created_at=datetime.fromisoformat(data['created_at']) if isinstance(data['created_at'], str) else data['created_at'],
             updated_at=datetime.fromisoformat(data['updated_at']) if isinstance(data['updated_at'], str) else data['updated_at'],
             metadata=data.get('metadata', {}),

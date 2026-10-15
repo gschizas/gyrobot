@@ -641,12 +641,26 @@ class GitHubApi():
                 return teams_by_login
             cursor = teams["pageInfo"]["endCursor"]
 
+    @staticmethod
+    def _ent_slug(team_name: str) -> str:
+        return 'ent:' + team_name.removeprefix('ent:')
+
     def add_users_to_ent_team(self, team_name: str, usernames: list[str]) -> list[dict]:
         result = self.ses_ent.post(
-            f"https://api.github.com/enterprises/{self.enterprise}/teams/{team_name}/memberships/add",
+            f"https://api.github.com/enterprises/{self.enterprise}/teams/{self._ent_slug(team_name)}"
+            f"/memberships/add",
             json={'usernames': usernames}
         )
         return result.json()
+
+    def remove_users_from_ent_team(self, team_name: str, usernames: list[str]) -> None:
+        """Remove users from an enterprise team; raises ``requests.HTTPError`` on failure."""
+        result = self.ses_ent.post(
+            f"https://api.github.com/enterprises/{self.enterprise}/teams/{self._ent_slug(team_name)}"
+            f"/memberships/remove",
+            json={'usernames': usernames}
+        )
+        result.raise_for_status()
 
     def fill_enterprise_id(self) -> None:
         get_enterprise_id_query = """

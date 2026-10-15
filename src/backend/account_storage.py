@@ -27,10 +27,12 @@ CREATE TABLE IF NOT EXISTS accounts (
     id UUID PRIMARY KEY,
     name TEXT,
     primary_email TEXT NOT NULL UNIQUE,
+    team TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     metadata JSONB NOT NULL DEFAULT '{}'::jsonb
 );
+-- Existing databases: ALTER TABLE accounts ADD COLUMN IF NOT EXISTS team TEXT;
 
 CREATE TABLE IF NOT EXISTS account_provisions (
     id UUID PRIMARY KEY,
@@ -98,20 +100,21 @@ def get_account_by_email(email: str) -> Optional[Account]:
     return Account.from_dict(row)
 
 
-def create_account(name: Optional[str], primary_email: str, **metadata) -> Account:
+def create_account(name: Optional[str], primary_email: str, team: Optional[str] = None, **metadata) -> Account:
     """Create a new account. Returns the created Account."""
-    account = Account(name=name, primary_email=primary_email, metadata=metadata)
+    account = Account(name=name, primary_email=primary_email, team=team, metadata=metadata)
     with _connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO accounts (id, name, primary_email, created_at, updated_at, metadata)
-                VALUES (%s, %s, %s, %s, %s, %s);
+                INSERT INTO accounts (id, name, primary_email, team, created_at, updated_at, metadata)
+                VALUES (%s, %s, %s, %s, %s, %s, %s);
                 """,
                 (
                     str(account.id),
                     account.name,
                     account.primary_email,
+                    account.team,
                     account.created_at.isoformat(),
                     account.updated_at.isoformat(),
                     Jsonb(account.metadata),
@@ -121,16 +124,22 @@ def create_account(name: Optional[str], primary_email: str, **metadata) -> Accou
     return account
 
 
-def get_or_create_account(primary_email: str, name: Optional[str] = None, **metadata) -> Account:
-    """Get account by email, or create it if it doesn't exist."""
+def get_or_create_account(primary_email: str, name: Optional[str] = None, team: Optional[str] = None,
+                          **metadata) -> Account:
+    """Get account by email, or create it if it doesn't exist.
+
+    ``team`` is only recorded when the account has none yet; changing it is what ``onboard move`` is for.
+    """
     existing = get_account_by_email(primary_email)
     if existing:
+        if team and not existing.team:
+            return update_account(existing.id, team=team) or existing
         return existing
-    return create_account(name, primary_email, **metadata)
+    return create_account(name, primary_email, team=team, **metadata)
 
 
 def update_account(account_id: UUID, **updates) -> Optional[Account]:
-    """Update account metadata. Returns updated Account or None if not found."""
+    """Update account name, team or metadata. Returns updated Account or None if not found."""
     from datetime import datetime
     
     account = get_account(account_id)
@@ -140,6 +149,8 @@ def update_account(account_id: UUID, **updates) -> Optional[Account]:
     # Update allowed fields
     if 'name' in updates:
         account.name = updates['name']
+    if 'team' in updates:
+        account.team = updates['team']
     if 'metadata' in updates:
         account.metadata = updates['metadata']
     
@@ -150,11 +161,12 @@ def update_account(account_id: UUID, **updates) -> Optional[Account]:
             cur.execute(
                 """
                 UPDATE accounts 
-                SET name = %s, metadata = %s, updated_at = %s
+                SET name = %s, team = %s, metadata = %s, updated_at = %s
                 WHERE id = %s;
                 """,
                 (
                     account.name,
+                    account.team,
                     Jsonb(account.metadata),
                     account.updated_at.isoformat(),
                     str(account_id),
