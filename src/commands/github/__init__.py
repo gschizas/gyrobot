@@ -7,6 +7,7 @@ from treelib import Tree
 
 from commands import gyrobot, DefaultCommandGroup
 from backend.constants import TableFormat
+from backend.account_storage import find_provisions_by_username
 from backend.github_api import GitHubApi
 from commands.extended_context import ExtendedContext
 import psycopg
@@ -60,8 +61,28 @@ def github_team_members(ctx: ExtendedContext, team_slug: str, as_excel: bool):
         ctx.chat.send_text(f"No members found for teams starting with {team_slug}.")
         return
 
-    table = [{'Username': m['login'], 'Email': ', '.join(m['emails']), 'Team': m['team']}
-             for m in sorted(members, key=lambda m: (m['team'], m['login'].lower()))]
+    # Fall back to the email recorded when the bot onboarded the user
+    missing = {m['login'] for m in members if not m['emails']}
+    fallback: dict[str, str] = {}
+    if missing:
+        try:
+            # Ordered by creation, so the most recent provision wins
+            for provision in find_provisions_by_username('github', list(missing)):
+                email = provision.data.get('email')
+                if email:
+                    fallback[provision.data['username'].lower()] = email
+        except Exception:
+            ctx.logger.warning('Could not look up fallback emails in the database', exc_info=True)
+
+    table = []
+    for m in sorted(members, key=lambda m: (m['team'], m['login'].lower())):
+        if m['emails']:
+            email, source = ', '.join(m['emails']), 'github'
+        elif m['login'].lower() in fallback:
+            email, source = fallback[m['login'].lower()], 'gyrobot'
+        else:
+            email, source = '', ''
+        table.append({'Username': m['login'], 'Email': email, 'Email source': source, 'Team': m['team']})
     ctx.chat.send_table(title=f'Members of teams starting with {team_slug}', table=table,
                         table_format=TableFormat.EXCEL if as_excel else TableFormat.TABLE)
 
