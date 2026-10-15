@@ -5,6 +5,7 @@ import re
 import click
 import requests
 
+from backend import bot_identity
 from backend.account_storage import (find_provisions_by_github_id, find_provisions_by_username,
                                      get_or_create_account, get_pending_provisions, set_provision_status)
 from backend.accounts import Provision
@@ -37,7 +38,7 @@ def _send_invitation_email(ctx: ExtendedContext, username: str, email: str, team
         send_email(
             'github_invitation', to=email,
             subject='GitHub invitation / Πρόσκληση GitHub',
-            bot_name=os.environ.get('BOT_NAME', 'Gyrobot').split()[0],
+            bot_name=bot_identity.bot_name(),
             username=username, team=team, expiry_days=api.invitation_expiry_days,
             invitation_url=f"https://github.com/enterprises/{api.enterprise}/member_invitation")
     except Exception as e:

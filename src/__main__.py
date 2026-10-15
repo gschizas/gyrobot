@@ -12,6 +12,7 @@ import traceback
 import click.testing
 import praw
 import requests
+from backend import bot_identity
 from backend.secret_store import load_environment
 
 import chat.chat_wrapper
@@ -55,7 +56,7 @@ def init():
     runner.mix_stderr = True
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
 
-    trigger_words = os.environ['BOT_NAME'].split()
+    trigger_words = bot_identity.trigger_words(required=True)
     bot_name = trigger_words[0]
     if 'SHORTCUT_WORDS' in os.environ:
         with open('data/' + os.environ['SHORTCUT_WORDS']) as sf:

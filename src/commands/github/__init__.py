@@ -7,6 +7,7 @@ from treelib import Tree
 
 from commands import gyrobot, DefaultCommandGroup
 from backend.constants import TableFormat
+from backend import bot_identity
 from backend.account_storage import find_provisions_by_username
 from backend.github_api import GitHubApi
 from commands.extended_context import ExtendedContext
@@ -79,7 +80,7 @@ def github_team_members(ctx: ExtendedContext, team_slug: str, as_excel: bool):
         if m['emails']:
             email, source = ', '.join(m['emails']), 'github'
         elif m['login'].lower() in fallback:
-            email, source = fallback[m['login'].lower()], os.environ.get('BOT_NAME', 'Gyrobot').split()[0]
+            email, source = fallback[m['login'].lower()], bot_identity.bot_name()
         else:
             email, source = '', ''
         table.append({'Username': m['login'], 'Email': email, 'Email source': source, 'Team': m['team']})
