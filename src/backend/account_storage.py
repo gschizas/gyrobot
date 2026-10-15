@@ -61,7 +61,31 @@ CREATE TABLE IF NOT EXISTS account_provision_history (
 
 CREATE INDEX IF NOT EXISTS idx_account_provision_history_account
     ON account_provision_history(account_id, resource, recorded_at);
+
+-- Append-only audit trail: a full snapshot of the account row on creation and after every update
+CREATE TABLE IF NOT EXISTS account_history (
+    id BIGSERIAL PRIMARY KEY,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    name TEXT,
+    primary_email TEXT,
+    team TEXT,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_history_account
+    ON account_history(account_id, recorded_at);
 """
+
+
+def _record_account_history(cur, account: Account) -> None:
+    cur.execute(
+        """
+        INSERT INTO account_history (account_id, name, primary_email, team, metadata)
+        VALUES (%s, %s, %s, %s, %s);
+        """,
+        (str(account.id), account.name, account.primary_email, account.team, Jsonb(account.metadata)),
+    )
 
 
 def _connect() -> psycopg.Connection:
@@ -120,6 +144,7 @@ def create_account(name: Optional[str], primary_email: str, team: Optional[str] 
                     Jsonb(account.metadata),
                 ),
             )
+            _record_account_history(cur, account)
         conn.commit()
     return account
 
@@ -172,6 +197,7 @@ def update_account(account_id: UUID, **updates) -> Optional[Account]:
                     str(account_id),
                 ),
             )
+            _record_account_history(cur, account)
         conn.commit()
     return account
 
