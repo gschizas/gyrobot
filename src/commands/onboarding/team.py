@@ -1,4 +1,5 @@
 import os
+import re
 
 import click
 
@@ -13,13 +14,20 @@ from commands.extended_context import ExtendedContext
 if 'APPROVAL_DATABASE_URL' not in os.environ:
     raise ImportError('APPROVAL_DATABASE_URL not found in environment')
 
+def _extract_email(email: str) -> str | None:
+    if match := re.match(r'<mailto:(?P<email>[-._\w]+@(?:\w+\.?)*)\|\1>', email):
+        return match.group('email')
+    return email
+
 
 def _move_summary(params: dict) -> str:
+    params['email'] = _extract_email(params['email'])
     return f"move {params['email']} to team {params['team']} on all resources"
 
 
 def _move_validate(params: dict) -> str | None:
     email = params['email'].strip()
+    email = _extract_email(email)
     params['team'] = team = normalize(params['team'])
     account = get_account_by_email(email)
     if not account:
@@ -46,7 +54,8 @@ def onboard_move(ctx: ExtendedContext, email: str, team: str):
     USAGE: bot onboard move <email> <team>
     """
     team = normalize(team)
-    account = get_account_by_email(email.strip())
+    email = _extract_email(email.strip())
+    account = get_account_by_email(email)
     if not account:
         ctx.chat.send_text(f"No account found for {email}", is_error=True)
         return f"Error: No account found for {email}"
