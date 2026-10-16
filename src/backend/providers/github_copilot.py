@@ -18,10 +18,25 @@ def provision(ctx, account: ProvisionRequest) -> str:
 
 
 def deprovision(ctx, provision: Provision) -> str:
-    # TODO: remove the Copilot seat via the GitHub Copilot billing API.
-    username = provision.data.get('username', '?')
-    ctx.logger.info(f"[stub] Remove {username} from GitHub enterprise")
-    return f"Removed {username} from GitHub enterprise (stub)"
+    """Withdraw a pending invitation, or remove an accepted user from the GitHub enterprise."""
+    username = provision.data['username']
+    api = GitHubApi()
+
+    if provision.status == 'invited':
+        keys = [k for k in (provision.data.get('invitation_id'), username) if k]
+        invitations = next((found for key in keys if (found := api.find_pending_invitations(key))), [])
+        if not invitations:
+            return f"{username}: no pending invitation (already withdrawn or expired)"
+        for invitation in invitations:
+            api.cancel_invitation(invitation['id'])
+        message = f"Cancelled the pending invitation of {username}"
+    elif username.lower() in {member['login'].lower() for member in api.get_ent_members()}:
+        api.remove_enterprise_member(username)
+        message = f"Removed {username} from the GitHub enterprise"
+    else:
+        message = f"{username} is not a member of the GitHub enterprise (already removed)"
+    ctx.logger.info(message)
+    return message
 
 
 def change_team(ctx, provision: Provision, new_team: str) -> str:

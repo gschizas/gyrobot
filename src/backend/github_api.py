@@ -718,6 +718,20 @@ class GitHubApi():
             self.fill_enterprise_id()
         return self._run_invite_mutation({"email": email})
 
+    def remove_enterprise_member(self, username: str) -> None:
+        """Remove a user from the whole enterprise (and so from every organization and team in it)."""
+        if self.enterprise_id is None:
+            self.fill_enterprise_id()
+        mutation = """
+        mutation RemoveEnterpriseMember($input: RemoveEnterpriseMemberInput!) {
+          removeEnterpriseMember(input: $input) {
+            clientMutationId
+          }
+        }
+        """
+        user_id = self.get_user_details(username)['node_id']
+        self._graphql(self.ses_ent, mutation, {"input": {"enterpriseId": self.enterprise_id, "userId": user_id}})
+
     def check_github_invitations(self) -> Dict[str, Any]:
         """Check pending GitHub invitations and auto-assign accepted users.
 
