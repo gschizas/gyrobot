@@ -14,6 +14,9 @@ from tabulate import tabulate
 from backend.constants import TableFormat
 from backend.excel import write_excel_table
 
+# Kinds of argument a platform may decorate (see Conversation.clean_argument)
+ARGUMENT_EMAIL = 'email'
+
 
 class Conversation(ABC):
     channel_id: str
@@ -27,6 +30,13 @@ class Conversation(ABC):
         self.channel_id = channel_id
         self.user_id = user_id
         self.team_id = team_id
+
+    def clean_argument(self, text: str, kind: str) -> str:
+        """Strip this platform's markup from a command argument of the given kind (``ARGUMENT_*``).
+
+        The default does nothing; platforms that decorate input override it. Must leave already-clean text as is.
+        """
+        return text.strip()
 
     @abstractmethod
     def send_text(self, text, is_error: bool = False, icon_emoji: str = None, channel=None) -> None:

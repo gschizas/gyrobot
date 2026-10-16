@@ -228,7 +228,8 @@ def requires_approval(func: Callable = None, *, summarize: Callable = None,
 
     The command's click parameters must be JSON-serializable. Pass ``summarize`` to
     build a human-readable one-line summary from the params dict, and ``validate`` to
-    reject bad requests before they are queued (return an error string to abort).
+    reject bad requests before they are queued (return an error string to abort);
+    ``validate(params, ctx)`` may also normalise ``params`` in place (e.g. strip chat markup).
     """
     if func is None:
         return functools.partial(requires_approval, summarize=summarize, validate=validate)
@@ -244,7 +245,7 @@ def requires_approval(func: Callable = None, *, summarize: Callable = None,
 
         params = dict(ctx.params)
 
-        if validate is not None and (error := validate(params)):
+        if validate is not None and (error := validate(params, ctx)):
             ctx.chat.send_text(error, is_error=True)
             return
 

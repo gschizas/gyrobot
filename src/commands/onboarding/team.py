@@ -1,11 +1,11 @@
 import os
-import re
 
 import click
 
 from backend.account_storage import LIVE_STATUSES, get_account_by_email, get_active_provisions, \
     set_provision_status, update_account
 from backend.approval import requires_approval
+from backend.arguments import extract_email
 from backend.github_api import GitHubApi
 from backend.providers import PROVIDERS, RESOURCE_LABELS
 from backend.team_mapping import normalize, resolve_team
@@ -14,20 +14,16 @@ from commands.extended_context import ExtendedContext
 if 'APPROVAL_DATABASE_URL' not in os.environ:
     raise ImportError('APPROVAL_DATABASE_URL not found in environment')
 
-def _extract_email(email: str) -> str | None:
-    if match := re.match(r'<mailto:(?P<email>[-._\w]+@(?:\w+\.?)*)\|\1>', email):
-        return match.group('email')
-    return email
-
 
 def _move_summary(params: dict) -> str:
-    params['email'] = _extract_email(params['email'])
     return f"move {params['email']} to team {params['team']} on all resources"
 
 
-def _move_validate(params: dict) -> str | None:
-    email = params['email'].strip()
-    email = _extract_email(email)
+def _move_validate(params: dict, ctx: ExtendedContext) -> str | None:
+    email = extract_email(ctx, params['email'])
+    if not email:
+        return f"'{params['email']}' is not a valid email address."
+    params['email'] = email
     params['team'] = team = normalize(params['team'])
     account = get_account_by_email(email)
     if not account:
@@ -54,7 +50,7 @@ def onboard_move(ctx: ExtendedContext, email: str, team: str):
     USAGE: bot onboard move <email> <team>
     """
     team = normalize(team)
-    email = _extract_email(email.strip())
+    email = extract_email(ctx, email) or email.strip()
     account = get_account_by_email(email)
     if not account:
         ctx.chat.send_text(f"No account found for {email}", is_error=True)

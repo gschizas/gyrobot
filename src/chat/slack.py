@@ -3,6 +3,7 @@ PLUGIN = {'requires': ['SLACK_APP_TOKEN', 'SLACK_BOT_TOKEN'], 'dependencies': ['
 import datetime
 import logging
 import os
+import re
 from typing import List, Dict, Callable
 
 from slack_bolt import App
@@ -11,7 +12,7 @@ from tabulate import tabulate
 
 from backend.configuration import truthy_env
 from backend.constants import TableFormat
-from chat.chat_wrapper import Conversation, Message
+from chat.chat_wrapper import ARGUMENT_EMAIL, Conversation, Message
 
 teams_cache = {}
 users_cache = {}
@@ -24,6 +25,14 @@ app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
 
 
 class SlackConversation(Conversation):
+    _MAILTO = re.compile(r'<mailto:(?P<address>[^|>]+)(?:\|[^>]*)?>')
+
+    def clean_argument(self, text: str, kind: str) -> str:
+        text = text.strip()
+        if kind == ARGUMENT_EMAIL and (match := self._MAILTO.fullmatch(text)):
+            return match.group('address')
+        return text
+
     @property
     def channel_name(self):
         return channels_cache[self.team_id].get(self.channel_id)

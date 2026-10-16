@@ -1,6 +1,5 @@
 import datetime
 import os
-import re
 
 import click
 import requests
@@ -10,6 +9,7 @@ from backend.account_storage import (find_provisions_by_github_id, find_provisio
                                      get_or_create_account, get_pending_provisions, set_provision_status)
 from backend.accounts import Provision
 from backend.approval import requires_approval
+from backend.arguments import extract_email
 from backend.email_logging import send_email
 from backend.github_api import GitHubApi
 from backend.providers import ProvisionRequest, PROVIDERS, RESOURCE_LABELS
@@ -47,12 +47,7 @@ def _send_invitation_email(ctx: ExtendedContext, username: str, email: str, team
         return f" (invitation email to {email} FAILED: {e})"
     return f" (invitation email sent to {email})"
 
-def _extract_email(email: str) -> str | None:
-    if match := re.match(r'<mailto:(?P<email>[-._\w]+@(?:\w+\.?)*)\|\1>', email):
-        return match.group('email')
-    return None
-
-def _github_validate(params: dict) -> str | None:
+def _github_validate(params: dict, ctx: ExtendedContext) -> str | None:
     # ensure GitHub username exists
     # ensure team is valid
     global github_client
@@ -85,7 +80,7 @@ def _github_validate(params: dict) -> str | None:
         raise RuntimeError(f"Team {team} not found.")
 
     email = params['email']
-    if extracted_email := _extract_email(email):
+    if extracted_email := extract_email(ctx, email):
         params['email'] = email = extracted_email
 
     if '@' in email:
@@ -148,13 +143,13 @@ def _github_cancel_summary(params: dict) -> str:
     return f"cancel the GitHub invitation of {params['identifier']}"
 
 
-def _resolve_cancellation(identifier: str) -> tuple[dict | None, Provision | None, str | None]:
+def _resolve_cancellation(ctx: ExtendedContext, identifier: str) -> tuple[dict | None, Provision | None, str | None]:
     """Find what ``identifier`` (GitHub login, email or invitation id) refers to.
 
     Returns (pending GitHub invitation, invited provision in the database, error). Either of the first two may be
     missing (for example an invitation sent outside the bot, or one already withdrawn on GitHub).
     """
-    wanted = (_extract_email(identifier) or identifier).strip()
+    wanted = (extract_email(ctx, identifier) or identifier).strip()
     lowered = wanted.lower()
     api = GitHubApi()
 
@@ -187,8 +182,8 @@ def _resolve_cancellation(identifier: str) -> tuple[dict | None, Provision | Non
     return invitation, provision, None
 
 
-def _github_cancel_validate(params: dict) -> str | None:
-    return _resolve_cancellation(params['identifier'])[2]
+def _github_cancel_validate(params: dict, ctx: ExtendedContext) -> str | None:
+    return _resolve_cancellation(ctx, params['identifier'])[2]
 
 
 @github_group.command('cancel')
@@ -202,7 +197,7 @@ def github_cancel(ctx: ExtendedContext, identifier: str):
 
     USAGE: bot onboard github cancel <login|email|invitation_id>
     """
-    invitation, provision, error = _resolve_cancellation(identifier)
+    invitation, provision, error = _resolve_cancellation(ctx, identifier)
     if error:
         ctx.chat.send_text(error, is_error=True)
         return f"Error: {error}"
