@@ -14,10 +14,11 @@ def provision(ctx, account: ProvisionRequest) -> str:
     return f"Crowd entry would be created for {account.name} <{account.email}> (stub)"
 
 
-def deprovision(ctx, account: ProvisionRequest) -> str:
+def deprovision(ctx, provision: Provision) -> str:
     # TODO: remove the user from Crowd via the Crowd REST API.
-    ctx.logger.info(f"[stub] Remove Crowd entry for {account.email}")
-    return f"Crowd entry would be removed for {account.name} <{account.email}> (stub)"
+    username = provision.data.get('username', '?')
+    ctx.logger.info(f"[stub] Remove Crowd entry for {username}")
+    return f"Crowd entry would be removed for {username} (stub)"
 
 
 def change_team(ctx, provision: Provision, new_team: str) -> str:

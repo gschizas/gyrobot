@@ -15,10 +15,11 @@ def provision(ctx, account: ProvisionRequest) -> str:
     return f"JetBrains IntelliJ IDEA licence would be assigned to {account.email} (stub)"
 
 
-def deprovision(ctx, account: ProvisionRequest) -> str:
-    # TODO: revoke the JetBrains IntelliJ IDEA licence seat via the JetBrains API.
-    ctx.logger.info(f"[stub] Remove JetBrains IntelliJ IDEA licence from {account.email}")
-    return f"JetBrains IntelliJ IDEA licence would be removed from {account.email} (stub)"
+def deprovision(ctx, provision: Provision) -> str:
+    # TODO: remove the JetBrains IntelliJ IDEA licence seat via the JetBrains API.
+    email = provision.data.get('email', '?')
+    ctx.logger.info(f"[stub] Remove JetBrains IntelliJ IDEA licence from {email}")
+    return f"JetBrains IntelliJ IDEA licence would be removed from {email} (stub)"
 
 
 def change_team(ctx, provision: Provision, new_team: str) -> str:

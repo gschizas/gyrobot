@@ -17,10 +17,11 @@ def provision(ctx, account: ProvisionRequest) -> str:
     return f"Sent invitation {invitation['id']} at {invitation['createdAt']} to {account.userid}"
 
 
-def deprovision(ctx, account: ProvisionRequest) -> str:
+def deprovision(ctx, provision: Provision) -> str:
     # TODO: remove the Copilot seat via the GitHub Copilot billing API.
-    ctx.logger.info(f"[stub] Remove {account.userid} from GitHub enterprise")
-    return f"Removed {account.userid} from GitHub enterprise (stub)"
+    username = provision.data.get('username', '?')
+    ctx.logger.info(f"[stub] Remove {username} from GitHub enterprise")
+    return f"Removed {username} from GitHub enterprise (stub)"
 
 
 def change_team(ctx, provision: Provision, new_team: str) -> str:

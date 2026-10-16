@@ -1,7 +1,7 @@
 """Provisioning providers for onboarding/offboarding.
 
 Each resource provider exposes ``provision(ctx, account)`` and
-``deprovision(ctx, account)`` returning a human-readable status string, and optionally
+``deprovision(ctx, provision)`` (the stored ``Provision``, so its ``data`` is available) returning a human-readable status string, and optionally
 ``change_team(ctx, provision, new_team)`` to move a user to another of its own teams (it updates
 ``provision.data`` and raises on failure; resources without it are skipped by ``onboard move``). The
 implementations here are stubs that log the intended action and return a message;
