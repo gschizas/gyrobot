@@ -66,6 +66,29 @@ accepted/expired are not visible in the web UI or API. Options:
    how to handle roles. It should present a list of people to choose from, either from Slack or from the
    active directory.
 7. **Store active directory users with their domain**: store e.g. `jdoe@example.com` instead of just `jdoe`.
+8. **Move to Alembic for database migrations**. All the databases (approval, permissions, kudos, survey) are one
+   PostgreSQL database, so use a single migration history.
+   - Add `alembic` and `sqlalchemy` (with a `postgresql+psycopg://` URL); `env.py` loads `.env.d/<name>.env` through
+     `backend.secret_store.load_environment`. Write migrations as plain SQL with `op.execute()`; no ORM models or
+     autogenerate are needed, so the code can stay on psycopg (and Pydantic, if adopted).
+   - Baseline `0001`: the schema as it is today, written with `IF NOT EXISTS`, then `alembic stamp 0001` on every
+     existing database. Taken from the code's `_SCHEMA` strings for `accounts`, `account_provisions`,
+     `account_provision_history`, `account_history` and `approval_requests`; from `scripts/migrate_permissions.py`
+     for `permission_rules`; and from `pg_dump --schema-only` for `kudos` (gyrobot-only) and the survey tables
+     `"Votes"`, `"Answers"` and `"Receipts"` (created by the separate questionnaire app through Flask-SQLAlchemy
+     `create_all`; gyrobot only reads them).
+   - Make the next changes real migrations: `accounts.team` and `account_history`.
+   - Delete the `_SCHEMA` strings and the table creation in `approval._connect`; replace `scripts/check_schema.py` with
+     `alembic current` / `alembic check`; document `alembic upgrade head` as a deploy step (maybe in the Docker
+     entrypoint). Decide whether the bot, web UI and API refuse to start, or only warn, when the database is behind.
+   - Once the questionnaire app is retired, the survey tables can be dropped from the baseline.
+9. **Remove the obsolete `cheese` and `too_many_posts` commands**:
+   - Delete `src/commands/cheese.py`, `src/commands/reddit/database.py` and `data/cheese_agent.yml`.
+   - Remove the `cheese` and `too_many_posts` rows and the `cheese` section from `.github/copilot-instructions.md`, plus the
+     `CHEESE_DATABASE_URL` and `GYROBOT_DATABASE_URL` variables from the environment table and from the `.env.d` files.
+   - Remove the mention of `cheese` under `send_ephemeral` (the method itself stays).
+   - Check `config/plugins.yml`, `docs/` and the permission rules (`permission_rules`) for entries naming them.
+   - Optionally drop the `"machineState"` and `"jobQueue"` tables and `public.submissions`; keep them out of the Alembic baseline.
 
 ## Other chat platforms
 
