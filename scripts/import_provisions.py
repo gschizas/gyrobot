@@ -59,9 +59,12 @@ def parse_date(text: str) -> datetime | None:
 
 def validate(row: dict, default_status: str) -> tuple[dict | None, str | None]:
     email, resource = row.get('email', ''), row.get('resource', '').lower()
+    team = row.get('team', '').lower()
     status = row.get('status') or default_status
     if '@' not in email:
         return None, f"invalid email {email!r}"
+    if not team:
+        return None, f"Invalid team {team!r}"
     if resource not in RESOURCES:
         return None, f"unknown resource {resource!r}"
     if status not in STATUSES:
