@@ -61,6 +61,11 @@ accepted/expired are not visible in the web UI or API. Options:
    - Rename the `provision_data` field to `result_data`, and the `account` parameter of the provider functions to
      `request`.
    - Tidy the old `Account as ProviderAccount` import aliases.
+6. **Permissions web page**: a page to manage permissions. Gather all functions that need permissions
+   (reflection over the registered commands / `check_security` and `requires_approval` decorators?). Open question:
+   how to handle roles. It should present a list of people to choose from, either from Slack or from the
+   active directory.
+7. **Store active directory users with their domain**: store e.g. `jdoe@example.com` instead of just `jdoe`.
 
 ## Other chat platforms
 
