@@ -278,6 +278,14 @@ def github_expired(ctx: ExtendedContext, team_prefix: str | None, as_excel: bool
     prefix = team_prefix.lower().removeprefix('ent:') if team_prefix else ''
     invited_at = get_last_status_times('github', 'invited')
     expired_at = get_last_status_times('github', 'expired')
+
+    def local_time(moment: datetime.datetime | None):
+        # Excel has no time zones: use the server's local time, and real datetimes so that Excel sorts them as such
+        if moment is None:
+            return None
+        moment = moment.astimezone().replace(tzinfo=None, microsecond=0)
+        return moment if as_excel else moment.strftime('%Y-%m-%d %H:%M')
+
     table = []
     for provision in get_provisions('github'):
         data = provision.data
@@ -285,18 +293,22 @@ def github_expired(ctx: ExtendedContext, team_prefix: str | None, as_excel: bool
         if provision.status != 'expired' or not team.lower().removeprefix('ent:').startswith(prefix):
             continue
         # History first; accounts imported without history fall back to what the provision itself recorded
-        invited = invited_at.get(provision.account_id)
-        expired = expired_at.get(provision.account_id)
+        stored_expiry = data.get('expired_at')
         table.append({'Username': data.get('username', ''), 'Email': data.get('email', ''), 'Team': team,
-                      'Invited': invited.date().isoformat() if invited else provision.created_at.date().isoformat(),
-                      'Expired': expired.date().isoformat() if expired else data.get('expired_at', '')[:10]})
+                      'Invited': local_time(invited_at.get(provision.account_id) or provision.created_at),
+                      'Expired': local_time(expired_at.get(provision.account_id) or
+                                            (datetime.datetime.fromisoformat(stored_expiry) if stored_expiry else None)),
+                      '_sort': expired_at.get(provision.account_id)
+                               or datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)})
 
     if not table:
         suffix = f' for teams starting with {team_prefix}' if team_prefix else ''
         ctx.chat.send_text(f"No expired invitations found{suffix}.")
         return
 
-    table.sort(key=lambda row: row['Expired'], reverse=True)
+    table.sort(key=lambda row: row['_sort'], reverse=True)
+    for row in table:
+        del row['_sort']
     title = 'Expired Invitations' + (f' (teams starting with {team_prefix})' if team_prefix else '')
     ctx.chat.send_table(title=title, table=table,
                         table_format=TableFormat.EXCEL if as_excel else TableFormat.TABLE)
