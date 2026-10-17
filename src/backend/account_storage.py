@@ -4,148 +4,66 @@ Handles CRUD operations for accounts and their provisioning state across resourc
 Uses APPROVAL_DATABASE_URL environment variable for database connection.
 """
 import os
+from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID
 
-import psycopg
-from psycopg.rows import dict_row
-from psycopg.types.json import Jsonb
+from sqlalchemy import func, select, type_coerce, update
+from sqlalchemy.dialects.postgresql import JSONB, insert
+from sqlalchemy.orm import Session
 
 from backend.accounts import Account, Provision
+from backend.database import get_engine
+from backend.models.accounts import AccountHistoryRow, AccountRow, ProvisionHistoryRow, ProvisionRow
 
 if 'APPROVAL_DATABASE_URL' not in os.environ:
     raise ImportError('APPROVAL_DATABASE_URL not found in environment')
 
-
-_schema_ready = False
-
 # Provision statuses meaning the resource is held or an invitation is outstanding
 LIVE_STATUSES = ('pending', 'invited', 'accepted', 'assigned', 'active')
 
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS accounts (
-    id UUID PRIMARY KEY,
-    name TEXT,
-    primary_email TEXT NOT NULL UNIQUE,
-    team TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    metadata JSONB NOT NULL DEFAULT '{}'::jsonb
-);
--- Existing databases: ALTER TABLE accounts ADD COLUMN IF NOT EXISTS team TEXT;
 
-CREATE TABLE IF NOT EXISTS account_provisions (
-    id UUID PRIMARY KEY,
-    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    resource TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending',
-    data JSONB NOT NULL DEFAULT '{}'::jsonb,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(account_id, resource)
-);
-
-CREATE INDEX IF NOT EXISTS idx_account_provisions_resource_status 
-    ON account_provisions(resource, status);
-
--- Append-only audit trail: one row per provision status write
-CREATE TABLE IF NOT EXISTS account_provision_history (
-    id BIGSERIAL PRIMARY KEY,
-    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    resource TEXT NOT NULL,
-    previous_status TEXT,
-    status TEXT NOT NULL,
-    data JSONB NOT NULL DEFAULT '{}'::jsonb,
-    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_account_provision_history_account
-    ON account_provision_history(account_id, resource, recorded_at);
-
--- Append-only audit trail: a full snapshot of the account row on creation and after every update
-CREATE TABLE IF NOT EXISTS account_history (
-    id BIGSERIAL PRIMARY KEY,
-    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    name TEXT,
-    primary_email TEXT,
-    team TEXT,
-    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_account_history_account
-    ON account_history(account_id, recorded_at);
-"""
+def _session() -> Session:
+    return Session(get_engine('APPROVAL_DATABASE_URL'))
 
 
-def _record_account_history(cur, account: Account) -> None:
-    cur.execute(
-        """
-        INSERT INTO account_history (account_id, name, primary_email, team, metadata)
-        VALUES (%s, %s, %s, %s, %s);
-        """,
-        (str(account.id), account.name, account.primary_email, account.team, Jsonb(account.metadata)),
-    )
+def _to_account(row: AccountRow) -> Account:
+    return Account(id=row.id, name=row.name, primary_email=row.primary_email, team=row.team,
+                   created_at=row.created_at, updated_at=row.updated_at, metadata=row.metadata_ or {})
 
 
-def _connect() -> psycopg.Connection:
-    """Establish database connection and initialize schema if needed."""
-    global _schema_ready
-    conn = psycopg.connect(os.environ['APPROVAL_DATABASE_URL'], row_factory=dict_row, connect_timeout=10)
-    _schema_ready = True
-    return conn
-    #if not _schema_ready:
-    #    with conn.cursor() as cur:
-    #        cur.execute(_SCHEMA)
-    #    conn.commit()
-    #    _schema_ready = True
-    #return conn
+def _to_provision(row: ProvisionRow) -> Provision:
+    return Provision(id=row.id, account_id=row.account_id, resource=row.resource, status=row.status,
+                     data=row.data or {}, created_at=row.created_at, updated_at=row.updated_at)
 
+
+def _record_account_history(session: Session, account: Account) -> None:
+    session.add(AccountHistoryRow(account_id=account.id, name=account.name, primary_email=account.primary_email,
+                                  team=account.team, metadata_=account.metadata))
 
 def get_account(account_id: UUID) -> Optional[Account]:
     """Retrieve account by ID."""
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM accounts WHERE id = %s;", (str(account_id),))
-            row = cur.fetchone()
-    if not row:
-        return None
-    return Account.from_dict(row)
+    with _session() as session:
+        row = session.get(AccountRow, account_id)
+        return _to_account(row) if row else None
 
 
 def get_account_by_email(email: str) -> Optional[Account]:
     """Retrieve account by primary email."""
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM accounts WHERE primary_email = %s;", (email,))
-            row = cur.fetchone()
-    if not row:
-        return None
-    return Account.from_dict(row)
+    with _session() as session:
+        row = session.scalars(select(AccountRow).where(AccountRow.primary_email == email)).first()
+        return _to_account(row) if row else None
 
 
 def create_account(name: Optional[str], primary_email: str, team: Optional[str] = None, **metadata) -> Account:
     """Create a new account. Returns the created Account."""
     account = Account(name=name, primary_email=primary_email, team=team, metadata=metadata)
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO accounts (id, name, primary_email, team, created_at, updated_at, metadata)
-                VALUES (%s, %s, %s, %s, %s, %s, %s);
-                """,
-                (
-                    str(account.id),
-                    account.name,
-                    account.primary_email,
-                    account.team,
-                    account.created_at.isoformat(),
-                    account.updated_at.isoformat(),
-                    Jsonb(account.metadata),
-                ),
-            )
-            _record_account_history(cur, account)
-        conn.commit()
+    with _session() as session, session.begin():
+        session.add(AccountRow(id=account.id, name=account.name, primary_email=account.primary_email,
+                               team=account.team, created_at=account.created_at, updated_at=account.updated_at,
+                               metadata_=account.metadata))
+        session.flush()  # the history row has a foreign key to the account
+        _record_account_history(session, account)
     return account
 
 
@@ -165,40 +83,19 @@ def get_or_create_account(primary_email: str, name: Optional[str] = None, team: 
 
 def update_account(account_id: UUID, **updates) -> Optional[Account]:
     """Update account name, team or metadata. Returns updated Account or None if not found."""
-    from datetime import datetime, timezone
-    
-    account = get_account(account_id)
-    if not account:
-        return None
-    
-    # Update allowed fields
-    if 'name' in updates:
-        account.name = updates['name']
-    if 'team' in updates:
-        account.team = updates['team']
-    if 'metadata' in updates:
-        account.metadata = updates['metadata']
-    
-    account.updated_at = datetime.now(timezone.utc)
-    
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                UPDATE accounts 
-                SET name = %s, team = %s, metadata = %s, updated_at = %s
-                WHERE id = %s;
-                """,
-                (
-                    account.name,
-                    account.team,
-                    Jsonb(account.metadata),
-                    account.updated_at.isoformat(),
-                    str(account_id),
-                ),
-            )
-            _record_account_history(cur, account)
-        conn.commit()
+    with _session() as session, session.begin():
+        row = session.get(AccountRow, account_id)
+        if not row:
+            return None
+        if 'name' in updates:
+            row.name = updates['name']
+        if 'team' in updates:
+            row.team = updates['team']
+        if 'metadata' in updates:
+            row.metadata_ = updates['metadata']
+        row.updated_at = datetime.now(timezone.utc)
+        account = _to_account(row)
+        _record_account_history(session, account)
     return account
 
 
@@ -208,8 +105,6 @@ def set_provision_status(account_id: UUID, resource: str, status: str, data: dic
 
     ``created_at`` backdates the provision (used when importing pre-existing users).
     """
-    from datetime import datetime, timezone
-    
     provision = Provision(
         account_id=account_id,
         resource=resource,
@@ -218,90 +113,49 @@ def set_provision_status(account_id: UUID, resource: str, status: str, data: dic
     )
     if created_at is not None:
         provision.created_at = created_at
-    
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT status FROM account_provisions WHERE account_id = %s AND resource = %s;",
-                (str(account_id), resource),
-            )
-            previous = cur.fetchone()
-            cur.execute(
-                """
-                INSERT INTO account_provision_history (account_id, resource, previous_status, status, data)
-                VALUES (%s, %s, %s, %s, %s);
-                """,
-                (str(account_id), resource, previous['status'] if previous else None, status, Jsonb(data)),
-            )
-            cur.execute(
-                """
-                INSERT INTO account_provisions (id, account_id, resource, status, data, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (account_id, resource) 
-                DO UPDATE SET status = %s, data = %s, created_at = %s, updated_at = %s;
-                """,
-                (
-                    str(provision.id),
-                    str(account_id),
-                    resource,
-                    status,
-                    Jsonb(data),
-                    provision.created_at.isoformat(),
-                    provision.updated_at.isoformat(),
-                    status,
-                    Jsonb(data),
-                    provision.created_at.isoformat(),
-                    datetime.now(timezone.utc).isoformat(),
-                ),
-            )
-        conn.commit()
+
+    with _session() as session, session.begin():
+        previous = session.scalar(select(ProvisionRow.status).where(
+            ProvisionRow.account_id == account_id, ProvisionRow.resource == resource))
+        session.add(ProvisionHistoryRow(account_id=account_id, resource=resource, previous_status=previous,
+                                        status=status, data=data))
+        stmt = insert(ProvisionRow).values(
+            id=provision.id, account_id=account_id, resource=resource, status=status, data=data,
+            created_at=provision.created_at, updated_at=provision.updated_at)
+        session.execute(stmt.on_conflict_do_update(
+            constraint='account_provisions_account_id_resource_key',
+            set_={'status': status, 'data': stmt.excluded.data, 'created_at': provision.created_at,
+                  'updated_at': datetime.now(timezone.utc)}))
     return provision
 
 
 def get_provision(account_id: UUID, resource: str) -> Optional[Provision]:
     """Retrieve provision status for account + resource."""
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT * FROM account_provisions 
-                WHERE account_id = %s AND resource = %s;
-                """,
-                (str(account_id), resource),
-            )
-            row = cur.fetchone()
-    if not row:
-        return None
-    return Provision.from_dict(row)
+    with _session() as session:
+        row = session.scalars(select(ProvisionRow).where(
+            ProvisionRow.account_id == account_id, ProvisionRow.resource == resource)).first()
+        return _to_provision(row) if row else None
 
 
 def get_provision_history(account_id: UUID, resource: Optional[str] = None) -> List[dict]:
     """Audit trail of provision status changes for an account, oldest first."""
-    query = "SELECT * FROM account_provision_history WHERE account_id = %s"
-    params: list = [str(account_id)]
+    query = select(ProvisionHistoryRow).where(ProvisionHistoryRow.account_id == account_id)
     if resource:
-        query += " AND resource = %s"
-        params.append(resource)
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(query + " ORDER BY recorded_at, id;", params)
-            return cur.fetchall()
+        query = query.where(ProvisionHistoryRow.resource == resource)
+    with _session() as session:
+        return [{c.key: getattr(row, c.key) for c in ProvisionHistoryRow.__table__.columns}
+                for row in session.scalars(query.order_by(ProvisionHistoryRow.recorded_at, ProvisionHistoryRow.id))]
+
+
+def _provisions(*conditions) -> List[Provision]:
+    with _session() as session:
+        return [_to_provision(row) for row in session.scalars(
+            select(ProvisionRow).where(*conditions).order_by(ProvisionRow.created_at))]
 
 
 def get_pending_provisions(resource: str, status: str) -> List[Provision]:
     """Get all provisions for a resource with a specific status."""
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT * FROM account_provisions 
-                WHERE resource = %s AND status = %s
-                ORDER BY created_at;
-                """,
-                (resource, status),
-            )
-            rows = cur.fetchall()
-    return [Provision.from_dict(row) for row in rows]
+    return _provisions(ProvisionRow.resource == resource, ProvisionRow.status == status)
 
 
 def find_provisions_by_username(resource: str, usernames: List[str],
@@ -313,86 +167,48 @@ def find_provisions_by_username(resource: str, usernames: List[str],
     """
     if not usernames:
         return []
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT * FROM account_provisions
-                WHERE resource = %s AND status = ANY(%s) AND lower(data->>'username') = ANY(%s)
-                ORDER BY created_at;
-                """,
-                (resource, list(statuses), [u.lower() for u in usernames]),
-            )
-            rows = cur.fetchall()
-    return [Provision.from_dict(row) for row in rows]
+    return _provisions(ProvisionRow.resource == resource, ProvisionRow.status.in_(statuses),
+                       func.lower(ProvisionRow.data['username'].astext).in_([u.lower() for u in usernames]))
+
+
+def find_provisions_by_any_username(usernames: List[str]) -> List[Provision]:
+    """Provisions of any resource whose stored ``username`` is one of the given names (exact match)."""
+    if not usernames:
+        return []
+    return _provisions(ProvisionRow.data['username'].astext.in_(usernames))
 
 
 def get_provisions(resource: str) -> List[Provision]:
     """All provisions of a resource, whatever their status."""
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM account_provisions WHERE resource = %s ORDER BY created_at;", (resource,))
-            rows = cur.fetchall()
-    return [Provision.from_dict(row) for row in rows]
+    return _provisions(ProvisionRow.resource == resource)
 
 
 def find_provisions_by_github_id(github_id: int, statuses: tuple[str, ...] = LIVE_STATUSES) -> List[Provision]:
     """GitHub provisions stored with the given numeric GitHub user id (survives username changes)."""
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT * FROM account_provisions
-                WHERE resource = 'github' AND status = ANY(%s) AND data->>'github_id' = %s
-                ORDER BY created_at;
-                """,
-                (list(statuses), str(github_id)),
-            )
-            rows = cur.fetchall()
-    return [Provision.from_dict(row) for row in rows]
+    return _provisions(ProvisionRow.resource == 'github', ProvisionRow.status.in_(statuses),
+                       ProvisionRow.data['github_id'].astext == str(github_id))
 
 
 def merge_provision_data(account_id: UUID, resource: str, extra: dict) -> None:
     """Add/overwrite keys in a provision's data without touching its status or created_at."""
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                UPDATE account_provisions SET data = data || %s, updated_at = now()
-                WHERE account_id = %s AND resource = %s;
-                """,
-                (Jsonb(extra), str(account_id), resource),
-            )
-        conn.commit()
+    with _session() as session, session.begin():
+        session.execute(update(ProvisionRow)
+                        .where(ProvisionRow.account_id == account_id, ProvisionRow.resource == resource)
+                        .values(data=ProvisionRow.data.op('||')(type_coerce(extra, JSONB)), updated_at=func.now()))
 
 
 def get_account_provisions(account_id: UUID) -> List[Provision]:
     """Get all provisions for an account (across all resources)."""
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT * FROM account_provisions 
-                WHERE account_id = %s
-                ORDER BY resource;
-                """,
-                (str(account_id),),
-            )
-            rows = cur.fetchall()
-    return [Provision.from_dict(row) for row in rows]
+    with _session() as session:
+        return [_to_provision(row) for row in session.scalars(
+            select(ProvisionRow).where(ProvisionRow.account_id == account_id).order_by(ProvisionRow.resource))]
 
 
 def get_active_provisions(account_id: UUID) -> List[Provision]:
     """Get all active (non-deprovisioned) provisions for an account."""
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT * FROM account_provisions 
-                WHERE account_id = %s AND status NOT IN ('deprovisioned', 'cancelled', 'expired')
-                ORDER BY resource;
-                """,
-                (str(account_id),),
-            )
-            rows = cur.fetchall()
-    return [Provision.from_dict(row) for row in rows]
+    with _session() as session:
+        return [_to_provision(row) for row in session.scalars(
+            select(ProvisionRow)
+            .where(ProvisionRow.account_id == account_id,
+                   ProvisionRow.status.not_in(('deprovisioned', 'cancelled', 'expired')))
+            .order_by(ProvisionRow.resource))]

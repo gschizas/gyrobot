@@ -15,7 +15,7 @@ uv run python src/plugins.py requirements <env-name> | uv pip install -r -   # s
 ```
 
 **Database schema** is managed by Alembic (`migrations/`, one history for the whole bot database; models live in
-`src/backend/models/`, engines come from `backend.database.get_engine(env_var)`). Migrated so far: `kudos`, `permission_rules`:
+`src/backend/models/`, engines come from `backend.database.get_engine(env_var)`). Migrated so far: everything (`kudos`, `permission_rules`, accounts/provisions/approvals):
 ```sh
 uv run alembic -x env=<env-name> upgrade head   # create/upgrade tables (the baseline is idempotent)
 uv run alembic -x env=<env-name> check          # model vs. database drift
@@ -350,7 +350,7 @@ Assets required: `img/kudos/wallpaper.jpg`, `img/kudos/amstrad_cpc464.ttf`.
 
 ### Approval queue (`backend/approval.py`, `commands/onboarding/`, `commands/approvals.py`)
 
-Env guards: `APPROVAL_DATABASE_URL` (PostgreSQL via psycopg3; schema auto-created on first use) **and** `APPROVAL_CONFIGURATION` (path to the security YAML, under `config/` or absolute — same convention as the OpenShift commands).
+Env guards: `APPROVAL_DATABASE_URL` (PostgreSQL via SQLAlchemy; the schema is created by `alembic upgrade head`) **and** `APPROVAL_CONFIGURATION` (path to the security YAML, under `config/` or absolute — same convention as the OpenShift commands).
 
 A generic **command-approval queue**. Decorate any command with `@requires_approval` (placed *below* `@click.pass_context`) to make invoking it enqueue a pending request instead of running. Designated approvers act on the queue via the `approvals` group; approval re-invokes the original command body.
 
@@ -436,7 +436,7 @@ Used by `commands/github/` (`github teams` — renders the enterprise team hiera
 
 ### `backend/account_storage.py` / `backend/accounts.py` — onboarding persistence
 
-`account_storage.py` is a psycopg3-backed store (env: `APPROVAL_DATABASE_URL`) for the `ProvisionRequest`/`Provision` dataclasses defined in `accounts.py`. Key functions: `create_account`, `get_account`, `get_account_by_email`, `get_or_create_account`, `update_account`, `set_provision_status`, `get_provision`, `get_pending_provisions(resource, status)`, `get_account_provisions`, `get_active_provisions`. Used throughout `commands/onboarding/` and `github_provisioning.py` to track multi-stage provisioning (invited → accepted → assigned / active).
+`account_storage.py` is a SQLAlchemy-backed store (models in `backend/models/accounts.py`, env: `APPROVAL_DATABASE_URL`) for the `ProvisionRequest`/`Provision` dataclasses defined in `accounts.py`. Key functions: `create_account`, `get_account`, `get_account_by_email`, `get_or_create_account`, `update_account`, `set_provision_status`, `get_provision`, `get_pending_provisions(resource, status)`, `get_account_provisions`, `get_active_provisions`. Used throughout `commands/onboarding/` and `github_provisioning.py` to track multi-stage provisioning (invited → accepted → assigned / active).
 
 ### `bot_framework/praw_wrapper.py` — Reddit OAuth
 
@@ -562,5 +562,5 @@ All runtime config lives outside the repo under mounted volumes:
 | `KUDOS_DATABASE_URL` | PostgreSQL DSN for `kudos` (SQLAlchemy) |
 | `GITHUB_TOKEN` | Bearer token for `backend/github_api.py` (`GitHubApi`); enables `commands/github/` and `onboard github`/`github_check` |
 | `GITHUB_ORG` | GitHub org/enterprise slug used by `backend/github_api.py`; required alongside `GITHUB_TOKEN` |
-| `APPROVAL_DATABASE_URL` | PostgreSQL DSN for the approval queue + account/provision storage (psycopg3); enables `onboard`/`offboard`/`approvals` |
+| `APPROVAL_DATABASE_URL` | PostgreSQL DSN for the approval queue + account/provision storage (SQLAlchemy); enables `onboard`/`offboard`/`approvals` |
 | `APPROVAL_CONFIGURATION` | Path to the approval security YAML (under `config/` or absolute). Selects the active `environment`; per-environment `requesters`/`approvers`, their channels, `notify_channel` live in `.permissions.yml` |

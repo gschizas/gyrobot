@@ -70,14 +70,15 @@ accepted/expired are not visible in the web UI or API. Options:
       dependencies, a `postgresql+psycopg://` URL, `env.py` using `backend.secret_store.load_environment`) and the
       baseline `0001`; the kudos table definition comes from `pg_dump --schema-only -t kudos`.
    2. **DONE (pending a test on the real database)** permissions (`permission_rules`, `backend/permissions.py`, DDL now in `scripts/migrate_permissions.py`).
-   3. onboarding / offboarding / approvals (`accounts`, `account_provisions`, `account_provision_history`,
-      `account_history`, `approval_requests`). Make `accounts.team` and `account_history` real migrations.
-   - For each group: define the SQLAlchemy models, write the migration (stamp it on existing databases with
-     `alembic stamp`, because the tables already exist), switch the queries over, and delete the old `_SCHEMA`
-     strings and table creation.
-   - At the end: replace `scripts/check_schema.py` with `alembic current` / `alembic check`; document
-     `alembic upgrade head` as a deploy step (maybe in the Docker entrypoint). Decide whether the bot, web UI and API
-     refuse to start, or only warn, when the database is behind.
+   3. **DONE (pending a test on the real database)** onboarding / offboarding / approvals (`accounts`,
+      `account_provisions`, `account_provision_history`, `account_history`, `approval_requests`); migration `0003`
+      adds `accounts.team` and `account_history` where they are missing.
+   - For each group: define the SQLAlchemy models, write the migration (idempotent, so it is safe on existing
+     databases), switch the queries over, and delete the old `_SCHEMA` strings and table creation.
+   - Remaining: run `alembic upgrade head` and `alembic check` on the real database (PostgreSQL 9.5 is below what
+     SQLAlchemy officially supports); document `alembic upgrade head` as a deploy step (maybe in the Docker
+     entrypoint). Decide whether the bot, web UI and API refuse to start, or only warn, when the database is behind.
+     `scripts/check_schema.py` was removed in favour of `alembic check`.
 9. **Leftovers from the removed `cheese`, `too_many_posts` and `survey` commands** (code and docs are already removed):
    - Remove `CHEESE_DATABASE_URL`, `GYROBOT_DATABASE_URL`, `QUESTIONNAIRE_DATABASE_URL` and `QUESTIONNAIRE_FILE` from
      the `.env.d` files, the questionnaire YAML from `data/` and `data/cheese_agent.yml` on the server, and any

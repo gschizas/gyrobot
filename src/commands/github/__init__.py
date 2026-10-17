@@ -8,10 +8,9 @@ from treelib import Tree
 from commands import gyrobot, DefaultCommandGroup
 from backend.constants import TableFormat
 from backend import bot_identity
-from backend.account_storage import find_provisions_by_username
+from backend.account_storage import find_provisions_by_any_username, find_provisions_by_username
 from backend.github_api import GitHubApi
 from commands.extended_context import ExtendedContext
-import psycopg
 
 if 'GITHUB_TOKEN' not in os.environ:
     raise ImportError('GITHUB_TOKEN not found in environment')
@@ -102,19 +101,15 @@ def github_pending_invitations(ctx: ExtendedContext, team_prefix: str | None, as
 
     usernames = [invite['login'] for invite in invitations]
 
-    with psycopg.connect(os.environ['APPROVAL_DATABASE_URL'], row_factory=psycopg.rows.dict_row) as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT ap.* FROM public.account_provisions AS ap WHERE data->>'username' = ANY(%s)",
-                        (usernames,))
-            db_rows = cur.fetchall()
+    db_rows = find_provisions_by_any_username(usernames)
 
-    users_by_username = {row['data']['username']: row for row in db_rows}
+    users_by_username = {p.data['username']: p for p in db_rows}
     for inv in invitations:
         user = users_by_username.get(inv['login'])
         if not user:
             continue
-        inv['email'] = user['data']['email']
-        inv['team'] = user['data']['team']
+        inv['email'] = user.data['email']
+        inv['team'] = user.data['team']
 
     if team_prefix:
         prefix = team_prefix.lower().removeprefix('ent:')

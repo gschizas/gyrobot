@@ -6,7 +6,7 @@ the invocation (command name + click parameters) is serialized into the
 run the ``approvals`` command group to approve/reject pending requests; on approval
 the original command body is executed via :func:`execute_approved`.
 
-Storage is PostgreSQL (psycopg3), configured through ``APPROVAL_DATABASE_URL``.
+Storage is PostgreSQL (SQLAlchemy model ``backend/models/approval.py``), configured through ``APPROVAL_DATABASE_URL``.
 Permissions (who may request/approve, allowed channels, ``notify_channel``,
 ``allow_self``) come from the ``permission_rules`` table via
 ``backend.permissions`` (see ``scripts/migrate_permissions.py``), not from YAML.
@@ -17,13 +17,14 @@ import os
 from typing import Callable, List, Optional
 
 import click
-import psycopg
-from psycopg.rows import dict_row
-from psycopg.types.json import Jsonb
+from sqlalchemy import func, select, update
+from sqlalchemy.orm import Session
 
 from backend import permissions
 from backend.configuration import user_allowed
+from backend.database import get_engine
 from backend.email_logging import send_email_log
+from backend.models.approval import ApprovalRequest
 from commands.extended_context import ExtendedContext
 
 if 'APPROVAL_DATABASE_URL' not in os.environ:
@@ -48,102 +49,50 @@ GLOBAL_APPROVAL_FUNCTION = 'backend.approval:_global'
 # requires_approval decorator at import time so requests can be re-invoked by name.
 APPROVAL_COMMANDS: dict = {}
 
-_schema_ready = False
-
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS approval_requests (
-    id                   SERIAL PRIMARY KEY,
-    created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    requested_by_user_id TEXT,
-    requested_by_name    TEXT,
-    team_id              TEXT,
-    team_name            TEXT,
-    channel_id           TEXT,
-    command              TEXT NOT NULL,
-    params               JSONB NOT NULL DEFAULT '{}'::jsonb,
-    summary              TEXT,
-    status               TEXT NOT NULL DEFAULT 'pending',
-    decided_by_user_id   TEXT,
-    decided_by_name      TEXT,
-    decided_at           TIMESTAMPTZ,
-    result               TEXT
-);
-"""
+def _session() -> Session:
+    return Session(get_engine('APPROVAL_DATABASE_URL'))
 
 
-def _connect():
-    global _schema_ready
-    conn = psycopg.connect(os.environ['APPROVAL_DATABASE_URL'], row_factory=dict_row)
-    if not _schema_ready:
-        with conn.cursor() as cur:
-            cur.execute(_SCHEMA)
-        conn.commit()
-        _schema_ready = True
-    return conn
+def _as_dict(row: ApprovalRequest) -> dict:
+    return {c.key: getattr(row, c.key) for c in ApprovalRequest.__table__.columns}
 
 
 def enqueue(*, command: str, params: dict, summary: str,
             requested_by_user_id: str, requested_by_name: str,
             team_id: str, team_name: str, channel_id: str) -> int:
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO approval_requests
-                    (command, params, summary, requested_by_user_id, requested_by_name,
-                     team_id, team_name, channel_id)
-                VALUES (%(command)s, %(params)s, %(summary)s, %(user_id)s, %(name)s,
-                        %(team_id)s, %(team_name)s, %(channel_id)s)
-                RETURNING id;
-                """,
-                {'command': command, 'params': Jsonb(params), 'summary': summary,
-                 'user_id': requested_by_user_id, 'name': requested_by_name,
-                 'team_id': team_id, 'team_name': team_name, 'channel_id': channel_id})
-            request_id = cur.fetchone()['id']
-        conn.commit()
-    return request_id
+    with _session() as session, session.begin():
+        row = ApprovalRequest(command=command, params=params, summary=summary,
+                              requested_by_user_id=requested_by_user_id, requested_by_name=requested_by_name,
+                              team_id=team_id, team_name=team_name, channel_id=channel_id)
+        session.add(row)
+        session.flush()
+        return row.id
 
 
 def get(request_id: int) -> Optional[dict]:
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM approval_requests WHERE id = %s;", (request_id,))
-            return cur.fetchone()
+    with _session() as session:
+        row = session.get(ApprovalRequest, request_id)
+        return _as_dict(row) if row else None
 
 
 def list_pending() -> List[dict]:
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT * FROM approval_requests WHERE status = 'pending' ORDER BY id;")
-            return cur.fetchall()
+    with _session() as session:
+        return [_as_dict(r) for r in session.scalars(
+            select(ApprovalRequest).where(ApprovalRequest.status == 'pending').order_by(ApprovalRequest.id))]
 
 
 def set_decision(request_id: int, status: str, decided_by_user_id: str,
                  decided_by_name: str) -> None:
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                UPDATE approval_requests
-                SET status = %(status)s,
-                    decided_by_user_id = %(user_id)s,
-                    decided_by_name = %(name)s,
-                    decided_at = NOW()
-                WHERE id = %(id)s;
-                """,
-                {'status': status, 'user_id': decided_by_user_id,
-                 'name': decided_by_name, 'id': request_id})
-        conn.commit()
+    with _session() as session, session.begin():
+        session.execute(update(ApprovalRequest).where(ApprovalRequest.id == request_id).values(
+            status=status, decided_by_user_id=decided_by_user_id, decided_by_name=decided_by_name,
+            decided_at=func.now()))
 
 
 def set_result(request_id: int, status: str, result: str) -> None:
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE approval_requests SET status = %s, result = %s WHERE id = %s;",
-                (status, result, request_id))
-        conn.commit()
+    with _session() as session, session.begin():
+        session.execute(update(ApprovalRequest).where(ApprovalRequest.id == request_id).values(
+            status=status, result=result))
 
 
 def _allow_self_approval() -> bool:
