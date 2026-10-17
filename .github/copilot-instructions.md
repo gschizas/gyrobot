@@ -14,6 +14,13 @@ uv sync
 uv run python src/plugins.py requirements <env-name> | uv pip install -r -   # see docs/INSTALLATION.md
 ```
 
+**Database schema** is managed by Alembic (`migrations/`, one history for the whole bot database; models live in
+`src/backend/models/`, engines come from `backend.database.get_engine(env_var)`). Currently only `kudos` is migrated:
+```sh
+uv run alembic -x env=<env-name> upgrade head   # create/upgrade tables (the baseline is idempotent)
+uv run alembic -x env=<env-name> check          # model vs. database drift
+```
+
 **Run locally** (loads `.env.d/<name>.env`):
 ```sh
 python src/__main__.py <env-name>
@@ -334,7 +341,7 @@ Dice rolling with NdS+B notation (e.g. `roll 2d6+3`). Subcommands: `magic8` (Mag
 
 ### `kudos` group (`commands/kudos.py`)
 
-Env guard: `KUDOS_DATABASE_URL` (PostgreSQL via psycopg3).
+Env guard: `KUDOS_DATABASE_URL` (PostgreSQL via SQLAlchemy; model `backend/models/kudos.py`).
 
 - **`kudos @user [reason]`** (default): records kudos in DB, randomly appends an emoji gift (75% chance). Parses Slack `<@USER_ID|name>` mentions via `EXTRACT_SLACK_ID` regex.
 - **`kudos view [days] [channel] [-g] [-t|-x|-v|-i]`**: leaderboard for last N days (default 14). Output formats: text table, Excel, PNG image, or MP4 video (retro arcade high-score animation using imageio + Pillow + Amstrad CPC464 font from `img/kudos/`).
@@ -552,7 +559,7 @@ All runtime config lives outside the repo under mounted volumes:
 | `WEATHER_URL` | Base URL for `weather` PNG fetch (default: `http://wttr.in/`) |
 | `WEATHER_FONT` | Path to TTF font file used by the ANSI→PNG renderer |
 | `ALT_PROXY` | HTTP proxy for `joke` command |
-| `KUDOS_DATABASE_URL` | PostgreSQL DSN for `kudos` (psycopg3) |
+| `KUDOS_DATABASE_URL` | PostgreSQL DSN for `kudos` (SQLAlchemy) |
 | `GITHUB_TOKEN` | Bearer token for `backend/github_api.py` (`GitHubApi`); enables `commands/github/` and `onboard github`/`github_check` |
 | `GITHUB_ORG` | GitHub org/enterprise slug used by `backend/github_api.py`; required alongside `GITHUB_TOKEN` |
 | `APPROVAL_DATABASE_URL` | PostgreSQL DSN for the approval queue + account/provision storage (psycopg3); enables `onboard`/`offboard`/`approvals` |

@@ -9,58 +9,18 @@ import re
 import click
 import imageio.v3 as imageio
 import numpy as np
-import psycopg
 from PIL import Image, ImageDraw, ImageFont
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 from backend.constants import TableFormat
+from backend.database import get_engine
+from backend.models.kudos import Kudos
 from commands import gyrobot, DefaultCommandGroup
 from commands.extended_context import ExtendedContext
 
 if 'KUDOS_DATABASE_URL' not in os.environ:
     raise ImportError('KUDOS_DATABASE_URL not found in environment')
-
-SQL_KUDOS_INSERT = """ \
-                   INSERT INTO kudos (from_user, from_user_id,
-                                      to_user, to_user_id,
-                                      team_name, team_id,
-                                      channel_name, channel_id,
-                                      permalink, reason)
-                   VALUES (%(sender_name)s, %(sender_id)s,
-                           %(recipient_name)s, %(recipient_id)s,
-                           %(team_name)s, %(team_id)s,
-                           %(channel_name)s, %(channel_id)s,
-                           %(permalink)s, %(reason)s); \
-                   """
-
-SQL_KUDOS_VIEW = """ \
-                 SELECT to_user as "User", COUNT(*) as Kudos
-                 FROM kudos
-                 WHERE DATE_PART('day', NOW() - datestamp) < %(days)s
-                   AND channel_id = %(channel_id)s
-                 GROUP BY to_user
-                 ORDER BY 2 DESC;"""
-
-SQL_KUDOS_VIEW_ALL = """ \
-                     SELECT to_user as "User", COUNT(*) as Kudos
-                     FROM kudos
-                     WHERE DATE_PART('day', NOW() - datestamp) < %(days)s
-                     GROUP BY to_user
-                     ORDER BY 2 DESC;"""
-
-SQL_KUDOS_VIEW_GIVERS = """ \
-                        SELECT from_user as "User", COUNT(*) as Kudos
-                        FROM kudos
-                        WHERE DATE_PART('day', NOW() - datestamp) < %(days)s
-                          AND channel_id = %(channel_id)s
-                        GROUP BY from_user
-                        ORDER BY 2 DESC;"""
-
-SQL_KUDOS_VIEW_GIVERS_ALL = """ \
-                            SELECT from_user as "User", COUNT(*) as Kudos
-                            FROM kudos
-                            WHERE DATE_PART('day', NOW() - datestamp) < %(days)s
-                            GROUP BY from_user
-                            ORDER BY 2 DESC;"""
 
 
 @gyrobot.group('kudos',
@@ -146,22 +106,20 @@ def kudos_give(ctx: ExtendedContext):
 def kudos_view(ctx: ExtendedContext, days_to_check: int, channel: str,
                show_givers: bool,
                output_format: str):
-    database_url = os.environ['KUDOS_DATABASE_URL']
-    with psycopg.connect(database_url) as conn:
-        with conn.cursor() as cur:
-            if channel == '*':
-                sql = SQL_KUDOS_VIEW_ALL if not show_givers else SQL_KUDOS_VIEW_GIVERS_ALL
-                cur.execute(sql, {'days': days_to_check})
-            else:
-                channel_id = ctx.chat.channel_id if channel == '' else (EXTRACT_SLACK_ID.findall(channel) or [''])[0]
-                sql = SQL_KUDOS_VIEW if not show_givers else SQL_KUDOS_VIEW_GIVERS
-                cur.execute(sql, {'days': days_to_check, 'channel_id': channel_id})
-            rows = cur.fetchall()
-            cols = [col.name for col in cur.description]
-    if len(rows) == 0:
+    user_column = Kudos.from_user if show_givers else Kudos.to_user
+    count = func.count().label('kudos')
+    query = (select(user_column.label('User'), count)
+             .where(func.date_part('day', func.now() - Kudos.datestamp) < days_to_check)
+             .group_by(user_column)
+             .order_by(count.desc()))
+    if channel != '*':
+        channel_id = ctx.chat.channel_id if channel == '' else (EXTRACT_SLACK_ID.findall(channel) or [''])[0]
+        query = query.where(Kudos.channel_id == channel_id)
+    with Session(get_engine('KUDOS_DATABASE_URL')) as session:
+        table = [dict(row._mapping) for row in session.execute(query)]
+    if len(table) == 0:
         ctx.chat.send_text("No kudos yet!")
     else:
-        table = [dict(zip(cols, row)) for row in rows]
         if output_format == 'video':
             video_file = _create_kudos_video(table)
             ctx.chat.send_file(video_file, title="Kudos", filename="kudos.mp4")
@@ -291,16 +249,11 @@ def _create_kudos_video(high_scores):
 
 
 def _record_kudos(ctx: ExtendedContext, sender_name, recipient_name, recipient_user_id, reason):
-    database_url = os.environ['KUDOS_DATABASE_URL']
-    with psycopg.connect(database_url) as conn:
-        conn.autocommit = True
-        with conn.cursor() as cur:
-            cmd_vars = {
-                'sender_name': sender_name, 'sender_id': ctx.chat.user_id,
-                'recipient_name': recipient_name, 'recipient_id': recipient_user_id,
-                'team_name': ctx.chat.team_name, 'team_id': ctx.chat.team_id,
-                'channel_name': ctx.chat.channel_name, 'channel_id': ctx.chat.channel_id,
-                'permalink': ctx.message.permalink, 'reason': reason}
-            cur.execute(SQL_KUDOS_INSERT, params=cmd_vars)
-            success = cur.rowcount > 0
-    return success
+    with Session(get_engine('KUDOS_DATABASE_URL')) as session, session.begin():
+        session.add(Kudos(
+            from_user=sender_name, from_user_id=ctx.chat.user_id,
+            to_user=recipient_name, to_user_id=recipient_user_id,
+            team_name=ctx.chat.team_name, team_id=ctx.chat.team_id,
+            channel_name=ctx.chat.channel_name, channel_id=ctx.chat.channel_id,
+            permalink=ctx.message.permalink, reason=reason))
+    return True

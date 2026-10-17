@@ -35,6 +35,8 @@ dependencies = [
     "ldap3>=2.9.1",
     "itsdangerous>=2.2.0",
     "pycryptodome>=3.23.0",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
 ]
 
 [dependency-groups]
