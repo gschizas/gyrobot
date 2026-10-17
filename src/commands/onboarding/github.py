@@ -260,6 +260,7 @@ def github_check(ctx: ExtendedContext):
 
     message = '\n'.join(summary_lines)
     ctx.chat.send_text(message)
+    return message
 
 
 @github_group.command('expired')
@@ -294,4 +295,3 @@ def github_expired(ctx: ExtendedContext, team_prefix: str | None, as_excel: bool
     title = 'Expired Invitations' + (f' (teams starting with {team_prefix})' if team_prefix else '')
     ctx.chat.send_table(title=title, table=table,
                         table_format=TableFormat.EXCEL if as_excel else TableFormat.TABLE)
-    return message
