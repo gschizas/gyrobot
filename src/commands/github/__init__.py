@@ -11,6 +11,7 @@ from backend import bot_identity
 from backend.account_storage import find_provisions_by_any_username, find_provisions_by_username
 from backend.github_api import GitHubApi
 from commands.extended_context import ExtendedContext
+from commands.team_columns import team_level_columns
 
 if 'GITHUB_TOKEN' not in os.environ:
     raise ImportError('GITHUB_TOKEN not found in environment')
@@ -84,7 +85,8 @@ def github_team_members(ctx: ExtendedContext, team_slug: str, as_excel: bool):
             email, source = '', ''
         table.append({'Username': m['login'], 'Email': email, 'Email source': source, 'Team': m['team']})
     ctx.chat.send_table(title=f'Members of teams starting with {team_slug}', table=table,
-                        table_format=TableFormat.EXCEL if as_excel else TableFormat.TABLE)
+                        table_format=TableFormat.EXCEL if as_excel else TableFormat.TABLE,
+                        formula_columns=team_level_columns)
 
 
 @github.command("pending-invitations")
@@ -121,4 +123,5 @@ def github_pending_invitations(ctx: ExtendedContext, team_prefix: str | None, as
 
     title = 'Pending Invitations' + (f' (teams starting with {team_prefix})' if team_prefix else '')
     ctx.chat.send_table(title=title, table=invitations,
-                        table_format=TableFormat.EXCEL if as_excel else TableFormat.TABLE)
+                        table_format=TableFormat.EXCEL if as_excel else TableFormat.TABLE,
+                        formula_columns=team_level_columns)

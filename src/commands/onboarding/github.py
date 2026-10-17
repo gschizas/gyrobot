@@ -17,7 +17,7 @@ from backend.github_api import GitHubApi
 from backend.providers import ProvisionRequest, PROVIDERS, RESOURCE_LABELS
 from commands import DefaultCommandGroup
 from commands.extended_context import ExtendedContext
-from commands.onboarding.team_columns import team_level_columns
+from commands.team_columns import team_level_columns
 
 if 'APPROVAL_DATABASE_URL' not in os.environ:
     raise ImportError('APPROVAL_DATABASE_URL not found in environment')
