@@ -19,8 +19,11 @@ import os
 import threading
 from typing import Optional
 
-import psycopg
-from psycopg.rows import dict_row
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from backend.database import get_engine
+from backend.models.permissions import PermissionRule
 
 # Sentinel used for the `environment` column/key when a function has no
 # per-environment/namespace axis (e.g. approval-queue commands). Deliberately
@@ -41,30 +44,22 @@ def function_full_name(func) -> str:
     return f'{func.__module__}:{func.__name__}'
 
 
-def _database_url() -> str:
-    try:
-        return os.environ['PERMISSIONS_DATABASE_URL']
-    except KeyError:
+def _engine():
+    if 'PERMISSIONS_DATABASE_URL' not in os.environ:
         raise RuntimeError(
             "PERMISSIONS_DATABASE_URL not set - required to resolve permissions "
             "from the permission_rules table. See scripts/migrate_permissions.py "
             "--to-db to populate it.")
+    return get_engine('PERMISSIONS_DATABASE_URL')
 
 
 def _load_all() -> dict:
-    cache = {}
-    with psycopg.connect(_database_url(), row_factory=dict_row) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT function_name, environment, role, users, channels, extra "
-                "FROM permission_rules;")
-            for row in cur.fetchall():
-                cache[(row['function_name'], row['environment'], row['role'])] = {
-                    'users': row['users'] or [],
-                    'channels': row['channels'] or [],
-                    'extra': row['extra'] or {},
-                }
-    return cache
+    with Session(_engine()) as session:
+        return {(r.function_name, r.environment, r.role): {
+            'users': r.users or [],
+            'channels': r.channels or [],
+            'extra': r.extra or {},
+        } for r in session.scalars(select(PermissionRule))}
 
 
 def _ensure_cache() -> dict:

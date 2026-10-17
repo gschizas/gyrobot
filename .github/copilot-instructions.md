@@ -15,7 +15,7 @@ uv run python src/plugins.py requirements <env-name> | uv pip install -r -   # s
 ```
 
 **Database schema** is managed by Alembic (`migrations/`, one history for the whole bot database; models live in
-`src/backend/models/`, engines come from `backend.database.get_engine(env_var)`). Currently only `kudos` is migrated:
+`src/backend/models/`, engines come from `backend.database.get_engine(env_var)`). Migrated so far: `kudos`, `permission_rules`:
 ```sh
 uv run alembic -x env=<env-name> upgrade head   # create/upgrade tables (the baseline is idempotent)
 uv run alembic -x env=<env-name> check          # model vs. database drift

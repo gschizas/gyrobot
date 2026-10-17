@@ -422,80 +422,45 @@ def flatten_to_rows(ordered: dict) -> list[dict]:
     return rows
 
 
-_PERMISSION_RULES_SCHEMA = """
-CREATE TABLE IF NOT EXISTS permission_rules (
-    id            SERIAL PRIMARY KEY,
-    function_name TEXT NOT NULL,
-    environment   TEXT NOT NULL DEFAULT '',
-    role          TEXT NOT NULL DEFAULT 'default',
-    users         JSONB NOT NULL DEFAULT '[]'::jsonb,
-    channels      JSONB NOT NULL DEFAULT '[]'::jsonb,
-    extra         JSONB NOT NULL DEFAULT '{}'::jsonb,
-    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (function_name, environment, role)
-);
-"""
-
-
 def write_to_db(rows: list[dict], warnings: list, prune: bool = False) -> int:
-    try:
-        import psycopg
-        from psycopg.types.json import Jsonb
-    except ImportError:
-        warnings.append("[error] psycopg is not installed - cannot write to DB")
-        return 0
-
-    dsn = os.environ.get('PERMISSIONS_DATABASE_URL')
-    if not dsn:
+    """Upsert the rows; the table itself is created by ``alembic upgrade head``."""
+    if not os.environ.get('PERMISSIONS_DATABASE_URL'):
         warnings.append("[error] PERMISSIONS_DATABASE_URL not set - skipping DB write")
         return 0
 
-    with psycopg.connect(dsn) as conn:
-        with conn.cursor() as cur:
-            cur.execute(_PERMISSION_RULES_SCHEMA)
-            for row in rows:
-                cur.execute(
-                    """
-                    INSERT INTO permission_rules
-                        (function_name, environment, role, users, channels, extra)
-                    VALUES
-                        (%(function_name)s, %(environment)s, %(role)s,
-                         %(users)s, %(channels)s, %(extra)s)
-                    ON CONFLICT (function_name, environment, role)
-                    DO UPDATE SET
-                        users = EXCLUDED.users,
-                        channels = EXCLUDED.channels,
-                        extra = EXCLUDED.extra,
-                        updated_at = NOW();
-                    """,
-                    {
-                        'function_name': row['function_name'],
-                        'environment': row['environment'],
-                        'role': row['role'],
-                        'users': Jsonb(row['users']),
-                        'channels': Jsonb(row['channels']),
-                        'extra': Jsonb(row['extra']),
-                    })
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'src'))
+    from sqlalchemy import delete, func, select
+    from sqlalchemy.dialects.postgresql import insert
+    from sqlalchemy.orm import Session
+    from backend.database import get_engine
+    from backend.models.permissions import PermissionRule
 
-            if prune:
-                by_function: dict[str, set] = {}
-                for row in rows:
-                    by_function.setdefault(row['function_name'], set()).add(
-                        (row['environment'], row['role']))
-                for function_name, keep in by_function.items():
-                    cur.execute(
-                        "SELECT environment, role FROM permission_rules WHERE function_name = %s;",
-                        (function_name,))
-                    stale = [(env, role) for (env, role) in cur.fetchall() if (env, role) not in keep]
-                    for env, role in stale:
-                        cur.execute(
-                            "DELETE FROM permission_rules "
-                            "WHERE function_name = %s AND environment = %s AND role = %s;",
-                            (function_name, env, role))
-                        warnings.append(
-                            f"[pruned] {function_name} environment={env!r} role={role!r} "
-                            f"- no longer present in source YAML")
-        conn.commit()
+    with Session(get_engine('PERMISSIONS_DATABASE_URL')) as session, session.begin():
+        for row in rows:
+            stmt = insert(PermissionRule).values(
+                function_name=row['function_name'], environment=row['environment'], role=row['role'],
+                users=row['users'], channels=row['channels'], extra=row['extra'])
+            session.execute(stmt.on_conflict_do_update(
+                constraint='permission_rules_function_name_environment_role_key',
+                set_={'users': stmt.excluded.users, 'channels': stmt.excluded.channels,
+                      'extra': stmt.excluded.extra, 'updated_at': func.now()}))
+
+        if prune:
+            by_function: dict[str, set] = {}
+            for row in rows:
+                by_function.setdefault(row['function_name'], set()).add((row['environment'], row['role']))
+            for function_name, keep in by_function.items():
+                existing = session.execute(select(PermissionRule.environment, PermissionRule.role)
+                                           .where(PermissionRule.function_name == function_name)).all()
+                for env, role in existing:
+                    if (env, role) in keep:
+                        continue
+                    session.execute(delete(PermissionRule).where(
+                        PermissionRule.function_name == function_name,
+                        PermissionRule.environment == env, PermissionRule.role == role))
+                    warnings.append(
+                        f"[pruned] {function_name} environment={env!r} role={role!r} "
+                        f"- no longer present in source YAML")
     return len(rows)
 
 

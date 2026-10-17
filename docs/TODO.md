@@ -69,7 +69,7 @@ accepted/expired are not visible in the web UI or API. Options:
    1. **DONE (pending a test on the real database)** kudos (`kudos` table, `commands/kudos.py`) - this one also sets up Alembic (`alembic` and `sqlalchemy`
       dependencies, a `postgresql+psycopg://` URL, `env.py` using `backend.secret_store.load_environment`) and the
       baseline `0001`; the kudos table definition comes from `pg_dump --schema-only -t kudos`.
-   2. permissions (`permission_rules`, `backend/permissions.py`, DDL now in `scripts/migrate_permissions.py`).
+   2. **DONE (pending a test on the real database)** permissions (`permission_rules`, `backend/permissions.py`, DDL now in `scripts/migrate_permissions.py`).
    3. onboarding / offboarding / approvals (`accounts`, `account_provisions`, `account_provision_history`,
       `account_history`, `approval_requests`). Make `accounts.team` and `account_history` real migrations.
    - For each group: define the SQLAlchemy models, write the migration (stamp it on existing databases with
