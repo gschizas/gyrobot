@@ -799,7 +799,8 @@ class GitHubApi():
                             logger.warning(f"User {username} not found in GitHub enterprise (yet)")
                             continue
                         provision.data['expired_at'] = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
-                        set_provision_status(provision.account_id, 'github', 'expired', provision.data)
+                        set_provision_status(provision.account_id, 'github', 'expired', provision.data,
+                                             created_at=provision.created_at)
                         results['expired'].append(username)
                         logger.warning(f"Invitation for {username} expired")
                         notify(f":hourglass: GitHub invitation for *{username}* ({provision.data.get('email', 'no email')}) "

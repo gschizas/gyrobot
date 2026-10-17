@@ -6,10 +6,12 @@ import requests
 
 from backend import bot_identity
 from backend.account_storage import (find_provisions_by_github_id, find_provisions_by_username,
-                                     get_or_create_account, get_pending_provisions, set_provision_status)
+                                     get_or_create_account, get_pending_provisions, get_provisions,
+                                     set_provision_status)
 from backend.accounts import Provision
 from backend.approval import requires_approval
 from backend.arguments import extract_email
+from backend.constants import TableFormat
 from backend.email_logging import send_email
 from backend.github_api import GitHubApi
 from backend.providers import ProvisionRequest, PROVIDERS, RESOURCE_LABELS
@@ -258,4 +260,38 @@ def github_check(ctx: ExtendedContext):
 
     message = '\n'.join(summary_lines)
     ctx.chat.send_text(message)
+
+
+@github_group.command('expired')
+@click.argument('team_prefix', required=False)
+@click.option('-x', '--excel', 'as_excel', is_flag=True, help='Send the result as an Excel file')
+@click.pass_context
+def github_expired(ctx: ExtendedContext, team_prefix: str | None, as_excel: bool):
+    """List GitHub invitations that expired without being accepted.
+
+    Expired invitations no longer exist on GitHub, so they come from the bot's database.
+    Optionally only for teams starting with TEAM_PREFIX.
+
+    USAGE: bot onboard github expired [team_prefix] [-x]
+    """
+    prefix = team_prefix.lower().removeprefix('ent:') if team_prefix else ''
+    table = []
+    for provision in get_provisions('github'):
+        data = provision.data
+        team = data.get('team', '')
+        if provision.status != 'expired' or not team.lower().removeprefix('ent:').startswith(prefix):
+            continue
+        table.append({'Username': data.get('username', ''), 'Email': data.get('email', ''), 'Team': team,
+                      'Invited': provision.created_at.date().isoformat(),
+                      'Expired': data.get('expired_at', '')[:10]})
+
+    if not table:
+        suffix = f' for teams starting with {team_prefix}' if team_prefix else ''
+        ctx.chat.send_text(f"No expired invitations found{suffix}.")
+        return
+
+    table.sort(key=lambda row: row['Expired'], reverse=True)
+    title = 'Expired Invitations' + (f' (teams starting with {team_prefix})' if team_prefix else '')
+    ctx.chat.send_table(title=title, table=table,
+                        table_format=TableFormat.EXCEL if as_excel else TableFormat.TABLE)
     return message
