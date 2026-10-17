@@ -195,7 +195,6 @@ thread_id = extract_real_thread_id(raw_arg)  # returns bare Reddit base-36 ID
 | `unicode_post <thread_id>` | `SUBREDDIT_NAME` | Dump Unicode codepoints of a post title |
 | `make post <thread_id\|NEW> <wiki_page>` | `REDDIT_ALT_USER` | Create/update a post from a wiki page using the alt account |
 | `make sticky <thread_id> <wiki_page>` | `REDDIT_ALT_USER` | Create/update a stickied mod comment from a wiki page |
-| `too_many_posts` | `GYROBOT_DATABASE_URL` | Users with >2 submissions in the last 24h (queries `public.submissions` table) |
 | `survey <query>` | `QUESTIONNAIRE_DATABASE_URL` | Query survey results from PostgreSQL (psycopg3) |
 
 ### Reddit-specific patterns
@@ -536,7 +535,6 @@ All runtime config lives outside the repo under mounted volumes:
 | `REDDIT_ALT_USER` | Enables alt mod account (`bot_reddit_session`); used for `make post/sticky` |
 | `REDDIT_POLICY_SUBREDDIT` | Subreddit for `add_policy` (default: `SUBREDDIT_NAME`) |
 | `REDDIT_POLICY_PAGE` | Wiki page for `add_policy` (default: `mod_policy_votes`) |
-| `GYROBOT_DATABASE_URL` | PostgreSQL DSN for `too_many_posts` (psycopg3) |
 | `QUESTIONNAIRE_DATABASE_URL` | PostgreSQL DSN for `survey` (psycopg3) |
 | `QUESTIONNAIRE_FILE` | Filename under `data/` for survey questionnaire YAML |
 
