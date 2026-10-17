@@ -343,10 +343,6 @@ Env guard: `KUDOS_DATABASE_URL` (PostgreSQL via psycopg3).
 
 Assets required: `img/kudos/wallpaper.jpg`, `img/kudos/amstrad_cpc464.ttf`.
 
-### `cheese` group (`commands/cheese.py`)
-
-Env guard: `CHEESE_DATABASE_URL` (PostgreSQL via psycopg3). Config from `data/cheese_agent.yml`. Manages remote machines (ngrok/Citrix status, remote restart, message dispatch) via a job-queue table. `ngrok status` and `citrix status` use `send_ephemeral` (only visible to the requesting user). Machine access is gated by matching `ctx.chat.user_id` against `slack_ids` in config.
-
 ### `survey` group (`commands/reddit/survey.py`)
 
 Env guard: `QUESTIONNAIRE_DATABASE_URL`. Questionnaire definition loaded from `data/$QUESTIONNAIRE_FILE` (multi-document YAML). Question types: `radio`, `checkbox`, `tree`, `checktree`, `text`, `textarea`, `scale-matrix`. Subqueries: `count`, `questions`, `questions_full`, `mods`, `votes_per_day`, `q_N`, `full_replies [json]`.
@@ -478,7 +474,7 @@ Channel names are prefixed: `#` for public, `🔒` for private, `🧑` for DMs (
 
 **`send_table`**: sends as Excel if `send_as_excel=True` **or** if `SEND_TABLES_AS_EXCEL` env var is truthy — a global override for environments where file uploads of `.txt` are unwanted.
 
-**`send_ephemeral`**: only visible to the triggering user. Used by `cheese` commands for private status info.
+**`send_ephemeral`**: only visible to the triggering user. Currently unused by any command.
 
 **`send_fields`**: uses Slack legacy `attachments` API (colored sidebar blocks). Used by `usernotes` for color-coded notes.
 
@@ -566,7 +562,6 @@ All runtime config lives outside the repo under mounted volumes:
 | `WEATHER_FONT` | Path to TTF font file used by the ANSI→PNG renderer |
 | `ALT_PROXY` | HTTP proxy for `joke` command |
 | `KUDOS_DATABASE_URL` | PostgreSQL DSN for `kudos` (psycopg3) |
-| `CHEESE_DATABASE_URL` | PostgreSQL DSN for `cheese` (psycopg3) |
 | `GITHUB_TOKEN` | Bearer token for `backend/github_api.py` (`GitHubApi`); enables `commands/github/` and `onboard github`/`github_check` |
 | `GITHUB_ORG` | GitHub org/enterprise slug used by `backend/github_api.py`; required alongside `GITHUB_TOKEN` |
 | `APPROVAL_DATABASE_URL` | PostgreSQL DSN for the approval queue + account/provision storage (psycopg3); enables `onboard`/`offboard`/`approvals` |

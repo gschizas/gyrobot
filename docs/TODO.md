@@ -82,13 +82,14 @@ accepted/expired are not visible in the web UI or API. Options:
      `alembic current` / `alembic check`; document `alembic upgrade head` as a deploy step (maybe in the Docker
      entrypoint). Decide whether the bot, web UI and API refuse to start, or only warn, when the database is behind.
    - Once the questionnaire app is retired, the survey tables can be dropped from the baseline.
-9. **Remove the obsolete `cheese` and `too_many_posts` commands**:
-   - Delete `src/commands/cheese.py`, `src/commands/reddit/database.py` and `data/cheese_agent.yml`.
-   - Remove the `cheese` and `too_many_posts` rows and the `cheese` section from `.github/copilot-instructions.md`, plus the
-     `CHEESE_DATABASE_URL` and `GYROBOT_DATABASE_URL` variables from the environment table and from the `.env.d` files.
-   - Remove the mention of `cheese` under `send_ephemeral` (the method itself stays).
-   - Check `config/plugins.yml`, `docs/` and the permission rules (`permission_rules`) for entries naming them.
-   - Optionally drop the `"machineState"` and `"jobQueue"` tables and `public.submissions`; keep them out of the Alembic baseline.
+9. **Remove the obsolete `too_many_posts` command** (the `cheese` command is already removed):
+   - Delete `src/commands/reddit/database.py`.
+   - Remove the `too_many_posts` row from `.github/copilot-instructions.md`, plus the `GYROBOT_DATABASE_URL` variable from
+     the environment table and from the `.env.d` files.
+   - Check `config/plugins.yml`, `docs/` and the permission rules (`permission_rules`) for entries naming it.
+   - Leftovers from `cheese`: `CHEESE_DATABASE_URL` in the `.env.d` files, `data/cheese_agent.yml` on the server, and its
+     permission rules. Optionally drop the `"machineState"` and `"jobQueue"` tables and `public.submissions`; keep them
+     out of the Alembic baseline.
 
 ## Other chat platforms
 
