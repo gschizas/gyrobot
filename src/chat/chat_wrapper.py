@@ -12,7 +12,7 @@ import pandas as pd
 from tabulate import tabulate
 
 from backend.constants import TableFormat
-from backend.excel import write_excel_table
+from backend.excel import FormulaColumns, write_excel_table
 
 # Kinds of argument a platform may decorate (see Conversation.clean_argument)
 ARGUMENT_EMAIL = 'email'
@@ -43,12 +43,15 @@ class Conversation(ABC):
         pass
 
     @abstractmethod
-    def send_table(self, title: str, table: List[Dict], table_format: TableFormat = TableFormat.TABLE) -> None:
+    def send_table(self, title: str, table: List[Dict], table_format: TableFormat = TableFormat.TABLE,
+                   formula_columns: FormulaColumns | None = None) -> None:
+        """formula_columns only affects Excel output (see backend.excel.write_excel_table)."""
         pass
 
     @abstractmethod
     def send_tables(self, title: str, tables: Dict[str, List[Dict]],
-                    table_format: TableFormat = TableFormat.TABLE) -> None:
+                    table_format: TableFormat = TableFormat.TABLE,
+                    formula_columns: FormulaColumns | None = None) -> None:
         pass
 
     @abstractmethod
@@ -80,14 +83,14 @@ class Conversation(ABC):
         return self.get_team_info()['name']
 
     @staticmethod
-    def make_excel_table(table):
+    def make_excel_table(table, formula_columns: FormulaColumns | None = None):
         table_output: BytesIO
         with io.BytesIO() as table_output:
             table_df = pd.DataFrame(table)
             Conversation.localize_datetime(table_df)
             # noinspection PyTypeChecker
             with pd.ExcelWriter(table_output, engine='xlsxwriter') as writer:
-                write_excel_table(writer, table_df, 'Sheet1', 'Table1')
+                write_excel_table(writer, table_df, 'Sheet1', 'Table1', formula_columns)
             excel_data = table_output.getvalue()
         return excel_data
 
@@ -129,7 +132,7 @@ class Conversation(ABC):
         return zip_data
 
     @staticmethod
-    def excel_from_tables(tables):
+    def excel_from_tables(tables, formula_columns: FormulaColumns | None = None):
         excel_output: BytesIO
         with io.BytesIO() as excel_output:
             # noinspection PyTypeChecker
@@ -143,7 +146,8 @@ class Conversation(ABC):
                         long_sheet_names.append({'Original Name': table_name, 'Translated Name': sheet_name})
                     table_df = pd.DataFrame(table)
                     Conversation.localize_datetime(table_df)
-                    write_excel_table(writer, table_df, sheet_name, f'Table{table_index}_{table_name}')
+                    write_excel_table(writer, table_df, sheet_name, f'Table{table_index}_{table_name}',
+                                      formula_columns)
                 if long_sheet_names:
                     write_excel_table(writer, pd.DataFrame(long_sheet_names), '__LongNames', 'LongNames')
             excel_output.seek(0)

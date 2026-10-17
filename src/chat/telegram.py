@@ -25,6 +25,7 @@ import telebot
 from tabulate import tabulate
 
 from backend.constants import TableFormat
+from backend.excel import FormulaColumns
 from chat.chat_wrapper import Conversation, Message
 
 MAX_MESSAGE_LENGTH = 3500  # Telegram's limit is 4096 *after* HTML escaping/tags are added
@@ -72,7 +73,8 @@ class TelegramConversation(Conversation):
             text = f"🤦 {text}"
         _send(channel or self.channel_id, text)
 
-    def send_table(self, title: str, table: List[Dict], table_format: TableFormat = TableFormat.TABLE) -> None:
+    def send_table(self, title: str, table: List[Dict], table_format: TableFormat = TableFormat.TABLE,
+                   formula_columns: FormulaColumns | None = None) -> None:
         # TODO: Excel / file output according to table_format
         if not table:
             self.send_text(f"*{title}*\n(no rows)")
@@ -82,7 +84,8 @@ class TelegramConversation(Conversation):
             self.send_text(f"```\n{part}\n```")
 
     def send_tables(self, title: str, tables: Dict[str, List[Dict]],
-                    table_format: TableFormat = TableFormat.TABLE) -> None:
+                    table_format: TableFormat = TableFormat.TABLE,
+                    formula_columns: FormulaColumns | None = None) -> None:
         for table_title, table in tables.items():
             self.send_table(f"{title} - {table_title}", table, table_format)
 

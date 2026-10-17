@@ -12,6 +12,7 @@ from tabulate import tabulate
 
 from backend.configuration import truthy_env
 from backend.constants import TableFormat
+from backend.excel import FormulaColumns
 from chat.chat_wrapper import ARGUMENT_EMAIL, Conversation, Message
 
 teams_cache = {}
@@ -46,7 +47,8 @@ class SlackConversation(Conversation):
             icon_emoji=icon_emoji,
             username=self.bot_name)
 
-    def send_table(self, title: str, table: List[Dict], table_format: TableFormat = TableFormat.TABLE) -> None:
+    def send_table(self, title: str, table: List[Dict], table_format: TableFormat = TableFormat.TABLE,
+                   formula_columns: FormulaColumns | None = None) -> None:
         def cell_value(value) -> str:
             return '\xA0' if value == '' else str(value)
 
@@ -55,7 +57,7 @@ class SlackConversation(Conversation):
             table_format = TableFormat.EXCEL
 
         if table_format == TableFormat.EXCEL or truthy_env('SEND_TABLES_AS_EXCEL'):
-            excel_data = self.make_excel_table(table)
+            excel_data = self.make_excel_table(table, formula_columns)
             self.send_file(excel_data, filename=f'{title}.xlsx')
         elif table_format == TableFormat.MARKDOWN:
             table_markdown = tabulate(table, headers='keys', tablefmt='fancy_outline')
@@ -73,9 +75,10 @@ class SlackConversation(Conversation):
             self.send_blocks(blocks=[table_block])
 
     def send_tables(self, title: str, tables: Dict[str, List[Dict]],
-                    table_format: TableFormat = TableFormat.TABLE) -> None:
+                    table_format: TableFormat = TableFormat.TABLE,
+                    formula_columns: FormulaColumns | None = None) -> None:
         if table_format == TableFormat.EXCEL or self.truthy_env('SEND_TABLES_AS_EXCEL'):
-            excel_data = self.excel_from_tables(tables)
+            excel_data = self.excel_from_tables(tables, formula_columns)
             self.send_file(excel_data, filename=f'{title}.xlsx')
         elif table_format == TableFormat.ZIP_MARKDOWN:
             markdown_data = self.markdown_from_tables(tables)

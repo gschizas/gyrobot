@@ -12,6 +12,7 @@ from mattermostdriver import Driver
 from tabulate import tabulate
 
 from backend.constants import TableFormat
+from backend.excel import FormulaColumns
 from chat.chat_wrapper import Conversation, Message
 
 teams_cache = {}
@@ -31,7 +32,8 @@ class MattermostConversation(Conversation):
             "message": text
         })
 
-    def send_table(self, title: str, table: List[Dict], table_format: TableFormat = TableFormat.TABLE) -> None:
+    def send_table(self, title: str, table: List[Dict], table_format: TableFormat = TableFormat.TABLE,
+                   formula_columns: FormulaColumns | None = None) -> None:
         table_markdown = tabulate(table, headers='keys', tablefmt='pipe')
         mattermost_client.posts.create_post({
             "channel_id": self.channel_id,
@@ -39,7 +41,8 @@ class MattermostConversation(Conversation):
         })
 
     def send_tables(self, title: str, tables: Dict[str, List[Dict]],
-                    table_format: TableFormat = TableFormat.TABLE) -> None:
+                    table_format: TableFormat = TableFormat.TABLE,
+                    formula_columns: FormulaColumns | None = None) -> None:
         full_text = "### " + title + "\n"
         for table_title, table in tables.items():
             full_text += '#### ' + table_title + '\n'

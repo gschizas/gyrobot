@@ -31,6 +31,7 @@ from botbuilder.schema import ConversationReference
 from tabulate import tabulate
 
 from backend.constants import TableFormat
+from backend.excel import FormulaColumns
 from chat.chat_wrapper import Conversation, Message
 from state_file import state_file
 
@@ -112,7 +113,8 @@ class TeamsConversation(Conversation):
             text = f"🤦 {text}"
         _send(channel or self.channel_id, text)
 
-    def send_table(self, title: str, table: List[Dict], table_format: TableFormat = TableFormat.TABLE) -> None:
+    def send_table(self, title: str, table: List[Dict], table_format: TableFormat = TableFormat.TABLE,
+                   formula_columns: FormulaColumns | None = None) -> None:
         # TODO: Adaptive Card table / Excel upload according to table_format
         if not table:
             self.send_text(f"**{title}**\n\n(no rows)")
@@ -120,7 +122,8 @@ class TeamsConversation(Conversation):
         self.send_text(f"**{title}**\n\n```\n{tabulate(table, headers='keys', tablefmt='simple')}\n```")
 
     def send_tables(self, title: str, tables: Dict[str, List[Dict]],
-                    table_format: TableFormat = TableFormat.TABLE) -> None:
+                    table_format: TableFormat = TableFormat.TABLE,
+                    formula_columns: FormulaColumns | None = None) -> None:
         for table_title, table in tables.items():
             self.send_table(f"{title} - {table_title}", table, table_format)
 

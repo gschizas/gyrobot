@@ -1,4 +1,5 @@
 import re
+from collections.abc import Callable
 
 import pandas as pd
 
@@ -11,10 +12,22 @@ def safe_excel_table_name(name: str) -> str:
     return cleaned[:255]
 
 
-def write_excel_table(writer: pd.ExcelWriter, df: pd.DataFrame, sheet_name: str, table_name: str | None = None):
-    """Write a DataFrame to an xlsxwriter-backed ExcelWriter as a formatted Excel Table with auto-sized columns."""
+FormulaColumns = Callable[[pd.DataFrame], dict[str, str]]
+
+
+def write_excel_table(writer: pd.ExcelWriter, df: pd.DataFrame, sheet_name: str, table_name: str | None = None,
+                      formula_columns: FormulaColumns | None = None):
+    """Write a DataFrame to an xlsxwriter-backed ExcelWriter as a formatted Excel Table with auto-sized columns.
+
+    formula_columns, if given, receives the DataFrame and returns {header: formula} for extra columns
+    appended to the table.
+    """
     df = df.reset_index(drop=True)
     df.columns = [str(c) for c in df.columns]
+    formulas = {name: formula for name, formula in (formula_columns(df) if formula_columns else {}).items()
+                if name not in df.columns}
+    for name in formulas:
+        df[name] = ''
     columns = list(df.columns)
     df.to_excel(writer, sheet_name=sheet_name, index=False)
     worksheet = writer.sheets[sheet_name]
@@ -30,7 +43,8 @@ def write_excel_table(writer: pd.ExcelWriter, df: pd.DataFrame, sheet_name: str,
         len(columns) - 1,
         {
             'name': safe_excel_table_name(table_name or sheet_name),
-            'columns': [{'header': column} for column in columns],
+            'columns': [{'header': column, **({'formula': formulas[column]} if column in formulas else {})}
+                        for column in columns],
             'style': 'Table Style Medium 9',
         }
     )

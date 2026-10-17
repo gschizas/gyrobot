@@ -8,6 +8,7 @@ render however they like.
 from typing import Dict, List
 
 from backend.constants import TableFormat
+from backend.excel import FormulaColumns
 from chat.chat_wrapper import Conversation
 from webapp.emoji import convert_slack_emoji
 
@@ -34,11 +35,13 @@ class HeadlessConversation(Conversation):
     def send_text(self, text, is_error: bool = False, icon_emoji: str = None, channel=None) -> None:
         self.messages.append({'type': 'text', 'text': convert_slack_emoji(text), 'is_error': is_error})
 
-    def send_table(self, title: str, table: List[Dict], table_format: TableFormat = TableFormat.TABLE) -> None:
+    def send_table(self, title: str, table: List[Dict], table_format: TableFormat = TableFormat.TABLE,
+                   formula_columns: FormulaColumns | None = None) -> None:
         self.messages.append({'type': 'table', 'title': title, 'rows': table})
 
     def send_tables(self, title: str, tables: Dict[str, List[Dict]],
-                    table_format: TableFormat = TableFormat.TABLE) -> None:
+                    table_format: TableFormat = TableFormat.TABLE,
+                    formula_columns: FormulaColumns | None = None) -> None:
         self.messages.append({'type': 'tables', 'title': title, 'tables': tables})
 
     def send_ephemeral(self, text, blocks, is_error, icon_emoji):

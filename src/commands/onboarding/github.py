@@ -17,6 +17,7 @@ from backend.github_api import GitHubApi
 from backend.providers import ProvisionRequest, PROVIDERS, RESOURCE_LABELS
 from commands import DefaultCommandGroup
 from commands.extended_context import ExtendedContext
+from commands.onboarding.team_columns import team_level_columns
 
 if 'APPROVAL_DATABASE_URL' not in os.environ:
     raise ImportError('APPROVAL_DATABASE_URL not found in environment')
@@ -311,4 +312,5 @@ def github_expired(ctx: ExtendedContext, team_prefix: str | None, as_excel: bool
         del row['_sort']
     title = 'Expired Invitations' + (f' (teams starting with {team_prefix})' if team_prefix else '')
     ctx.chat.send_table(title=title, table=table,
-                        table_format=TableFormat.EXCEL if as_excel else TableFormat.TABLE)
+                        table_format=TableFormat.EXCEL if as_excel else TableFormat.TABLE,
+                        formula_columns=team_level_columns)
