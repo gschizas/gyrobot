@@ -147,6 +147,19 @@ def get_provision_history(account_id: UUID, resource: Optional[str] = None) -> L
                 for row in session.scalars(query.order_by(ProvisionHistoryRow.recorded_at, ProvisionHistoryRow.id))]
 
 
+def get_last_status_times(resource: str, status: str) -> dict[UUID, datetime]:
+    """When each account's ``resource`` provision last entered ``status``, from the audit trail.
+
+    Unlike the provision row's own timestamps, these come from the database clock and survive later rewrites.
+    """
+    with _session() as session:
+        rows = session.execute(
+            select(ProvisionHistoryRow.account_id, func.max(ProvisionHistoryRow.recorded_at))
+            .where(ProvisionHistoryRow.resource == resource, ProvisionHistoryRow.status == status)
+            .group_by(ProvisionHistoryRow.account_id))
+        return {account_id: recorded_at for account_id, recorded_at in rows}
+
+
 def _provisions(*conditions) -> List[Provision]:
     with _session() as session:
         return [_to_provision(row) for row in session.scalars(

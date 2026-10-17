@@ -6,8 +6,8 @@ import requests
 
 from backend import bot_identity
 from backend.account_storage import (find_provisions_by_github_id, find_provisions_by_username,
-                                     get_or_create_account, get_pending_provisions, get_provisions,
-                                     set_provision_status)
+                                     get_last_status_times, get_or_create_account, get_pending_provisions,
+                                     get_provisions, set_provision_status)
 from backend.accounts import Provision
 from backend.approval import requires_approval
 from backend.arguments import extract_email
@@ -276,15 +276,20 @@ def github_expired(ctx: ExtendedContext, team_prefix: str | None, as_excel: bool
     USAGE: bot onboard github expired [team_prefix] [-x]
     """
     prefix = team_prefix.lower().removeprefix('ent:') if team_prefix else ''
+    invited_at = get_last_status_times('github', 'invited')
+    expired_at = get_last_status_times('github', 'expired')
     table = []
     for provision in get_provisions('github'):
         data = provision.data
         team = data.get('team', '')
         if provision.status != 'expired' or not team.lower().removeprefix('ent:').startswith(prefix):
             continue
+        # History first; accounts imported without history fall back to what the provision itself recorded
+        invited = invited_at.get(provision.account_id)
+        expired = expired_at.get(provision.account_id)
         table.append({'Username': data.get('username', ''), 'Email': data.get('email', ''), 'Team': team,
-                      'Invited': provision.created_at.date().isoformat(),
-                      'Expired': data.get('expired_at', '')[:10]})
+                      'Invited': invited.date().isoformat() if invited else provision.created_at.date().isoformat(),
+                      'Expired': expired.date().isoformat() if expired else data.get('expired_at', '')[:10]})
 
     if not table:
         suffix = f' for teams starting with {team_prefix}' if team_prefix else ''
