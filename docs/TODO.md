@@ -63,27 +63,27 @@ accepted/expired are not visible in the web UI or API. Options:
    how to handle roles. It should present a list of people to choose from, either from Slack or from the
    active directory.
 7. **Store active directory users with their domain**: store e.g. `jdoe@example.com` instead of just `jdoe`.
-8. **Move to Alembic for database migrations**. All the databases (approval, permissions, kudos, survey) are one
-   PostgreSQL database, so use a single migration history.
-   - Add `alembic` and `sqlalchemy` (with a `postgresql+psycopg://` URL); `env.py` loads `.env.d/<name>.env` through
-     `backend.secret_store.load_environment`. Write migrations as plain SQL with `op.execute()`; no ORM models or
-     autogenerate are needed, so the code can stay on psycopg (and Pydantic, if adopted).
-   - Baseline `0001`: the schema as it is today, written with `IF NOT EXISTS`, then `alembic stamp 0001` on every
-     existing database. Taken from the code's `_SCHEMA` strings for `accounts`, `account_provisions`,
-     `account_provision_history`, `account_history` and `approval_requests`; from `scripts/migrate_permissions.py`
-     for `permission_rules`; and from `pg_dump --schema-only` for `kudos` (gyrobot-only) and the survey tables
-     `"Votes"`, `"Answers"` and `"Receipts"` (created by the separate questionnaire app through Flask-SQLAlchemy
-     `create_all`; gyrobot only reads them).
-   - Make the next changes real migrations: `accounts.team` and `account_history`.
-   - Delete the `_SCHEMA` strings and the table creation in `approval._connect`; replace `scripts/check_schema.py` with
-     `alembic current` / `alembic check`; document `alembic upgrade head` as a deploy step (maybe in the Docker
-     entrypoint). Decide whether the bot, web UI and API refuse to start, or only warn, when the database is behind.
-   - Once the questionnaire app is retired, the survey tables can be dropped from the baseline.
-9. **Leftovers from the removed `cheese` and `too_many_posts` commands** (code and docs are already removed):
-   - Remove `CHEESE_DATABASE_URL` and `GYROBOT_DATABASE_URL` from the `.env.d` files, `data/cheese_agent.yml` from
-     the server, and any permission rules (`permission_rules`) naming the two commands.
-   - Optionally drop the `"machineState"` and `"jobQueue"` tables and `public.submissions`; keep them out of the
-     Alembic baseline.
+8. **Move all database access to SQLAlchemy + Alembic**. Everything the bot owns is one PostgreSQL database, so use
+   a single migration history, and move the queries from psycopg to SQLAlchemy as well (not only the schema).
+   Do it one functional group at a time, least complicated first, each as its own commit:
+   1. kudos (`kudos` table, `commands/kudos.py`) - this one also sets up Alembic (`alembic` and `sqlalchemy`
+      dependencies, a `postgresql+psycopg://` URL, `env.py` using `backend.secret_store.load_environment`) and the
+      baseline `0001`; the kudos table definition comes from `pg_dump --schema-only -t kudos`.
+   2. permissions (`permission_rules`, `backend/permissions.py`, DDL now in `scripts/migrate_permissions.py`).
+   3. onboarding / offboarding / approvals (`accounts`, `account_provisions`, `account_provision_history`,
+      `account_history`, `approval_requests`). Make `accounts.team` and `account_history` real migrations.
+   - For each group: define the SQLAlchemy models, write the migration (stamp it on existing databases with
+     `alembic stamp`, because the tables already exist), switch the queries over, and delete the old `_SCHEMA`
+     strings and table creation.
+   - At the end: replace `scripts/check_schema.py` with `alembic current` / `alembic check`; document
+     `alembic upgrade head` as a deploy step (maybe in the Docker entrypoint). Decide whether the bot, web UI and API
+     refuse to start, or only warn, when the database is behind.
+9. **Leftovers from the removed `cheese`, `too_many_posts` and `survey` commands** (code and docs are already removed):
+   - Remove `CHEESE_DATABASE_URL`, `GYROBOT_DATABASE_URL`, `QUESTIONNAIRE_DATABASE_URL` and `QUESTIONNAIRE_FILE` from
+     the `.env.d` files, the questionnaire YAML from `data/` and `data/cheese_agent.yml` on the server, and any
+     permission rules (`permission_rules`) naming the three commands.
+   - Optionally drop the `"machineState"`, `"jobQueue"`, `"Votes"`, `"Answers"` and `"Receipts"` tables and
+     `public.submissions`; they stay out of the Alembic baseline.
 
 ## Other chat platforms
 

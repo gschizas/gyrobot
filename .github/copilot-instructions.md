@@ -195,7 +195,6 @@ thread_id = extract_real_thread_id(raw_arg)  # returns bare Reddit base-36 ID
 | `unicode_post <thread_id>` | `SUBREDDIT_NAME` | Dump Unicode codepoints of a post title |
 | `make post <thread_id\|NEW> <wiki_page>` | `REDDIT_ALT_USER` | Create/update a post from a wiki page using the alt account |
 | `make sticky <thread_id> <wiki_page>` | `REDDIT_ALT_USER` | Create/update a stickied mod comment from a wiki page |
-| `survey <query>` | `QUESTIONNAIRE_DATABASE_URL` | Query survey results from PostgreSQL (psycopg3) |
 
 ### Reddit-specific patterns
 
@@ -341,10 +340,6 @@ Env guard: `KUDOS_DATABASE_URL` (PostgreSQL via psycopg3).
 - **`kudos view [days] [channel] [-g] [-t|-x|-v|-i]`**: leaderboard for last N days (default 14). Output formats: text table, Excel, PNG image, or MP4 video (retro arcade high-score animation using imageio + Pillow + Amstrad CPC464 font from `img/kudos/`).
 
 Assets required: `img/kudos/wallpaper.jpg`, `img/kudos/amstrad_cpc464.ttf`.
-
-### `survey` group (`commands/reddit/survey.py`)
-
-Env guard: `QUESTIONNAIRE_DATABASE_URL`. Questionnaire definition loaded from `data/$QUESTIONNAIRE_FILE` (multi-document YAML). Question types: `radio`, `checkbox`, `tree`, `checktree`, `text`, `textarea`, `scale-matrix`. Subqueries: `count`, `questions`, `questions_full`, `mods`, `votes_per_day`, `q_N`, `full_replies [json]`.
 
 ### Approval queue (`backend/approval.py`, `commands/onboarding/`, `commands/approvals.py`)
 
@@ -535,8 +530,6 @@ All runtime config lives outside the repo under mounted volumes:
 | `REDDIT_ALT_USER` | Enables alt mod account (`bot_reddit_session`); used for `make post/sticky` |
 | `REDDIT_POLICY_SUBREDDIT` | Subreddit for `add_policy` (default: `SUBREDDIT_NAME`) |
 | `REDDIT_POLICY_PAGE` | Wiki page for `add_policy` (default: `mod_policy_votes`) |
-| `QUESTIONNAIRE_DATABASE_URL` | PostgreSQL DSN for `survey` (psycopg3) |
-| `QUESTIONNAIRE_FILE` | Filename under `data/` for survey questionnaire YAML |
 
 **OpenShift / Kubernetes:**
 
