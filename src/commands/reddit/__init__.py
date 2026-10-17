@@ -255,7 +255,7 @@ def add_policy(ctx: ExtendedContext, title):
     sr = ctx.reddit_session.subreddit(policy_subreddit)
     existing_page = sr.wiki[policy_page]
     content = existing_page.content_md
-    today_text = datetime.datetime.strftime(datetime.datetime.utcnow(), '%d/%m/%Y')
+    today_text = datetime.datetime.strftime(datetime.datetime.now(datetime.timezone.utc), '%d/%m/%Y')
     title = re.sub(r'\s', ' ', title)
     title = title.replace('|', '\xa6')
     new_content = f'\r\n{today_text}|{title}|[Slack]({permalink})'
@@ -428,7 +428,7 @@ def configure_enhanced_crowd_control_list(ctx):
             s = ctx.reddit_session.submission(thread['id'])
             s.comment_limit = 0
             s._fetch()
-            submission_date = datetime.datetime.utcfromtimestamp(s.created_utc)
+            submission_date = datetime.datetime.fromtimestamp(s.created_utc, tz=datetime.timezone.utc)
             permalink = s.permalink
             thread['date'] = submission_date
             thread['permalink'] = permalink
@@ -457,7 +457,7 @@ def configure_enhanced_crowd_control_add(ctx: ExtendedContext, thread_id):
         s = ctx.reddit_session.submission(thread_id)
         s.comment_limit = 0
         s._fetch()
-        submission_date = datetime.datetime.utcfromtimestamp(s.created_utc)
+        submission_date = datetime.datetime.fromtimestamp(s.created_utc, tz=datetime.timezone.utc)
         submission_subreddit = s.subreddit.display_name
         submission_url = ctx.reddit_session.config.reddit_url + s.permalink
         if s.subreddit.display_name.lower() != ctx.subreddit.display_name.lower():

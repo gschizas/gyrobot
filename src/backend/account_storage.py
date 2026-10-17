@@ -165,7 +165,7 @@ def get_or_create_account(primary_email: str, name: Optional[str] = None, team: 
 
 def update_account(account_id: UUID, **updates) -> Optional[Account]:
     """Update account name, team or metadata. Returns updated Account or None if not found."""
-    from datetime import datetime
+    from datetime import datetime, timezone
     
     account = get_account(account_id)
     if not account:
@@ -179,7 +179,7 @@ def update_account(account_id: UUID, **updates) -> Optional[Account]:
     if 'metadata' in updates:
         account.metadata = updates['metadata']
     
-    account.updated_at = datetime.utcnow()
+    account.updated_at = datetime.now(timezone.utc)
     
     with _connect() as conn:
         with conn.cursor() as cur:
@@ -208,7 +208,7 @@ def set_provision_status(account_id: UUID, resource: str, status: str, data: dic
 
     ``created_at`` backdates the provision (used when importing pre-existing users).
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
     
     provision = Provision(
         account_id=account_id,
@@ -251,7 +251,7 @@ def set_provision_status(account_id: UUID, resource: str, status: str, data: dic
                     status,
                     Jsonb(data),
                     provision.created_at.isoformat(),
-                    datetime.utcnow().isoformat(),
+                    datetime.now(timezone.utc).isoformat(),
                 ),
             )
         conn.commit()

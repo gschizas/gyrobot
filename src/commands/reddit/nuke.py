@@ -132,7 +132,7 @@ def nuke_user(ctx: ExtendedContext, username: str, timeframe: tuple[str] = None,
     already_removed = 0
     too_old = 0
     other_subreddit_history = {}
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
 
     result = ""
 
@@ -156,7 +156,7 @@ def nuke_user(ctx: ExtendedContext, username: str, timeframe: tuple[str] = None,
         if c.banned_by and c.banned_by != 'AutoModerator':
             already_removed += 1
             continue
-        comment_created = datetime.datetime.fromtimestamp(c.created_utc)
+        comment_created = datetime.datetime.fromtimestamp(c.created_utc, tz=datetime.timezone.utc)
         comment_age = now - comment_created
         if comment_age.days > cutoff_age.to_days():
             too_old += 1
@@ -185,7 +185,7 @@ def nuke_user(ctx: ExtendedContext, username: str, timeframe: tuple[str] = None,
             if s.banned_by and s.banned_by != 'AutoModerator':
                 already_removed_submissions += 1
                 continue
-            submission_created = datetime.datetime.fromtimestamp(s.created_utc)
+            submission_created = datetime.datetime.fromtimestamp(s.created_utc, tz=datetime.timezone.utc)
             submission_age = now - submission_created
             if submission_age.days > cutoff_age.to_days():
                 too_old += 1

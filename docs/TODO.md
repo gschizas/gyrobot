@@ -29,11 +29,9 @@ accepted/expired are not visible in the web UI or API. Options:
    bad team / email domain raise `RuntimeError`. Return strings for all.
 5. **No tests**: add pytest coverage for `_parse_id_spec`, `convert_slack_emoji`,
    `flatten_team_tree` and the invitation expiry decision.
-6. **Deprecated `datetime.utcnow()`** in `account_storage.py` / `accounts.py`: use
-   `datetime.now(timezone.utc)` (also removes the naive/aware mix).
-7. **Single notification sender**: `backend.notifications.set_sender` supports only one sender
+6. **Single notification sender**: `backend.notifications.set_sender` supports only one sender
    and the web process has none (see the notifications section above).
-8. `bot github members` (now GraphQL-based) shows no email when none exists on GitHub. Use the database to fill in the email. Add maybe a column that shows the source of the email (if it's from GitHub, or from the bot's database).
+7. `bot github members` (now GraphQL-based) shows no email when none exists on GitHub. Use the database to fill in the email. Add maybe a column that shows the source of the email (if it's from GitHub, or from the bot's database).
 
 ## Planned features and design notes
 
