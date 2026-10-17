@@ -76,7 +76,10 @@ accepted/expired are not visible in the web UI or API. Options:
    - For each group: define the SQLAlchemy models, write the migration (idempotent, so it is safe on existing
      databases), switch the queries over, and delete the old `_SCHEMA` strings and table creation.
    - Remaining: run `alembic upgrade head` and `alembic check` on the real database (PostgreSQL 9.5 is below what
-     SQLAlchemy officially supports); document `alembic upgrade head` as a deploy step (maybe in the Docker
+     SQLAlchemy officially supports). Migrations that really change a table need a role that owns it, so run them
+     with `MIGRATIONS_DATABASE_URL` set to the owner's connection string (`CREATE INDEX IF NOT EXISTS` and
+     `ALTER TABLE` demand ownership even when nothing changes). Document `alembic upgrade head` as a deploy step
+     (maybe in the Docker
      entrypoint). Decide whether the bot, web UI and API refuse to start, or only warn, when the database is behind.
      `scripts/check_schema.py` was removed in favour of `alembic check`.
 9. **Leftovers from the removed `cheese`, `too_many_posts` and `survey` commands** (code and docs are already removed):

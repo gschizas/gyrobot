@@ -46,9 +46,18 @@ def _database_url():
     return url
 
 
+def _include_object(obj, name, type_, reflected, compare_to):
+    # The database may hold tables that belong to other programs; never propose dropping what has no model
+    if type_ == 'table' and reflected and compare_to is None:
+        return False
+    if type_ == 'index' and reflected and compare_to is None and obj.table.name not in target_metadata.tables:
+        return False
+    return True
+
+
 def run_migrations_offline() -> None:
     context.configure(url=_database_url(), target_metadata=target_metadata, literal_binds=True,
-                      dialect_opts={'paramstyle': 'named'})
+                      dialect_opts={'paramstyle': 'named'}, include_object=_include_object)
     with context.begin_transaction():
         context.run_migrations()
 
@@ -56,7 +65,7 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     engine = create_engine(_database_url())
     with engine.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(connection=connection, target_metadata=target_metadata, include_object=_include_object)
         with context.begin_transaction():
             context.run_migrations()
 
