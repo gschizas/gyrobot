@@ -31,7 +31,6 @@ accepted/expired are not visible in the web UI or API. Options:
    `flatten_team_tree` and the invitation expiry decision.
 6. **Single notification sender**: `backend.notifications.set_sender` supports only one sender
    and the web process has none (see the notifications section above).
-7. `bot github members` (now GraphQL-based) shows no email when none exists on GitHub. Use the database to fill in the email. Add maybe a column that shows the source of the email (if it's from GitHub, or from the bot's database).
 
 ## Planned features and design notes
 
