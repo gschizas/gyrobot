@@ -44,29 +44,42 @@ class JetBrainsApi:
         })
         self._initialized = True
 
-    def get_teams(self):
-        """Get all teams for the customer.
+    def get_managed_teams(self) -> list[dict]:
+        """The teams (``id``, ``name``, ``role``) listed by ``GET /token``, which also covers teams without licenses.
 
-        There's no actual way to get all teams from the JetBrains API, so we have to get all licenses and then get the teams from the licenses.
+        Empty when the token cannot see them (a team-level token describes a single ``team`` instead).
+        """
+        resp = self.session.get(f"{BASE_URL}/token")
+        if not resp.ok:
+            return []
+        return resp.json().get('teams') or []
+
+    @staticmethod
+    def _make_team(team_id, name: str, licenses: list[dict]) -> JetBrainsTeam:
+        return JetBrainsTeam(
+            id=team_id, name=name, total_licenses=len(licenses),
+            unassigned_licenses=sum(1 for lic in licenses if lic.get('isAvailableToAssign')))
+
+    def get_teams(self):
+        """All teams of the customer, with their license counts.
+
+        The teams come from ``GET /token`` (so teams without licenses are included) plus whatever the licenses
+        say; the API has no team list of its own.
         """
         all_licenses = self.get_all_licenses()
-        teams_raw = [dict(items) for items in {frozenset(lic['team'].items()) for lic in all_licenses}]
-        for team in teams_raw:
-            team['total_licenses'] = sum(1 for lic in all_licenses if lic.get('team') and lic['team']['id'] == team['id'])
-            team['unassigned_licenses'] = sum(1 for lic in all_licenses if lic.get('team') and lic['team']['id'] == team['id'] and lic.get('isAvailableToAssign'))
-        teams = [JetBrainsTeam(**team) for team in teams_raw]
+        names = {t['id']: t['name'] for t in self.get_managed_teams()}
+        names.update({lic['team']['id']: lic['team']['name'] for lic in all_licenses if lic.get('team')})
+        teams = [self._make_team(team_id, name,
+                                 [lic for lic in all_licenses if lic.get('team') and lic['team']['id'] == team_id])
+                 for team_id, name in names.items()]
         return sorted(teams, key=lambda x: x.name)
 
     def get_all_licenses(self):
         return self.get_licenses(product_code='II', assigned=None)
 
-    def find_team(self, identifier: str) -> JetBrainsTeam:
-        """The team whose name, id or slug is ``identifier`` (case-insensitive; name, then id, then slug).
-
-        Raises ValueError if there is no such team or the match is ambiguous.
-        """
+    @staticmethod
+    def _match_team(identifier: str, teams: list[JetBrainsTeam]) -> JetBrainsTeam | None:
         wanted = str(identifier).strip().lower()
-        teams = self.get_teams()
         for matches in ([t for t in teams if t.name.lower() == wanted],
                         [t for t in teams if str(t.id) == wanted],
                         [t for t in teams if t.slug == wanted]):
@@ -74,6 +87,19 @@ class JetBrainsApi:
                 return matches[0]
             if matches:
                 raise ValueError(f"JetBrains team '{identifier}' is ambiguous: {', '.join(t.name for t in matches)}")
+        return None
+
+    def find_team(self, identifier: str) -> JetBrainsTeam:
+        """The team whose name, id or slug is ``identifier`` (case-insensitive; name, then id, then slug).
+
+        Raises ValueError if there is no such team or the match is ambiguous.
+        """
+        managed = [self._make_team(t['id'], t['name'], []) for t in self.get_managed_teams()]
+        if team := self._match_team(identifier, managed):
+            # Only this team's licenses are needed for the counts, not the whole customer's
+            return self._make_team(team.id, team.name, self.get_team_licenses(team.id))
+        if team := self._match_team(identifier, self.get_teams()):
+            return team
         raise ValueError(f"JetBrains team '{identifier}' not found")
 
     def get_licenses(self, product_code: str = 'II', assigned: bool = None, assignee_email: str = None):
