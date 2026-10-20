@@ -33,6 +33,11 @@ class HeadlessConversation(Conversation):
         self.messages: List[dict] = []
 
     def send_text(self, text, is_error: bool = False, icon_emoji: str = None, channel=None) -> None:
+        if channel and channel != self.channel_id:
+            # Addressed to a real chat channel (e.g. the approvals notify channel), not the web caller.
+            from backend import notifications
+            notifications.send(channel, text)
+            return
         self.messages.append({'type': 'text', 'text': convert_slack_emoji(text), 'is_error': is_error})
 
     def send_table(self, title: str, table: List[Dict], table_format: TableFormat = TableFormat.TABLE,

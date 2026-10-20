@@ -21,19 +21,28 @@ def set_sender(sender: Optional[Callable[[str, str], None]]) -> None:
     _sender = sender
 
 
-def notify(text: str) -> bool:
-    """Send ``text`` to the notifications channel. Returns True if it was sent."""
+def send(channel: str, text: str) -> bool:
+    """Send ``text`` to an explicit chat channel. Returns True if it was sent."""
     if _sender is None:
         logger.debug("No notification sender registered; dropping: %s", text)
         return False
+    try:
+        _sender(channel, text)
+        return True
+    except Exception:
+        logger.exception("Failed to send notification")
+        return False
+
+
+def notify(text: str) -> bool:
+    """Send ``text`` to the notifications channel. Returns True if it was sent."""
     try:
         from backend.approval import _notify_channel
         channel = _notify_channel()
         if not channel:
             logger.debug("No notification channel configured; dropping: %s", text)
             return False
-        _sender(channel, text)
-        return True
+        return send(channel, text)
     except Exception:
         logger.exception("Failed to send notification")
         return False

@@ -31,6 +31,20 @@ print(f"Starting FastAPI application on host: {hostname}...")
 
 ensure_commands_imported()
 
+
+def _register_notification_sender():
+    """Let commands run from the web/API post to the chat platform (e.g. the approvals notify channel)."""
+    from backend import notifications
+    from chat import get_notification_sender
+    try:
+        bot_name = os.environ.get('BOT_NAME', 'bot').split()[0]
+        notifications.set_sender(get_notification_sender(bot_name))
+    except Exception as e:
+        print(f"Chat notifications disabled for the web application: {e}")
+
+
+_register_notification_sender()
+
 root_path = os.environ.get('WEBAPP_ROOT_PATH', '/eurobot/')
 allowed_hosts = os.environ.get('WEBAPP_ALLOWED_HOSTS', '').split(',')
 
