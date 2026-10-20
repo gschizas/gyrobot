@@ -55,6 +55,34 @@ def get_account_by_email(email: str) -> Optional[Account]:
         return _to_account(row) if row else None
 
 
+def find_account_by_any_email(email: str) -> Optional[Account]:
+    """Retrieve account by primary email, or by one of its ``additional_emails`` (stored lowercase)."""
+    if account := get_account_by_email(email):
+        return account
+    with _session() as session:
+        row = session.scalars(select(AccountRow).where(
+            AccountRow.metadata_.contains({'additional_emails': [email.lower()]}))).first()
+        return _to_account(row) if row else None
+
+
+def find_accounts_by_name(name: str) -> List[Account]:
+    """Accounts whose name equals ``name``, ignoring case."""
+    with _session() as session:
+        rows = session.scalars(select(AccountRow).where(func.lower(AccountRow.name) == name.strip().lower()))
+        return [_to_account(row) for row in rows]
+
+
+def add_additional_email(account_id: UUID, email: str) -> Optional[Account]:
+    """Record ``email`` as another address of the account (``metadata['additional_emails']``)."""
+    account = get_account(account_id)
+    if account is None:
+        return None
+    emails = list(account.metadata.get('additional_emails', []))
+    if email.lower() in {e.lower() for e in emails}:
+        return account
+    return update_account(account_id, metadata={**account.metadata, 'additional_emails': [*emails, email.lower()]})
+
+
 def create_account(name: Optional[str], primary_email: str, team: Optional[str] = None, **metadata) -> Account:
     """Create a new account. Returns the created Account."""
     account = Account(name=name, primary_email=primary_email, team=team, metadata=metadata)

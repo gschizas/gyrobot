@@ -7,6 +7,7 @@ from typing import Dict, Any, Iterable, Optional
 import jwt
 import requests
 
+from backend import email_domains
 from backend.account_storage import get_pending_provisions, get_account, set_provision_status
 from backend.notifications import notify
 from bot_framework.yaml_wrapper import yaml
@@ -178,7 +179,7 @@ class GitHubApi():
         self.signing_key = config['signing_key']
         self.personal_access_token = config['personal_access_token']
         # Email domains allowed to onboard for GitHub Copilot; empty/absent means no restriction.
-        self.allowed_email_domains = config.get('allowed_email_domains', [])
+        self.allowed_email_domains = email_domains.allowed_email_domains(config)
         # Subset of allowed_email_domains that require an Active Directory lookup before onboarding.
         self.ad_check_email_domains = config.get('ad_check_email_domains', [])
         # Days after which an invited user who never appears in the enterprise is marked 'expired'.
