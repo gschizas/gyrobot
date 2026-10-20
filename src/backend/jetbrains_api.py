@@ -60,66 +60,93 @@ class JetBrainsApi:
     def get_all_licenses(self):
         return self.get_licenses(product_code='II', assigned=None)
 
-    def get_all_free_licenses(self):
-        return self.get_licenses(product_code='II', assigned=False)
+    def find_team(self, identifier: str) -> JetBrainsTeam:
+        """The team whose name, id or slug is ``identifier`` (case-insensitive; name, then id, then slug).
 
-    def get_all_assigned_licenses(self):
-        return self.get_licenses(product_code='II', assigned=True)
+        Raises ValueError if there is no such team or the match is ambiguous.
+        """
+        wanted = str(identifier).strip().lower()
+        teams = self.get_teams()
+        for matches in ([t for t in teams if t.name.lower() == wanted],
+                        [t for t in teams if str(t.id) == wanted],
+                        [t for t in teams if t.slug == wanted]):
+            if len(matches) == 1:
+                return matches[0]
+            if matches:
+                raise ValueError(f"JetBrains team '{identifier}' is ambiguous: {', '.join(t.name for t in matches)}")
+        raise ValueError(f"JetBrains team '{identifier}' not found")
 
-    def get_licenses(self, product_code: str = 'II', assigned: bool = None):
-        """Get all licenses for the customer."""
-        free_licenses = []
-        page = 1
-        while True:
-            licenses_resp = self.session.get(
-                f"{BASE_URL}/customer/licenses",
-                params={
-                    'page': page,
-                    'productCode': product_code,
-                    'perPage': 100,
-                    'assigned': assigned
-                })
-            licenses_resp.raise_for_status()
-            licenses_page = licenses_resp.json()
-            if not licenses_page:
-                break
-            free_licenses.extend(licenses_page)
-            page += 1
-        return free_licenses
+    def get_licenses(self, product_code: str = 'II', assigned: bool = None, assignee_email: str = None):
+        """Get the customer's licenses, optionally only the assigned/free ones or those held by one user."""
+        return self._get_pages(f"{BASE_URL}/customer/licenses", product_code, assigned, assignee_email)
 
-    def assign_license(self, email: str, license_code: str):
-        """Assign a license to a user."""
+    def get_assigned_licenses(self, email: str, product_code: str = 'II'):
+        """The licenses currently assigned to ``email``."""
+        return self.get_licenses(product_code=product_code, assigned=True, assignee_email=email)
+
+    def get_team_licenses(self, team_id: str, product_code: str = 'II', assigned: bool = None):
+        """Get all licenses of a team, optionally only the assigned/free ones."""
+        return self._get_pages(f"{BASE_URL}/customer/teams/{team_id}/licenses", product_code, assigned)
+
+    def assign_license(self, email: str, team_id: int, first_name: str = '', last_name: str = '',
+                       product_code: str = 'II') -> str:
+        """Assign a free license of ``team_id`` to ``email`` and return its license id.
+
+        Raises RuntimeError if the team has no free license.
+        """
+        free = [lic for lic in self.get_team_licenses(team_id, product_code, assigned=False)
+                if lic.get('isAvailableToAssign', True)]
+        if not free:
+            raise RuntimeError(f"No free JetBrains licenses left in team {team_id}")
+        license_id = free[0]['licenseId']
         payload = {
-            "contact": {
-                "email": email,
-                "firstName": "",
-                "lastName": ""
-            },
-            "includeOfflineActivationCode": True,
-            "license": {
-                "productCode": "II",
-                "team": 1
-            },
-            "licenseId": license_code,
-            "sendEmail": True}
-        assign_resp = self.session.post(
-            f"{BASE_URL}/customer/licenses/{license_code}/assign",
-            json=payload)
-        assign_resp.raise_for_status()
-        return assign_resp.json()
+            'contact': {'email': email, 'firstName': first_name, 'lastName': last_name},
+            'includeOfflineActivationCode': True,
+            'license': {'productCode': product_code, 'team': team_id},
+            'licenseId': license_id,
+            'sendEmail': True,
+        }
+        self._check(self.session.post(f"{BASE_URL}/customer/licenses/assign", json=payload))
+        return license_id
 
-    def get_team_licenses(self, team_id: str):
-        """Get all licenses for a team."""
-        team_licenses = []
+    def revoke_licenses(self, email: str, product_code: str = 'II') -> list[str]:
+        """Revoke the user's licenses for a product; returns the revoked license ids.
+
+        JetBrains refuses (and revokes nothing) if any of them was assigned less than 30 days ago.
+        """
+        resp = self.session.post(f"{BASE_URL}/customer/licenses/revoke",
+                                 params={'email': email, 'productCode': product_code})
+        self._check(resp)
+        return resp.json().get('licenseIds', [])
+
+    def change_licenses_team(self, license_ids: list[str], target_team_id: int):
+        """Transfer licenses to another team; ones that cannot be transferred silently stay where they are."""
+        self._check(self.session.post(f"{BASE_URL}/customer/changeLicensesTeam",
+                                      json={'licenseIds': license_ids, 'targetTeamId': target_team_id}))
+
+    def _get_pages(self, url: str, product_code: str, assigned: bool | None, assignee_email: str = None):
+        params = {'productCode': product_code, 'perPage': 100, 'assigneeEmail': assignee_email,
+                  'assigned': None if assigned is None else str(assigned).lower()}  # None values are not sent
+        results = []
         page = 1
         while True:
-            licenses_resp = self.session.get(
-                f"{BASE_URL}/customer/teams/{team_id}/licenses",
-                params={'perPage': 100})
-            licenses_resp.raise_for_status()
-            licenses_page = licenses_resp.json()
+            resp = self.session.get(url, params={**params, 'page': page})
+            self._check(resp)
+            licenses_page = resp.json()
             if not licenses_page:
                 break
-            team_licenses.extend(licenses_page)
+            results.extend(licenses_page)
             page += 1
-        return team_licenses
+        return results
+
+    @staticmethod
+    def _check(resp: requests.Response):
+        """Like raise_for_status, but with the API's own error code and description in the message."""
+        if resp.ok:
+            return
+        try:
+            error = resp.json()
+            detail = f"{error.get('code', resp.status_code)}: {error.get('description', resp.reason)}"
+        except ValueError:
+            detail = f"{resp.status_code} {resp.reason}"
+        raise requests.HTTPError(f"JetBrains API error {detail}", response=resp)
