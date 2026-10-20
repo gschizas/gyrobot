@@ -34,6 +34,9 @@ Two helpers create the mapping files to fill in by hand (they refuse to overwrit
                              team maps to yet. Replace each placeholder key with a core team (add more lines for
                              further core teams of the same JetBrains team) and merge it into
                              config/team_mapping.yml.
+    --report-misplaced CSV   Lists holders whose core team maps (via team_mapping.yml, parents included) to a
+                             different JetBrains team than the one they hold a licence in, plus the core teams that
+                             have no jetbrains mapping (cannot judge). Also written to a new CSV. Report only.
 """
 import argparse
 import csv
@@ -83,6 +86,27 @@ def write_team_map(path: str, teams: list, hints: dict) -> None:
     print(f"wrote {len(teams)} unmapped JetBrains team(s) to {path}")
 
 
+def report_misplaced(path: str, misplaced: list, cannot_judge: list) -> None:
+    print(f"\n{len(misplaced)} holder(s) in a JetBrains team other than the one their core team maps to:")
+    for email, core, actual, expected in sorted(misplaced, key=lambda m: (m[2], m[1], m[0])):
+        print(f"  {email:40} core team {core}: holds a licence in {actual}, expected {expected}")
+    if cannot_judge:
+        print(f"\n{len(cannot_judge)} holder(s) whose core team has no jetbrains mapping (cannot judge):")
+        for core, count in Counter(c[1] for c in cannot_judge).most_common():
+            print(f"  {core}: {count}")
+    try:
+        with open(path, 'x', newline='', encoding='utf8') as f:
+            writer = csv.writer(f)
+            writer.writerow(['status', 'email', 'core_team', 'jetbrains_team', 'expected_jetbrains_team'])
+            for email, core, actual, expected in misplaced:
+                writer.writerow(['misplaced', email, core, actual, expected])
+            for email, core, actual in cannot_judge:
+                writer.writerow(['cannot_judge', email, core, actual, ''])
+    except FileExistsError:
+        sys.exit(f"{path} already exists; delete it first")
+    print(f"wrote {len(misplaced) + len(cannot_judge)} row(s) to {path}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('env_name')
@@ -91,8 +115,10 @@ def main() -> None:
                                                       'emails outside the allowed domains')
     parser.add_argument('--write-email-map', metavar='FILE', help='write the still unmapped outside-domain emails to a new CSV')
     parser.add_argument('--write-team-map', metavar='FILE', help='write the JetBrains teams no core team maps to, to a new YAML')
+    parser.add_argument('--report-misplaced', metavar='CSV', help='list holders whose core team maps to a different '
+                                                                   'JetBrains team than the one they hold a licence in; also writes a new CSV')
     args = parser.parse_args()
-    for target in (args.write_email_map, args.write_team_map):
+    for target in (args.write_email_map, args.write_team_map, args.report_misplaced):
         if target and pathlib.Path(target).exists():
             sys.exit(f"{target} already exists; delete it first so a filled-in file is never overwritten")
 
@@ -100,7 +126,7 @@ def main() -> None:
     from backend import account_storage as storage
     from backend.email_domains import allowed_email_domains, is_allowed_email
     from backend.jetbrains_api import JetBrainsApi
-    from backend.team_mapping import mapped_teams
+    from backend.team_mapping import mapped_teams, resolve_team
 
     mapping = read_mapping(args.map) if args.map else {}
     domains = allowed_email_domains()
@@ -120,6 +146,10 @@ def main() -> None:
     seen: dict = {}  # account id -> the email whose licence was handled in this run (one provision per account)
     unmapped_users: list[tuple[str, str, list[str]]] = []
     team_hints: dict = {}  # JetBrains team id -> Counter of the core teams of its known holders
+    jetbrains_teams = JetBrainsApi().get_teams()
+    team_identifiers = {t.id: {t.name.lower(), str(t.id), t.slug} for t in jetbrains_teams}
+    misplaced: list[tuple[str, str, str, str]] = []  # email, core team, JetBrains team, expected team
+    cannot_judge: list[tuple[str, str, str]] = []  # core team has no jetbrains mapping
     for email, licenses in sorted(by_email.items()):
         lic = licenses[0]
         holder_name = (lic.get('assignee') or {}).get('name') or ''
@@ -149,6 +179,11 @@ def main() -> None:
 
         if account and account.team:
             team_hints.setdefault(lic['team']['id'], Counter())[account.team] += 1
+            expected = resolve_team('jetbrains', account.team)
+            if expected is None:
+                cannot_judge.append((account.primary_email, account.team, lic['team']['name']))
+            elif expected.strip().lower() not in team_identifiers.get(lic['team']['id'], {str(lic['team']['id'])}):
+                misplaced.append((account.primary_email, account.team, lic['team']['name'], expected))
         existing = storage.get_provision(account.id, 'jetbrains') if account else None
         holder = seen.get(account.id) if account else None
         if holder is None and existing and existing.status in storage.LIVE_STATUSES:
@@ -198,7 +233,7 @@ def main() -> None:
           + ('' if args.apply else "  -- preview only, rerun with --apply to write"))
 
     mapped_values = {v.strip().lower() for v in mapped_teams('jetbrains')}
-    unmapped_teams = [t for t in JetBrainsApi().get_teams()
+    unmapped_teams = [t for t in jetbrains_teams
                       if not mapped_values & {t.name.lower(), str(t.id), t.slug}]
     if unmapped_teams:
         print(f"\n{len(unmapped_teams)} JetBrains team(s) without a core team in config/team_mapping.yml:")
@@ -208,6 +243,8 @@ def main() -> None:
         write_team_map(args.write_team_map, unmapped_teams, team_hints)
     if args.write_email_map:
         write_email_map(args.write_email_map, unmapped_users)
+    if args.report_misplaced:
+        report_misplaced(args.report_misplaced, misplaced, cannot_judge)
 
 
 if __name__ == '__main__':
