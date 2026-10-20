@@ -32,6 +32,11 @@ def normalize(team: str) -> str:
     return team.strip().lower().removeprefix('ent:')
 
 
+def mapped_teams(resource: str) -> list[str]:
+    """The resource's own teams that some core team is mapped to (a many-to-one mapping repeats values)."""
+    return list(dict.fromkeys(str(v) for v in (_load().get(resource) or {}).values()))
+
+
 def resolve_team(resource: str, core_team: str) -> str | None:
     """The team of ``resource`` that corresponds to ``core_team``, or None if there is none."""
     mapping = {normalize(str(k)): str(v) for k, v in (_load().get(resource) or {}).items()}

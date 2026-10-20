@@ -24,11 +24,23 @@ where mapping.csv has the header ``external_email,account_email``. The external 
 additional email of that account (so the provision keeps the address JetBrains knows). Otherwise the licence is
 skipped, and the preview suggests accounts whose name equals the licence holder's name as lines ready to paste
 into the mapping file; suggestions are never applied automatically.
+
+Two helpers create the mapping files to fill in by hand (they refuse to overwrite an existing file):
+
+    --write-email-map FILE   CSV of the outside-domain emails still unmapped: external_email,account_email (blank, to
+                             fill in), holder_name, candidates (accounts with the same name, for reference only).
+                             Rows with a blank account_email are ignored when the file is passed back through --map.
+    --write-team-map FILE    YAML ``jetbrains:`` section with one placeholder entry per JetBrains team that no core
+                             team maps to yet. Replace each placeholder key with a core team (add more lines for
+                             further core teams of the same JetBrains team) and merge it into
+                             config/team_mapping.yml.
 """
 import argparse
 import csv
+import json
 import pathlib
 import sys
+from collections import Counter
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'src'))
 
@@ -44,18 +56,51 @@ def read_mapping(path: str) -> dict[str, str]:
                 for row in reader if row['external_email'].strip() and row['account_email'].strip()}
 
 
+def write_email_map(path: str, unmapped: list[tuple[str, str, list[str]]]) -> None:
+    try:
+        with open(path, 'x', newline='', encoding='utf8') as f:
+            writer = csv.writer(f)
+            writer.writerow(['external_email', 'account_email', 'holder_name', 'candidates'])
+            for email, name, candidates in unmapped:
+                writer.writerow([email, '', name, ';'.join(candidates)])
+    except FileExistsError:
+        sys.exit(f"{path} already exists; delete it first so a filled-in file is never overwritten")
+    print(f"wrote {len(unmapped)} unmapped email(s) to {path}")
+
+
+def write_team_map(path: str, teams: list, hints: dict) -> None:
+    try:
+        with open(path, 'x', encoding='utf8') as f:
+            f.write("# Replace each FILL-IN key with a core team (it also covers the teams below it), then merge into\n"
+                    "# config/team_mapping.yml. Several core teams may point to the same JetBrains team.\njetbrains:\n")
+            for team in teams:
+                known = ', '.join(f"{core} ({n})" for core, n in hints.get(team.id, Counter()).most_common())
+                f.write(f"  # {team.name}: id {team.id}, {team.total_licenses} licences, {team.unassigned_licenses} free"
+                        f"{'; core teams of its known holders: ' + known if known else ''}\n")
+                f.write(f"  {json.dumps(f'FILL-IN-{team.id}')}: {json.dumps(team.name)}\n")
+    except FileExistsError:
+        sys.exit(f"{path} already exists; delete it first so a filled-in file is never overwritten")
+    print(f"wrote {len(teams)} unmapped JetBrains team(s) to {path}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('env_name')
     parser.add_argument('--apply', action='store_true', help='write to the database (default: preview only)')
     parser.add_argument('--map', metavar='CSV', help='external_email,account_email pairs for licences held by '
                                                       'emails outside the allowed domains')
+    parser.add_argument('--write-email-map', metavar='FILE', help='write the still unmapped outside-domain emails to a new CSV')
+    parser.add_argument('--write-team-map', metavar='FILE', help='write the JetBrains teams no core team maps to, to a new YAML')
     args = parser.parse_args()
+    for target in (args.write_email_map, args.write_team_map):
+        if target and pathlib.Path(target).exists():
+            sys.exit(f"{target} already exists; delete it first so a filled-in file is never overwritten")
 
     load_dotenv(dotenv_path=f'.env.d/{args.env_name}.env', override=True)
     from backend import account_storage as storage
     from backend.email_domains import allowed_email_domains, is_allowed_email
     from backend.jetbrains_api import JetBrainsApi
+    from backend.team_mapping import mapped_teams
 
     mapping = read_mapping(args.map) if args.map else {}
     domains = allowed_email_domains()
@@ -73,6 +118,8 @@ def main() -> None:
 
     counts = {'create': 0, 'complete': 0, 'already': 0, 'not live': 0, 'link': 0, 'external': 0, 'duplicate': 0}
     seen: dict = {}  # account id -> the email whose licence was handled in this run (one provision per account)
+    unmapped_users: list[tuple[str, str, list[str]]] = []
+    team_hints: dict = {}  # JetBrains team id -> Counter of the core teams of its known holders
     for email, licenses in sorted(by_email.items()):
         lic = licenses[0]
         holder_name = (lic.get('assignee') or {}).get('name') or ''
@@ -93,11 +140,15 @@ def main() -> None:
                 link_to = account
             else:
                 print(f"{'external':10} {email:40} outside the allowed domains and not mapped; skipped{note}")
-                for candidate in storage.find_accounts_by_name(holder_name) if holder_name else []:
-                    print(f"{'':10} suggestion: {email},{candidate.primary_email}   (name \"{holder_name}\")")
+                candidates = [c.primary_email for c in storage.find_accounts_by_name(holder_name)] if holder_name else []
+                for candidate in candidates:
+                    print(f"{'':10} suggestion: {email},{candidate}   (name \"{holder_name}\")")
+                unmapped_users.append((email, holder_name, candidates))
                 counts['external'] += 1
                 continue
 
+        if account and account.team:
+            team_hints.setdefault(lic['team']['id'], Counter())[account.team] += 1
         existing = storage.get_provision(account.id, 'jetbrains') if account else None
         holder = seen.get(account.id) if account else None
         if holder is None and existing and existing.status in storage.LIVE_STATUSES:
@@ -145,6 +196,18 @@ def main() -> None:
           f"{counts['duplicate']} duplicate, "
           f"{skipped_holders} not held by a person"
           + ('' if args.apply else "  -- preview only, rerun with --apply to write"))
+
+    mapped_values = {v.strip().lower() for v in mapped_teams('jetbrains')}
+    unmapped_teams = [t for t in JetBrainsApi().get_teams()
+                      if not mapped_values & {t.name.lower(), str(t.id), t.slug}]
+    if unmapped_teams:
+        print(f"\n{len(unmapped_teams)} JetBrains team(s) without a core team in config/team_mapping.yml:")
+        for team in unmapped_teams:
+            print(f"  {team.name} (id {team.id}, {team.total_licenses} licences)")
+    if args.write_team_map:
+        write_team_map(args.write_team_map, unmapped_teams, team_hints)
+    if args.write_email_map:
+        write_email_map(args.write_email_map, unmapped_users)
 
 
 if __name__ == '__main__':
