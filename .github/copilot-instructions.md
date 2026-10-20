@@ -158,6 +158,8 @@ Always use `from bot_framework.yaml_wrapper import yaml` (a pre-configured `ruam
 
 Use the `check_security` decorator from `backend.configuration` to gate commands by user/channel permissions read from `config/*.permissions.yml`.
 
+**Web UI rule management** (`/admin/permissions`, `webapp/routers/permissions.py`, `backend/permission_admin.py`): list/filter, create, edit and delete `permission_rules` rows (users and channels one per line, `extra` as JSON), plus a change history (`permission_rules_history`, migration 0004). Access is governed by the rule `webapp.routers.permissions:manage` (global environment, role `default`, channel `$webui`; seeded by `scripts/migrate_permissions.py` — set the admin user there first). Denies when the rule is missing. The page refuses edits that would remove the acting user's own access and cannot delete or rename its own rule. Saving invalidates only the web process's cache; run `permissions reload` for the chat bot. Re-running `migrate_permissions.py --to-db` overwrites that rule from the script.
+
 ### Command groups and aliases
 
 - Use `cls=ClickAliasedGroup` for groups that need aliased subcommands.

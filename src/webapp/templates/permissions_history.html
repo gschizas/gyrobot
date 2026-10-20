@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Permission rule history - GyroBot{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block content %}
+<h1>Permission rule history</h1>
+{% if function_name %}<p>Showing only <code>{{ function_name }}</code>. <a href="{{ request.url_for('history') }}">Show all</a></p>{% endif %}
+<table>
+    <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Function / environment / role</th><th>Before</th><th>After</th></tr></thead>
+    <tbody>
+    {% for e in entries %}
+    <tr>
+        <td class="nowrap">{{ e.changed_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        <td>{{ e.changed_by }}</td>
+        <td>{{ e.action }}</td>
+        <td><code>{{ e.function_name }}</code> / {{ e.environment or '(global)' }} / {{ e.role }}</td>
+        <td><pre>{{ e.before | tojson if e.before is not none else '' }}</pre></td>
+        <td><pre>{{ e.after | tojson if e.after is not none else '' }}</pre></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">No changes recorded yet.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+<p><a href="{{ request.url_for('list_rules') }}">&larr; Back to permission rules</a></p>
+{% endblock %}

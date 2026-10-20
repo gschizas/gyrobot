@@ -132,6 +132,19 @@ GLOBAL_APPROVAL_FUNCTION = 'backend.approval:_global'
 # manual DB edits made directly to these two rows - edit BOOTSTRAP_FUNCTIONS
 # instead and re-run.
 BOOTSTRAP_FUNCTIONS = {
+    'webapp.routers.permissions:manage': {
+        'environments': {
+            '': {
+                'roles': {
+                    'default': {
+                        # TODO: replace with real admin LDAP username(s)/@group before running --to-db
+                        'users': ['<REPLACE_WITH_ADMIN_USER_ID>'],
+                        'channels': ['$webui'],
+                    }
+                }
+            }
+        }
+    },
     'commands.permissions:reload_permissions': {
         'environments': {
             '': {

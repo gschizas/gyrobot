@@ -24,7 +24,7 @@ from backend.github_api import GitHubApi
 from webapp import config
 from webapp.auth_ldap import ldap_authenticate
 from webapp.command_runner import run_bot_command
-
+from webapp.routers import permissions as permissions_router
 logger = logging.getLogger('webapp.routers.web')
 
 MAX_VALIDATE_USERNAMES = 100
@@ -146,7 +146,9 @@ def logout(request: Request):
 def dashboard(request: Request):
     if redirect := _require_login(request):
         return redirect
-    return templates.TemplateResponse(request, 'dashboard.html', {'user': _current_user(request), 'forms': FORMS})
+    return templates.TemplateResponse(request, 'dashboard.html', {
+        'user': _current_user(request), 'forms': FORMS,
+        'can_manage_permissions': permissions_router.can_manage(_current_user(request))})
 
 
 @router.post('/admin/reload-permissions', include_in_schema=False)

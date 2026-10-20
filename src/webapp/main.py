@@ -24,7 +24,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from webapp.bootstrap import ensure_commands_imported
 from webapp.config import session_secret
-from webapp.routers import api, web
+from webapp.routers import api, permissions, web
 
 hostname = subprocess.check_output(["hostname"]).decode().strip()
 print(f"Starting FastAPI application on host: {hostname}...")
@@ -45,4 +45,5 @@ if allowed_hosts:
 app.add_middleware(SessionMiddleware, secret_key=session_secret())
 
 app.include_router(web.router)
+app.include_router(permissions.router)
 app.include_router(api.router)

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Permission rules - GyroBot{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block content %}
+<h1>Permission rules</h1>
+{% if flash %}<div class="{{ 'error' if flash.is_error else 'message' }}">{{ flash.text }}</div>{% endif %}
+<p class="hint">Changes take effect immediately in the web UI/API process. The chat bot keeps its own cache:
+run <code>permissions reload</code> there afterwards. Users accept <code>*</code>, an ID or an <code>@group</code>;
+channels accept <code>*</code> or a display name (the web UI is <code>$webui</code>).</p>
+<p>
+    <a href="{{ request.url_for('new_form') }}">+ New rule</a> &middot;
+    <a href="{{ request.url_for('history') }}">Change history</a>
+</p>
+<input type="text" id="rule-filter" class="tree-search" placeholder="Filter by function, environment or role...">
+<table id="rules-table">
+    <thead><tr><th>Function</th><th>Environment</th><th>Role</th><th>Users</th><th>Channels</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rules %}
+    <tr>
+        <td><code>{{ r.function_name }}</code></td>
+        <td>{{ r.environment or '(global)' }}</td>
+        <td>{{ r.role }}</td>
+        <td>{{ r.users | join(', ') or '(nobody)' }}</td>
+        <td>{{ r.channels | join(', ') or '(nowhere)' }}</td>
+        <td class="nowrap">
+            <a href="{{ request.url_for('edit_form', rule_id=r.id) }}">Edit</a>
+            {% if r.function_name != manage_function or r.environment or r.role != 'default' %}
+            <form method="post" action="{{ request.url_for('delete', rule_id=r.id) }}" class="inline"
+                  onsubmit="return confirm('Delete this rule? Commands that depend on it will be denied.');">
+                <button type="submit" class="remove-row">Delete</button>
+            </form>
+            {% endif %}
+        </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">No rules.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+<p><a href="{{ request.url_for('dashboard') }}">&larr; Back to onboarding</a></p>
+<script>
+document.getElementById('rule-filter').addEventListener('input', function () {
+    const q = this.value.trim().toLowerCase();
+    document.querySelectorAll('#rules-table tbody tr').forEach(function (tr) {
+        const cells = tr.querySelectorAll('td');
+        const text = Array.from(cells).slice(0, 3).map(function (c) { return c.textContent; }).join(' ').toLowerCase();
+        tr.style.display = text.includes(q) ? '' : 'none';
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if rule_id else 'New' }} permission rule - GyroBot{% endblock %}
+{% block content %}
+<h1>{{ 'Edit' if rule_id else 'New' }} permission rule</h1>
+{% for e in errors %}<div class="error">{{ e }}</div>{% endfor %}
+<form method="post" action="{{ request.url_for('edit_form', rule_id=rule_id) if rule_id else request.url_for('new_form') }}">
+    <label for="function_name">Function name</label>
+    <input type="text" id="function_name" name="function_name" value="{{ rule.function_name }}" required
+           placeholder="commands.onboarding.github:onboard_github">
+    <label for="environment">Environment <span class="hint">(empty = global)</span></label>
+    <input type="text" id="environment" name="environment" value="{{ rule.environment }}">
+    <label for="role">Role <span class="hint">(default, requester, approver)</span></label>
+    <input type="text" id="role" name="role" value="{{ rule.role }}" required>
+    <label for="users">Users <span class="hint">(one per line: <code>*</code>, an ID, or <code>@group</code>)</span></label>
+    <textarea id="users" name="users" rows="6">{{ rule.users | join('\n') }}</textarea>
+    <label for="channels">Channels <span class="hint">(one per line: <code>*</code> or a display name)</span></label>
+    <textarea id="channels" name="channels" rows="4">{{ rule.channels | join('\n') }}</textarea>
+    <label for="extra">Extra <span class="hint">(JSON object)</span></label>
+    <textarea id="extra" name="extra" rows="4">{{ raw_extra if raw_extra is defined else (rule.extra | tojson if rule.extra else '{}') }}</textarea>
+    <button type="submit">Save</button>
+</form>
+<p><a href="{{ request.url_for('list_rules') }}">&larr; Back to permission rules</a></p>
+{% endblock %}
