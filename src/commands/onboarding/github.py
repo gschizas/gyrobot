@@ -12,6 +12,7 @@ from backend.accounts import Provision
 from backend.approval import requires_approval
 from backend.arguments import extract_email
 from backend.constants import TableFormat
+from backend.email_domains import domain_in, is_allowed_email
 from backend.email_logging import send_email
 from backend.github_api import GitHubApi
 from backend.providers import ProvisionRequest, PROVIDERS, RESOURCE_LABELS
@@ -88,10 +89,9 @@ def _github_validate(params: dict, ctx: ExtendedContext) -> str | None:
 
     if '@' in email:
         domain = email.split('@')[1]
-        allowed_domains = github_client.allowed_email_domains
-        if allowed_domains and domain not in allowed_domains:
+        if not is_allowed_email(email, github_client.allowed_email_domains):
             raise RuntimeError(f"Invalid Email Domain {domain}.")
-        if domain in github_client.ad_check_email_domains:
+        if domain_in(email, github_client.ad_check_email_domains):
             # check email with active directory
             pass
 

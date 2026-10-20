@@ -22,11 +22,16 @@ def allowed_email_domains(config: Optional[dict] = None) -> list[str]:
 
 
 def email_domain(email: str) -> str:
-    return email.rsplit('@', 1)[-1].strip().lower()
+    return email.rsplit('@', 1)[-1].strip().casefold()
+
+
+def domain_in(email: str, domains: list[str]) -> bool:
+    """True if the email's domain is one of ``domains``, ignoring case."""
+    return email_domain(email) in {d.casefold() for d in domains}
 
 
 def is_allowed_email(email: str, domains: Optional[list[str]] = None) -> bool:
     """True if the email's domain is allowed (or no domains are configured)."""
     if domains is None:
         domains = allowed_email_domains()
-    return not domains or email_domain(email) in {d.lower() for d in domains}
+    return not domains or domain_in(email, domains)
