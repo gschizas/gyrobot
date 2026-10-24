@@ -28,6 +28,11 @@ def _actuator_config():
 @gyrobot.group('actuator')
 @click.pass_context
 def actuator(ctx: ExtendedContext):
+    """Spring Boot Actuator of the pods of a deployment, reached through a Kubernetes port-forward.
+
+    Pods are found by the label deployment=<name>. Table commands accept -f/--format:
+    table (default), markdown, excel or zip_markdown.
+    """
     ctx.ensure_object(dict)
     ctx.obj['config'] = _actuator_config()
     ctx.obj['security_text'] = {
@@ -45,6 +50,11 @@ def actuator(ctx: ExtendedContext):
 @check_security
 def refresh_actuator(ctx: ExtendedContext, namespace: str, deployments: list[str],
                      table_format: TableFormat = TableFormat.TABLE):
+    """Refresh the configuration of the pods of one or more deployments.
+
+    For each pod this reads /actuator/env, calls /actuator/refresh and reads /actuator/env again,
+    showing the properties before, what changed and after.
+    """
     def refresh_action(conn, pod_results, pod_to_refresh):
         empty_proxies = {'http': None, 'https': None}
         response_before = requests.get(
@@ -74,6 +84,7 @@ def refresh_actuator(ctx: ExtendedContext, namespace: str, deployments: list[str
 @check_security
 def view_actuator(ctx: ExtendedContext, namespace: str, deployments: list[str],
                   table_format: TableFormat = TableFormat.TABLE):
+    """Show the environment properties (/actuator/env) of the pods of one or more deployments."""
     def view_action(conn, pod_results, pod_to_refresh):
         response = requests.get(
             url=f'http://{pod_to_refresh}.pod.{conn.project_name}.kubernetes:8778/actuator/env',
@@ -94,6 +105,7 @@ def view_actuator(ctx: ExtendedContext, namespace: str, deployments: list[str],
 @check_security
 def health_actuator(ctx: ExtendedContext, namespace: str, deployments: list[str],
                     table_format: TableFormat = TableFormat.TABLE):
+    """Show the health components (/actuator/health) of the pods of one or more deployments, with free disk space."""
     def health_action(conn, pod_results, pod):
         response = requests.get(
             url=f'http://{pod}.pod.{conn.project_name}.kubernetes:8778/actuator/health',
@@ -154,6 +166,10 @@ def _actuator_action(ctx: ExtendedContext, namespace: str, deployments: list[str
 @click.pass_context
 @check_security
 def pods(ctx: ExtendedContext, namespace: str, pod_name: str = None, table_format: TableFormat = TableFormat.TABLE):
+    """List the pods of NAMESPACE with readiness, status, restarts and IPs.
+
+    POD_NAME is a deployment name; without it all pods are listed.
+    """
     with KubernetesConnection(ctx, namespace) as conn:
         label_selector = f'deployment={pod_name}' if pod_name else None
         all_pods: kubernetes.client.V1PodList = conn.core_v1_api.list_namespaced_pod(namespace=conn.project_name,

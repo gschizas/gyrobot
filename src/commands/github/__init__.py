@@ -22,7 +22,10 @@ if 'GITHUB_ORG' not in os.environ:
 
 @gyrobot.group('github', cls=DefaultCommandGroup)
 def github():
-    pass
+    """Inspect the GitHub enterprise: teams, members and pending invitations.
+
+    To onboard someone use "onboard github" instead.
+    """
 
 
 @github.command('teams')

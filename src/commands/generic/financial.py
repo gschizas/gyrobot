@@ -12,7 +12,7 @@ from commands.extended_context import ExtendedContext
 @click.argument("stock_name")
 @click.pass_context
 def stocks(ctx: ExtendedContext, stock_name):
-    """Show info for a stock"""
+    """Show ask, bid, day high, previous close and daily change for a stock ticker, e.g. stocks MSFT."""
     import yfinance as yf
 
     if '|' in stock_name:
@@ -53,7 +53,7 @@ def stocks(ctx: ExtendedContext, stock_name):
 @click.argument('symbol', nargs=-1)
 @click.pass_context
 def crypto(ctx: ExtendedContext, symbol):
-    """Display the current exchange rate of currency"""
+    """Display the current price in USD and EUR of one or more crypto currency symbols (from cryptocompare.com)."""
     for cryptocoin in symbol:
         cryptocoin = cryptocoin.upper()
         prices = requests.get("https://min-api.cryptocompare.com/data/price",

@@ -94,6 +94,10 @@ def _schedule_description(schedule: str) -> str:
 @gyrobot.group('cronjob')
 @click.pass_context
 def cronjob(ctx: ExtendedContext):
+    """List, pause/resume or enable/disable the CronJobs of a namespace.
+
+    Table commands accept -f/--format: table (default), markdown, excel or zip_markdown.
+    """
     ctx.ensure_object(dict)
     ctx.obj['config'] = _cronjob_config
     ctx.obj['security_text'] = {
@@ -122,6 +126,7 @@ def _make_cronjob_table(cronjobs):
 @click.pass_context
 @check_security
 def list_cronjobs(ctx: ExtendedContext, namespace: str, table_format: TableFormat):
+    """List the CronJobs of NAMESPACE with suspended state, last run times and a readable schedule."""
     with KubernetesConnection(ctx, namespace) as k8s:
         cronjobs = k8s.batch_v1_api.list_namespaced_cron_job(k8s.project_name)
 
@@ -158,6 +163,10 @@ def _send_results(ctx, namespace, result, table_format: TableFormat = TableForma
 @click.pass_context
 @check_security
 def pause_cronjob(ctx: ExtendedContext, namespace: str, table_format: TableFormat = TableFormat.TABLE):
+    """Suspend every running CronJob of NAMESPACE, remembering which ones were suspended.
+
+    Use "cronjob resume" to re-enable exactly those; CronJobs that were already suspended stay suspended.
+    """
     suspended_cronjobs_stack = _load_cronjob_stack(namespace)
     with KubernetesConnection(ctx, namespace) as k8s:
         cronjobs = k8s.batch_v1_api.list_namespaced_cron_job(k8s.project_name)
@@ -181,6 +190,7 @@ def pause_cronjob(ctx: ExtendedContext, namespace: str, table_format: TableForma
 @click.pass_context
 @check_security
 def resume_cronjob(ctx: ExtendedContext, namespace, table_format: TableFormat = TableFormat.TABLE):
+    """Re-enable the CronJobs suspended by the most recent "cronjob pause" of NAMESPACE."""
     suspended_cronjobs_stack = _load_cronjob_stack(namespace)
     if len(suspended_cronjobs_stack) == 0:
         ctx.chat.send_text("No cronjobs to resume", is_error=True)
@@ -215,6 +225,10 @@ def _enable_disable_cronjob(ctx, namespace, cronjob_name, suspend_status,
 @click.pass_context
 @check_security
 def disable(ctx: ExtendedContext, namespace, cronjob_name: str, table_format: TableFormat = TableFormat.TABLE):
+    """Suspend one CronJob.
+
+    CRONJOB_NAME is the name of the CronJob in NAMESPACE.
+    """
     _enable_disable_cronjob(ctx, namespace, cronjob_name, True, table_format=table_format)
 
 
@@ -225,4 +239,8 @@ def disable(ctx: ExtendedContext, namespace, cronjob_name: str, table_format: Ta
 @click.pass_context
 @check_security
 def enable(ctx: ExtendedContext, namespace, cronjob_name: str, table_format: TableFormat = TableFormat.TABLE):
+    """Re-enable one suspended CronJob.
+
+    CRONJOB_NAME is the name of the CronJob in NAMESPACE.
+    """
     _enable_disable_cronjob(ctx, namespace, cronjob_name, False, table_format=table_format)

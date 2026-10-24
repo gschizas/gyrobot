@@ -17,7 +17,7 @@ from backend.constants import TableFormat
                  )
 @click.pass_context
 def binary(ctx):
-    """Convert binary to text"""
+    """Decode space-separated 8-bit binary groups to text (e.g. binary 01001000 01101001)."""
     rest_of_text = ' '.join(ctx.args)
     rest_of_text = re.sub(r'(\S{8})\s?', r'\1 ', rest_of_text)
     decoded_text = ''.join([chr(int(c, 2)) for c in rest_of_text.split()])
@@ -28,7 +28,7 @@ def binary(ctx):
 @click.argument('text', nargs=-1)
 @click.pass_context
 def unicode(ctx: ExtendedContext, text):
-    """Convert text to Unicode code points"""
+    """List the Unicode code point and name of every character of TEXT, as a file."""
     text = ' '.join(text)
     final_text = ''
     for char in text:
@@ -40,7 +40,7 @@ def unicode(ctx: ExtendedContext, text):
 @gyrobot.command('path')
 @click.pass_context
 def showpath(ctx: ExtendedContext):
-    """Show full environment"""
+    """Show the PATH of the bot's process, one entry per line, as a file."""
     import os
     text = os.environ['PATH'].replace(':', '\n')
     ctx.chat.send_file(text.encode('utf8'), filename='env.txt', title='env')
@@ -62,14 +62,14 @@ _version = _get_version()
 @gyrobot.command('version')
 @click.pass_context
 def version(ctx: ExtendedContext):
-    """Display version"""
+    """Display the bot's version (git describe)."""
     ctx.chat.send_text(f"Version: {_version}")
 
 @gyrobot.command('planets')
 @click.option('-f', '--format', 'table_format', type=TableFormat, default=TableFormat.TABLE)
 @click.pass_context
 def show_planets(ctx: ExtendedContext, table_format: TableFormat=TableFormat.TABLE):
-    """Test table"""
+    """Show a sample table of the planets, to try the table output formats (-f/--format)."""
     planets = [
         {"name": "Mercury", "diameter_km": 4879, "mass_kg": 3.30e23, "day_hours": 1407.6, "year_days": 88},
         {"name": "Venus", "diameter_km": 12104, "mass_kg": 4.87e24, "day_hours": 5832.5, "year_days": 225},

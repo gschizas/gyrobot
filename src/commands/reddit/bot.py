@@ -26,7 +26,7 @@ def _get_wiki_text(sr, wiki_page_name, revision_id=None):
 
 @gyrobot.group('make')
 def make():
-    pass
+    """Create or update posts and stickied comments from a wiki page, as the alternate moderator account."""
 
 
 @make.command('post')

@@ -27,6 +27,10 @@ def _scaledown_config():
 @gyrobot.group('scaledown', cls=DefaultCommandGroup)
 @click.pass_context
 def scaledown(ctx: ExtendedContext):
+    """Scale the Deployments and StatefulSets of a namespace down to 0 replicas.
+
+    "scaledown NAMESPACE" is the same as "scaledown do NAMESPACE".
+    """
     ctx.ensure_object(dict)
     ctx.obj['config'] = _scaledown_config()
     ctx.obj['security_text'] = {'do': 'scale down kubernetes objects'}
@@ -39,6 +43,7 @@ def scaledown(ctx: ExtendedContext):
 @click.argument('namespace', type=OpenShiftNamespace(_scaledown_config()))
 @click.pass_context
 def scaledown_default(ctx: ExtendedContext, namespace: str):
+    """Scale down NAMESPACE (shortcut for "scaledown do")."""
     ctx.forward(scaledown_do)
 
 
@@ -47,6 +52,10 @@ def scaledown_default(ctx: ExtendedContext, namespace: str):
 @click.pass_context
 @check_security
 def scaledown_do(ctx: ExtendedContext, namespace):
+    """Scale all Deployments and StatefulSets of NAMESPACE to 0 replicas.
+
+    Those listed under ~deployments and ~statefulsets in the configuration are left alone.
+    """
     with KubernetesConnection(ctx, namespace) as k8s:
         deployments_to_scaledown = k8s.apps_v1_api.list_namespaced_deployment(k8s.project_name)
         if len(deployments_to_scaledown.items) == 0:

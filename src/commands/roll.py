@@ -78,6 +78,7 @@ def roll_default(ctx: ExtendedContext, specs=None):
                   'allow_extra_args': True})
 @click.pass_context
 def roll_magic8(ctx: ExtendedContext):
+    """Ask the Magic 8-Ball (the question is ignored)."""
     result = random.choice(MAGIC_8_BALL_OUTCOMES)
     ctx.chat.send_text(result)
 
@@ -86,6 +87,10 @@ def roll_magic8(ctx: ExtendedContext):
 @click.argument('spec', nargs=1, required=False)
 @click.pass_context
 def roll_statline(ctx: ExtendedContext, spec=None):
+    """Roll an RPG ability-score line: six times 4d6, dropping the lowest die.
+
+    SPEC may be "drop1", meaning dice showing 1 are not allowed (each die is rolled from 2 to 6).
+    """
     min_roll = 2 if spec == 'drop1' else 1
     ability_text = ""
     for roll_line in range(6):

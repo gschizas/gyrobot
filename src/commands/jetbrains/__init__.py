@@ -18,7 +18,10 @@ if 'JETBRAINS_CUSTOMER_CODE' not in os.environ:
 
 @gyrobot.group('jetbrains', cls=DefaultCommandGroup)
 def jetbrains():
-    pass
+    """Inspect JetBrains licence teams and their holders (there are no invitations).
+
+    To onboard someone use "onboard jetbrains" instead.
+    """
 
 
 @jetbrains.command('teams')

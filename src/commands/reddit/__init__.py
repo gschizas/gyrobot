@@ -82,7 +82,10 @@ def _send_usernote(ctx: ExtendedContext, redditor_username, notes, warnings, use
 
 @gyrobot.group('modqueue', cls=DefaultCommandGroup)
 def modqueue():
-    pass
+    """Inspect the modqueue of the subreddit.
+
+    Without a subcommand this shows the modqueue length.
+    """
 
 
 @modqueue.command('posts')
@@ -112,6 +115,7 @@ def modqueue_comments(ctx):
 @modqueue.command('grouped')
 @click.pass_context
 def modqueue_grouped(ctx):
+    """List the authors with more than one item in the modqueue, most items first."""
     modqueue_list = list(ctx.subreddit.mod.modqueue(limit=None))
     if len(modqueue_list) < 1:
         ctx.chat.send_text('Modqueue is empty!', is_error=True)
@@ -176,7 +180,10 @@ def modqueue_length(ctx):
 @click.argument('verbose', required=False)
 @click.pass_context
 def usernotes(ctx: ExtendedContext, user, verbose=None):
-    """Display usernotes of a user"""
+    """Display the Toolbox usernotes of a user, read from the subreddit wiki.
+
+    USER is the username or a profile link. Add any VERBOSE value for the long format.
+    """
     redditor_username = user
     if (redditor_username := extract_username(redditor_username)) is None:
         ctx.chat.send_text(f'{redditor_username} is not a valid username', is_error=True)
@@ -204,7 +211,10 @@ def usernotes(ctx: ExtendedContext, user, verbose=None):
 @click.argument('url')
 @click.pass_context
 def youtube_post_info(ctx: ExtendedContext, url):
-    """Get YouTube media URL"""
+    """Find the YouTube channel and media URL of a Reddit post.
+
+    URL is the post link.
+    """
     thread_id = extract_real_thread_id(url)
     post = ctx.reddit_session.submission(thread_id)
     post._fetch()
@@ -224,7 +234,10 @@ def youtube_post_info(ctx: ExtendedContext, url):
 @click.argument('color')
 @click.pass_context
 def add_domain_tag(ctx: ExtendedContext, url, color):
-    """Add a tag to a domain"""
+    """Add a colour tag for a domain to the Toolbox wiki configuration.
+
+    URL is a link on the domain. COLOR is a hex colour such as #ff0000.
+    """
     toolbox_data = json.loads(ctx.subreddit.wiki['toolbox'].content_md)
     if re.match('<.*>', url):
         url = url[1:-1]
@@ -248,7 +261,10 @@ def add_domain_tag(ctx: ExtendedContext, url, color):
 @click.argument('title')
 @click.pass_context
 def add_policy(ctx: ExtendedContext, title):
-    """Add a minor policy change done via Slack's #modpolicy channel"""
+    """Append a minor policy change (decided in the mod policy channel) to the policy wiki page.
+
+    TITLE is the text of the change. The target is REDDIT_POLICY_SUBREDDIT / REDDIT_POLICY_PAGE.
+    """
     permalink = ctx.message.permalink
     policy_subreddit = os.environ.get('REDDIT_POLICY_SUBREDDIT', ctx.subreddit.display_name)
     policy_page = os.environ.get('REDDIT_POLICY_PAGE', 'mod_policy_votes')
@@ -349,10 +365,10 @@ def do_history(ctx: ExtendedContext, username):
 @click.argument('comment_id')
 @click.pass_context
 def comment_source(ctx: ExtendedContext, comment_id):
-    """Get comment source
-    Syntax:
-    comment_source comment_thing_id
-    comment_source comment_full_url"""
+    """Get the raw Markdown source of a comment, as a file.
+
+    COMMENT_ID is the comment id or its full URL.
+    """
     ctx.logger.debug(comment_id)
     if '/' in comment_id:
         comment_id = praw.reddit.Comment.id_from_url(comment_id)
@@ -391,12 +407,14 @@ def deleted_comment_source(ctx: ExtendedContext, comment_ids):
 @gyrobot.group('configure_enhanced_crowd_control', cls=ClickAliasedGroup, aliases=['order66', 'order_66'])
 @click.pass_context
 def configure_enhanced_crowd_control(ctx):
-    """Configure the enhanced crowd control
+    """Configure the enhanced crowd control: the threads that are monitored.
 
-    Syntax:
+    The list is kept in config/enhanced_crowd_control.yml.
+
+    \b
     list/show: list all current threads
     add THREAD_ID or URL: add a new thread to the monitored threads
-    del/delete/remove THREAD_ID or URL: delete the thread from the monitored threads
+    del/delete/remove THREAD_ID, URL or list number: delete the thread from the monitored threads
     """
     config = {}
     config_file = pathlib.Path(f'config/enhanced_crowd_control.yml')
@@ -418,6 +436,7 @@ def configure_enhanced_crowd_control(ctx):
 @configure_enhanced_crowd_control.command('list', aliases=['show'])
 @click.pass_context
 def configure_enhanced_crowd_control_list(ctx):
+    """List the monitored threads with their action, date and monitoring period."""
     monitored_threads = ctx.obj['monitored_threads']
     text = ""
     for thread_index, thread in enumerate(monitored_threads):
@@ -448,6 +467,10 @@ def configure_enhanced_crowd_control_list(ctx):
 @click.argument('thread_id')
 @click.pass_context
 def configure_enhanced_crowd_control_add(ctx: ExtendedContext, thread_id):
+    """Add a thread to the monitored threads.
+
+    THREAD_ID is the thread id or URL. Threads of other subreddits are refused.
+    """
     monitored_threads = ctx.obj['monitored_threads']
     thread_id = extract_real_thread_id(thread_id)
     found = [t for t in monitored_threads if t['id'] == thread_id]
@@ -482,6 +505,10 @@ def configure_enhanced_crowd_control_add(ctx: ExtendedContext, thread_id):
 @click.argument('thread_id')
 @click.pass_context
 def configure_enhanced_crowd_control_list(ctx: ExtendedContext, thread_id):
+    """Remove a thread from the monitored threads.
+
+    THREAD_ID is the thread id, URL or its number in the list.
+    """
     monitored_threads = ctx.obj['monitored_threads']
     thread_id = extract_real_thread_id(thread_id)
     remove_me = None
@@ -507,7 +534,10 @@ def configure_enhanced_crowd_control_list(ctx: ExtendedContext, thread_id):
 @click.argument('thread_id')
 @click.pass_context
 def unicode(ctx: ExtendedContext, thread_id):
-    """Convert reddit post title to unicode code points"""
+    """List the Unicode code points of a post title, to spot look-alike characters.
+
+    THREAD_ID is the post id or URL.
+    """
     thread_id = extract_real_thread_id(thread_id)
     ctx.logger.debug(thread_id)
     ctx.logger.debug(ctx.reddit_session)

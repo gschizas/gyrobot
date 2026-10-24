@@ -31,12 +31,12 @@ if 'KUDOS_DATABASE_URL' not in os.environ:
                    'allow_extra_args': True})
 @click.pass_context
 def kudos(ctx):
-    """Add kudos to user.
+    """Give kudos to colleagues and see the leaderboard.
 
-    Syntax:
-    kudos @username to give kudos to username
-    kudos view to see all kudos so far
-    kudos view 15 to see kudos given last 15 days
+    \b
+    kudos @username [reason]   give kudos (same as "kudos give")
+    kudos view [days]          leaderboard of the last days (default 14)
+    kudos view 15              kudos given in the last 15 days
     """
     pass
 
@@ -55,6 +55,10 @@ EXTRACT_SLACK_ID = re.compile(r'<(?:[#@])(?P<id>\w+)(?:\|)?(?:[-.\w]+)?>')
                    'allow_extra_args': True})
 @click.pass_context
 def kudos_give(ctx: ExtendedContext):
+    """Give kudos to one or more mentioned users, with an optional reason.
+
+    Usage: kudos @user [@user2 ...] [reason]. You cannot give kudos to yourself. Sometimes a gift emoji is added.
+    """
     arg = ' '.join(ctx.args)
     reason = html.unescape(arg.split('>')[-1].strip())
     all_users = set(EXTRACT_SLACK_ID.findall(arg))
@@ -106,6 +110,12 @@ def kudos_give(ctx: ExtendedContext):
 def kudos_view(ctx: ExtendedContext, days_to_check: int, channel: str,
                show_givers: bool,
                output_format: str):
+    """Show the kudos leaderboard.
+
+    DAYS_TO_CHECK is how far back to look (default 14). CHANNEL is a #channel mention, or * for all channels
+    (default: the current channel).
+    Use -g to rank the givers instead of the receivers. Output: -t text (default), -x Excel, -i image, -v video.
+    """
     user_column = Kudos.from_user if show_givers else Kudos.to_user
     count = func.count().label('kudos')
     query = (select(user_column.label('User'), count)

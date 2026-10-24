@@ -19,15 +19,17 @@ if 'SUBREDDIT_NAME' not in os.environ:
 
 @gyrobot.group('nuke', cls=ClickAliasedGroup)
 def nuke():
-    pass
+    """Bulk removal of Reddit content: threads, a user's comments, or comments of deleted accounts."""
 
 
 @nuke.command('thread', aliases=['post'])
 @click.argument('thread_id')
 @click.pass_context
 def nuke_thread(ctx: ExtendedContext, thread_id):
-    """Nuke whole thread (except distinguished comments)
-    Thread ID should be either the submission URL or the submission id"""
+    """Nuke a whole thread: remove the submission and all comments except distinguished ones, then lock it.
+
+    THREAD_ID is the submission URL or id. The removed comments are remembered, see thread_undo.
+    """
     thread_id = extract_real_thread_id(thread_id)
     post = ctx.reddit_session.submission(thread_id)
     post.comments.replace_more(limit=None)
@@ -60,10 +62,10 @@ def nuke_thread(ctx: ExtendedContext, thread_id):
 @click.argument('thread_id')
 @click.pass_context
 def undo_nuke_thread(ctx: ExtendedContext, thread_id):
-    """Undo previous nuking of a thread
+    """Undo a previous "nuke thread": approve the comments it removed.
 
-    :param ctx: command context
-    :param thread_id: either the submission URL or the submission id"""
+    THREAD_ID is the submission URL or id.
+    """
     thread_id = extract_real_thread_id(thread_id)
     with state_file('nuke_thread') as state:
         if thread_id not in state:
@@ -90,10 +92,10 @@ def _w2n(input_text):
               is_flag=True, default=False, type=click.BOOL)
 @click.pass_context
 def nuke_user(ctx: ExtendedContext, username: str, timeframe: tuple[str] = None, remove_submissions: bool = False):
-    """\
-    Nuke the comments of a user. Append the timeframe to search.
-    Default value is 3 days. You can use standard values, e.g. "48 hours", "2 months", "10 years" etc.
-    Add SUBMISSIONS or POSTS to remove submissions as well.
+    """Nuke the comments of a user, using the alternate moderator account.
+
+    TIMEFRAME is how far back to look, default 3 days. Natural language works, for example
+    "48 hours", "2 months", "a week" or "forever". Add -s/-p (or SUBMISSIONS/POSTS) to remove submissions too.
     """
     if not timeframe:
         timeframe = ('3', 'days')
@@ -205,8 +207,10 @@ def nuke_user(ctx: ExtendedContext, username: str, timeframe: tuple[str] = None,
 @click.argument('thread_id')
 @click.pass_context
 def nuke_ghosts(ctx: ExtendedContext, thread_id):
-    """Nuke deleted users in thread.
-    :parameter: thread_id either the submission URL or the submission id"""
+    """Remove the comments of deleted accounts in a thread.
+
+    THREAD_ID is the submission URL or id.
+    """
     thread_id = extract_real_thread_id(thread_id)
     submission = ctx.reddit_session.submission(thread_id)
     submission.comments.replace_more(limit=None)

@@ -27,6 +27,7 @@ def urban_dictionary(ctx: ExtendedContext, terms):
 @click.argument('url')
 @click.pass_context
 def youtube_info(ctx: ExtendedContext, url):
+    """Fetch the oEmbed metadata (title, channel, ...) of a YouTube video URL and send it as a JSON file."""
     if url.startswith('<') and url.endswith('>'):
         url = url[1:-1]
     ctx.logger.info(url)

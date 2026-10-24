@@ -44,10 +44,12 @@ def _get_conversion_value(unit: str) -> float:
 @click.argument('words', type=click.STRING, nargs=-1)
 @click.pass_context
 def convert(ctx: ExtendedContext, words):
-    """Convert money from one currency to another.
+    """Convert a number between units, or between currencies.
 
+    \b
     Example: convert 100.0 USD to EUR
-             convert 5'10" to cm"""
+             convert 5'10" to cm
+             convert 10 km to miles"""
 
     if len(words) < 3 or len(words) > 5:
         ctx.chat.send_text("Format is convert «number» «from» to «to»", is_error=True)

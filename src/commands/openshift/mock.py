@@ -51,6 +51,10 @@ def _masked_oc_password(variable_list):
 @gyrobot.group('mock', cls=DefaultCommandGroup)
 @click.pass_context
 def mock(ctx: click.Context):
+    """Switch and inspect the microservice mocks of an environment (uses the oc command-line tool).
+
+    "mock NAMESPACE STATUS" is the same as "mock set NAMESPACE STATUS".
+    """
     ctx.ensure_object(dict)
     ctx.obj['config'] = _mock_config()
     ctx.obj['security_text'] = {'set': 'switch mock status', 'check': 'view mock status', 'view': 'view mock status'}
@@ -64,6 +68,7 @@ def mock(ctx: click.Context):
 @click.argument('mock_status')
 @click.pass_context
 def mock_default(ctx: ExtendedContext, namespace: str, mock_status: OpenShiftNamespace):
+    """Switch the mock status of NAMESPACE (shortcut for "mock set")."""
     ctx.forward(set_mock)
 
 
@@ -73,7 +78,11 @@ def mock_default(ctx: ExtendedContext, namespace: str, mock_status: OpenShiftNam
 @click.pass_context
 @check_security
 def set_mock(ctx: ExtendedContext, namespace: str, mock_status: str):
-    """Switch openshift mock status on environment"""
+    """Switch the mock status of an environment.
+
+    MOCK_STATUS must be one of the statuses configured for the environment. Runs "oc set env" for each
+    microservice; the output is attached as a file with passwords masked.
+    """
     env_vars = ctx.obj['config']['env_vars']
     config_env = env_config(ctx, namespace)
     valid_mock_statuses = [k.lower() for k in config_env['status'].keys()]
@@ -148,7 +157,7 @@ def _get_environment_values(env_vars, vartemplates, microservice_info, status):
 @click.pass_context
 @check_security
 def mock_check(ctx: ExtendedContext, namespace: str, excel: bool):
-    """View current status of environment"""
+    """View the current environment variables of the mocked microservices of an environment (passwords masked)."""
     config_env = env_config(ctx, namespace)
 
     is_azure, prefix, project_name, result_text, should_exit = do_login(ctx, config_env, namespace)
@@ -191,6 +200,7 @@ def _make_deployments_table(result) -> List[Dict]:
 @click.pass_context
 @check_security
 def mock_view(ctx: ExtendedContext, namespace: str, table_format: TableFormat=TableFormat.TABLE):
+    """Show the Deployments of NAMESPACE as a table (-f/--format: table, markdown, excel or zip_markdown)."""
     with KubernetesConnection(ctx, namespace) as k8s:
         deployments = k8s.apps_v1_api.list_namespaced_deployment(k8s.project_name)
     deployments_table = _make_deployments_table(deployments.items)

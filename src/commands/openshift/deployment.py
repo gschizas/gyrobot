@@ -21,6 +21,10 @@ _deployment_config = read_config('OPENSHIFT_DEPLOYMENT')
 @gyrobot.group('deployment')
 @click.pass_context
 def deployment(ctx: ExtendedContext):
+    """List, pause or resume the Deployments of a namespace.
+
+    Table commands accept -f/--format: table (default), markdown, excel or zip_markdown.
+    """
     ctx.ensure_object(dict)
     ctx.obj['config'] = _deployment_config
     ctx.obj['security_text'] = {'list': 'list deployments', 'pause': 'pause deployment', 'resume': 'resume deployment'}
@@ -32,6 +36,7 @@ def deployment(ctx: ExtendedContext):
 @click.pass_context
 @check_security
 def list_deployments(ctx: ExtendedContext, namespace: str, table_format: TableFormat=TableFormat.TABLE):
+    """List the Deployments of NAMESPACE with their replica counts and paused state."""
     with KubernetesConnection(ctx, namespace) as k8s:
         deployments = k8s.apps_v1_api.list_namespaced_deployment(k8s.project_name)
     deployments_table = _make_deployments_table(deployments.items)
@@ -44,6 +49,7 @@ def list_deployments(ctx: ExtendedContext, namespace: str, table_format: TableFo
 @click.pass_context
 @check_security
 def pause_deployment(ctx: ExtendedContext, namespace: str, table_format: TableFormat=TableFormat.TABLE):
+    """Pause all Deployments of NAMESPACE."""
     with KubernetesConnection(ctx, namespace) as k8s:
         deployments = k8s.apps_v1_api.list_namespaced_deployment(k8s.project_name)
         result = []
@@ -61,6 +67,7 @@ def pause_deployment(ctx: ExtendedContext, namespace: str, table_format: TableFo
 @click.pass_context
 @check_security
 def resume_deployment(ctx: ExtendedContext, namespace, table_format: TableFormat=TableFormat.TABLE):
+    """Resume all Deployments of NAMESPACE."""
     with KubernetesConnection(ctx, namespace) as k8s:
         deployments = k8s.apps_v1_api.list_namespaced_deployment(k8s.project_name)
         result = []
