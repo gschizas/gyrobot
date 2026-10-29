@@ -30,6 +30,7 @@ Log in with your LDAP credentials at `/login`.
 | `/onboarding` | Dashboard of the available actions. |
 | `/onboarding/github` | GitHub Copilot onboarding. The team is chosen from a tree of the enterprise teams (a plain text field if GitHub cannot be reached). |
 | `/onboarding/github/bulk` | Onboard several people at once. Usernames can be validated first. |
+| `/onboarding/move/bulk` | Move several people to another team at once (one `onboard move` per row, each queued for approval). Rows are email + team; supports the team tree and pasting from Excel. Needs a permission rule for `commands.onboarding.team:onboard_move` that covers the `$webui` channel. |
 | `/onboarding/jetbrains`, `/crowd`, `/slack`, `/offboard` | Forms for the matching commands. |
 | `/admin/permissions` | Permission rule management: list and filter, create, edit, delete, and a change history. Gated by the rule `webapp.routers.permissions:manage`. A save that would remove your own access is refused, and the page's own rule cannot be deleted or renamed. |
 | Reload permissions | Dashboard action that invalidates the web process's cache. Run `permissions reload` in chat for the bot. |

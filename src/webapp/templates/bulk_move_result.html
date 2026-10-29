@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block title %}Bulk move - Result{% endblock %}
+{% block content %}
+<h1>Bulk move to another team</h1>
+<p>{{ rows|length }} row(s) processed.</p>
+
+{% for row in rows %}
+<div class="bulk-row">
+    <h2>{{ row.email }}</h2>
+    <p>New team: {{ row.team }}</p>
+    {% if row.error %}
+    <div class="error">{{ row.error }}</div>
+    {% else %}
+    {{ macros.render_command_result(row.result) }}
+    {% endif %}
+</div>
+{% endfor %}
+
+<p>
+    <a href="{{ request.url_for('move_bulk_form') }}">&larr; Move more</a> |
+    <a href="{{ request.url_for('dashboard') }}">Back to onboarding</a>
+</p>
+{% endblock %}

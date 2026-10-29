@@ -297,6 +297,43 @@ async def github_bulk_submit(request: Request):
     return templates.TemplateResponse(request, 'bulk_result.html', {'user': user, 'rows': rows})
 
 
+@router.get('/onboarding/move/bulk', include_in_schema=False)
+def move_bulk_form(request: Request):
+    if redirect := _require_login(request):
+        return redirect
+    team_tree, team_tree_error = _github_team_tree()
+    team_options = GitHubApi.flatten_team_tree(team_tree) if team_tree else None
+    return templates.TemplateResponse(request, 'bulk_move.html', {
+        'user': _current_user(request), 'team_tree': team_tree, 'team_tree_error': team_tree_error,
+        'team_options': team_options, 'email_placeholder': _github_email_placeholder(),
+    })
+
+
+@router.post('/onboarding/move/bulk', include_in_schema=False)
+async def move_bulk_submit(request: Request):
+    if redirect := _require_login(request):
+        return redirect
+
+    form_data = await request.form()
+    user = _current_user(request)
+    rows = []
+    for email, team in zip(form_data.getlist('email'), form_data.getlist('team')):
+        email, team = email.strip(), team.strip()
+        if not (email or team):
+            continue  # fully blank row - silently skipped
+
+        if not (email and team):
+            rows.append({'email': email, 'team': team, 'result': None, 'error': 'Missing email or team.'})
+            continue
+
+        result = run_bot_command(
+            ['onboard', 'move', email, team], user_id=user,
+            channel_name=config.web_channel_name(), team_name=config.web_team_name())
+        rows.append({'email': email, 'team': team, 'result': result, 'error': None})
+
+    return templates.TemplateResponse(request, 'bulk_move_result.html', {'user': user, 'rows': rows})
+
+
 def _build_args(action: str, form_data) -> list[str] | None:
     if action == 'github':
         return ['onboard', 'github', form_data['username'], form_data['email'], form_data['team']]

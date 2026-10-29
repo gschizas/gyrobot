@@ -47,20 +47,7 @@ the following rows/columns automatically, adding rows as needed.</p>
     </tr>
 </template>
 
-{% if team_tree %}
-<div id="team-tree-modal" class="modal-overlay" hidden>
-    <div class="modal-box">
-        <div class="modal-header">
-            <h2>Select a team</h2>
-            <button type="button" id="team-tree-modal-close" aria-label="Close">&times;</button>
-        </div>
-        <input type="text" id="team-tree-modal-search" class="tree-search" placeholder="Filter teams...">
-        <div class="tree" id="team-tree-modal-tree"></div>
-    </div>
-</div>
-<div id="team-tree-data" data-tree='{{ team_tree | tojson }}' hidden></div>
-{% endif %}
-
+{% include "_bulk_grid.html" %}
 {% include "_validate_users.html" %}
 <script>
 attachGithubUserValidation(document.getElementById('bulk-form'),
@@ -68,7 +55,6 @@ attachGithubUserValidation(document.getElementById('bulk-form'),
 (function () {
     const template = document.getElementById('row-template');
     const tbody = document.getElementById('bulk-table-body');
-    const columnOrder = ['username', 'email', 'team'];
 
     function addRow() {
         const clone = template.content.cloneNode(true);
@@ -83,162 +69,8 @@ attachGithubUserValidation(document.getElementById('bulk-form'),
     document.getElementById('add-row').addEventListener('click', function () { addRow(); });
     for (let i = 0; i < 3; i++) addRow();
 
-    // --- Excel-style multi-cell paste: pasting tab/newline-separated text
-    // (e.g. a range of cells copied from Excel/Google Sheets) into any
-    // username/email/team cell fills that cell and subsequent rows/columns,
-    // adding rows if the pasted data doesn't fit. A plain single-value paste
-    // (no tabs/newlines) is left alone to behave like a normal text paste.
-    tbody.addEventListener('paste', function (event) {
-        const target = event.target;
-        if (!target.matches('input[name="username"], input[name="email"], input[name="team"]')) return;
-
-        const text = (event.clipboardData || window.clipboardData).getData('text');
-        if (!/[\t\r\n]/.test(text)) return; // single value - let the default paste happen
-
-        event.preventDefault();
-
-        const lines = text.split(/\r\n|\r|\n/).filter(function (line, index, arr) {
-            return line !== '' || index < arr.length - 1; // drop a single trailing blank line
-        });
-        if (lines.length === 0) return;
-
-        const startColumn = columnOrder.indexOf(target.name);
-        let rows = Array.from(tbody.querySelectorAll('tr'));
-        let startRowIndex = rows.indexOf(target.closest('tr'));
-
-        lines.forEach(function (line, lineIndex) {
-            const rowIndex = startRowIndex + lineIndex;
-            while (rowIndex >= rows.length) {
-                rows.push(addRow());
-            }
-            const cells = line.split('\t');
-            cells.forEach(function (value, cellIndex) {
-                const columnIndex = startColumn + cellIndex;
-                if (columnIndex >= columnOrder.length) return; // ignore extra pasted columns
-                const input = rows[rowIndex].querySelector('[name="' + columnOrder[columnIndex] + '"]');
-                if (input) {
-                    input.value = value.trim();
-                    input.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            });
-        });
-    });
-
-    // --- Team tree browse modal (reuses the same tree widget as the
-    // single-entry onboarding form; see templates/form.html) ---
-    const modal = document.getElementById('team-tree-modal');
-    if (!modal) return;
-
-    const treeContainer = document.getElementById('team-tree-modal-tree');
-    const searchBox = document.getElementById('team-tree-modal-search');
-    const closeButton = document.getElementById('team-tree-modal-close');
-    const treeData = JSON.parse(document.getElementById('team-tree-data').getAttribute('data-tree'));
-    let activeInput = null;
-
-    function makeNode(node) {
-        const li = document.createElement('li');
-        const row = document.createElement('div');
-        row.className = 'tree-row';
-
-        const hasChildren = node.children && node.children.length > 0;
-        let childrenUl = null;
-
-        const toggle = document.createElement('span');
-        toggle.className = 'tree-toggle' + (hasChildren ? '' : ' tree-toggle-empty');
-        toggle.textContent = hasChildren ? '▾' : '';
-        if (hasChildren) {
-            toggle.addEventListener('click', function () {
-                const collapsed = childrenUl.classList.toggle('collapsed');
-                toggle.textContent = collapsed ? '▸' : '▾';
-            });
-        }
-        row.appendChild(toggle);
-
-        const label = document.createElement('span');
-        label.textContent = node.label;
-        if (node.value) {
-            label.className = 'tree-label tree-selectable';
-            label.addEventListener('click', function () {
-                if (activeInput) {
-                    activeInput.value = node.value;
-                    activeInput.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-                closeModal();
-            });
-        } else {
-            label.className = 'tree-label tree-folder';
-        }
-        row.appendChild(label);
-        li.appendChild(row);
-
-        if (hasChildren) {
-            childrenUl = document.createElement('ul');
-            childrenUl.className = 'tree-children';
-            node.children.forEach(function (child) { childrenUl.appendChild(makeNode(child)); });
-            li.appendChild(childrenUl);
-        }
-        return li;
-    }
-
-    function renderTree() {
-        const rootUl = document.createElement('ul');
-        rootUl.className = 'tree-root';
-        rootUl.appendChild(makeNode(treeData));
-        treeContainer.innerHTML = '';
-        treeContainer.appendChild(rootUl);
-    }
-
-    function filterTree(query) {
-        const lowerQuery = query.trim().toLowerCase();
-        const items = treeContainer.querySelectorAll('li');
-        items.forEach(function (li) {
-            if (!lowerQuery) {
-                li.style.display = '';
-                const ul = li.querySelector(':scope > ul.tree-children');
-                if (ul) ul.classList.remove('collapsed');
-                return;
-            }
-            const label = li.querySelector(':scope > .tree-row > .tree-label');
-            const text = label ? label.textContent.toLowerCase() : '';
-            const descendantMatch = Array.from(li.querySelectorAll('.tree-label')).some(function (l) {
-                return l.textContent.toLowerCase().includes(lowerQuery);
-            });
-            li.style.display = (text.includes(lowerQuery) || descendantMatch) ? '' : 'none';
-            const ul = li.querySelector(':scope > ul.tree-children');
-            if (ul && descendantMatch) ul.classList.remove('collapsed');
-        });
-    }
-
-    function openModal(input) {
-        activeInput = input;
-        searchBox.value = '';
-        filterTree('');
-        modal.hidden = false;
-        searchBox.focus();
-    }
-
-    function closeModal() {
-        modal.hidden = true;
-        activeInput = null;
-    }
-
-    renderTree();
-    searchBox.addEventListener('input', function () { filterTree(searchBox.value); });
-    closeButton.addEventListener('click', closeModal);
-    modal.addEventListener('click', function (event) {
-        if (event.target === modal) closeModal();
-    });
-    document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape' && !modal.hidden) closeModal();
-    });
-
-    // Event delegation so rows added later via "+ Add row" work automatically.
-    tbody.addEventListener('click', function (event) {
-        if (event.target.classList.contains('browse-team')) {
-            const input = event.target.closest('tr').querySelector('.team-input');
-            openModal(input);
-        }
-    });
+    attachGridPaste(tbody, ['username', 'email', 'team'], addRow);
+    attachTeamPicker(tbody);
 })();
 </script>
 {% endblock %}

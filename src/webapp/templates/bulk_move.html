@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Bulk move - GyroBot Onboarding{% endblock %}
+{% block content %}
+<h1>Bulk move to another team</h1>
+<p>Add one row per colleague. Email address and the new team are both required per row; entirely
+blank rows are ignored. Each move applies to every resource the person holds (GitHub, JetBrains, ...)
+and is queued for approval, exactly like <code>onboard move</code> in chat. Type/paste a team slug
+directly, or use the browse (🌳) button to pick one from the team tree.</p>
+<p class="hint">Tip: you can copy a range of cells (email / team columns, in that order) from Excel and paste
+it directly into any cell below &mdash; it will fill that cell and the following rows/columns automatically,
+adding rows as needed.</p>
+{% if team_tree_error %}<div class="error">{{ team_tree_error }}</div>{% endif %}
+<form method="post" action="{{ request.url_for('move_bulk_submit') }}" id="bulk-form">
+<table id="bulk-table">
+    <thead>
+        <tr><th>Email address</th><th>New team</th><th></th></tr>
+    </thead>
+    <tbody id="bulk-table-body"></tbody>
+</table>
+<button type="button" id="add-row">+ Add row</button>
+<button type="submit">Submit all</button>
+</form>
+<p><a href="{{ request.url_for('dashboard') }}">&larr; Back to onboarding</a></p>
+
+{% if team_options %}
+<datalist id="team-datalist">
+    {% for opt in team_options %}
+    <option value="{{ opt.value }}"></option>
+    {% endfor %}
+</datalist>
+{% endif %}
+
+<template id="row-template">
+    <tr>
+        <td><input type="text" name="email" placeholder="{{ email_placeholder }}"></td>
+        <td>
+            <div class="team-cell">
+                <input type="text" name="team" class="team-input" placeholder="team-slug"
+                       {% if team_options %}list="team-datalist"{% endif %}>
+                {% if team_tree %}
+                <button type="button" class="browse-team" title="Browse teams">🌳</button>
+                {% endif %}
+            </div>
+        </td>
+        <td><button type="button" class="remove-row">&times;</button></td>
+    </tr>
+</template>
+
+{% include "_bulk_grid.html" %}
+<script>
+(function () {
+    const template = document.getElementById('row-template');
+    const tbody = document.getElementById('bulk-table-body');
+
+    function addRow() {
+        const clone = template.content.cloneNode(true);
+        clone.querySelector('.remove-row').addEventListener('click', function (event) {
+            event.target.closest('tr').remove();
+        });
+        const tr = clone.querySelector('tr');
+        tbody.appendChild(clone);
+        return tr;
+    }
+
+    document.getElementById('add-row').addEventListener('click', function () { addRow(); });
+    for (let i = 0; i < 3; i++) addRow();
+
+    attachGridPaste(tbody, ['email', 'team'], addRow);
+    attachTeamPicker(tbody);
+})();
+</script>
+{% endblock %}
