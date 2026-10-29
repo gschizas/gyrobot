@@ -29,9 +29,13 @@ def github():
 
 
 @github.command('teams')
+@click.argument('team_prefix', required=False)
 @click.pass_context
-def github_teams(ctx: ExtendedContext):
-    """Display GitHub Teams"""
+def github_teams(ctx: ExtendedContext, team_prefix: str | None):
+    """Display the GitHub enterprise teams as a tree, optionally only those starting with TEAM_PREFIX.
+
+    The parents of matching teams are shown too, to keep the tree readable.
+    """
 
     def generate_tree(node_name, parent_node=None):
         # Check if this node is a leaf (has no children)
@@ -45,6 +49,12 @@ def github_teams(ctx: ExtendedContext):
             generate_tree(branch_name, parent)
 
     teams = GitHubApi().get_ent_teams()
+    if team_prefix:
+        prefix = team_prefix.lower().removeprefix('ent:')
+        teams = [t for t in teams if t['slug'].lower().removeprefix('ent:').startswith(prefix)]
+        if not teams:
+            ctx.chat.send_text(f"No teams found starting with {team_prefix}.")
+            return
     connections, root_item, _slug_set = GitHubApi().build_team_connections(teams)
 
     tree = Tree()

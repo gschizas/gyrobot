@@ -49,7 +49,7 @@ Needs `GITHUB_TOKEN` and `GITHUB_ORG`. Not gated by approval.
 
 | Command | Description |
 |---|---|
-| `github teams` | The enterprise team hierarchy as a tree. |
+| `github teams [team_prefix]` | The enterprise team hierarchy as a tree, optionally only teams whose slug starts with `team_prefix` (their parents are shown too). |
 | `github members <team_slug> [-x]` | Members (login, email, team) of every enterprise team whose slug starts with `team_slug`. A missing GitHub email falls back to the one recorded when the bot onboarded the person. With `-x`, Excel with `team L2`/`team L3` columns. |
 | `github pending-invitations [team_prefix] [-x]` | Pending invitations, with email and team when the bot sent them. |
 
