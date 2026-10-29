@@ -2,12 +2,14 @@ import base64
 import datetime
 import io
 import logging
+import re
 import uuid
 import zipfile
 from abc import ABC, abstractmethod
 from io import BytesIO
 from typing import List, Dict, Callable
 
+import click
 import pandas as pd
 from tabulate import tabulate
 
@@ -17,6 +19,20 @@ from backend.excel import FormulaColumns, write_excel_table
 # Kinds of argument a platform may decorate (see Conversation.clean_argument)
 ARGUMENT_EMAIL = 'email'
 
+_FENCED = re.compile(r'```\w*\n?(.*?)\n?```\s*', re.DOTALL)
+
+
+def code_file_name(name: str | None = None) -> str:
+    """File name for output sent as a file: ``<name>.<YYYYMMDD-HHMM>.txt``.
+
+    Without ``name`` it is taken from the command being run (``github teams`` -> ``github-teams``).
+    """
+    if not name:
+        context = click.get_current_context(silent=True)
+        name = '-'.join(context.command_path.split()[1:]) if context else ''
+    name = re.sub(r'[^\w.-]+', '-', name).strip('-.')
+    return f"{name or 'output'}.{datetime.datetime.now():%Y%m%d-%H%M}.txt"
+
 
 class Conversation(ABC):
     channel_id: str
@@ -24,6 +40,9 @@ class Conversation(ABC):
     user_id: str
     team_id: str
     bot_name: str
+
+    # Longest text the platform shows in one message; None means no limit (or no way to send a file instead).
+    MAX_TEXT_LENGTH: int | None = None
 
     def __init__(self, bot_name, channel_id, user_id, team_id):
         self.bot_name = bot_name
@@ -41,6 +60,30 @@ class Conversation(ABC):
     @abstractmethod
     def send_text(self, text, is_error: bool = False, icon_emoji: str = None, channel=None) -> None:
         pass
+
+    def overflow_to_file(self, text: str, channel=None) -> bool:
+        """For ``send_text`` implementations: if ``text`` is longer than the platform allows, send it as a text file
+        instead of letting it be split into broken messages, and return True."""
+        if self.MAX_TEXT_LENGTH is None or len(text) <= self.MAX_TEXT_LENGTH:
+            return False
+        if fenced := _FENCED.fullmatch(text.strip()):
+            text = fenced.group(1)
+        self.send_file(text.encode(), title='Too long for a message, sent as a file',
+                       filename=code_file_name(), channel=channel)
+        return True
+
+    def send_code(self, text: str, name: str | None = None, title: str | None = None, channel=None) -> None:
+        """Send preformatted text. It is shown as a code block, or as a text file if too long for one message.
+
+        ``name`` is the base of the file name (default: the running command, e.g. ``github-teams``); the date and
+        time are added, giving ``github-teams.20261029-2006.txt``.
+        """
+        text = text.strip('\n')
+        block = f"```\n{text}\n```"
+        if self.MAX_TEXT_LENGTH is None or len(block) <= self.MAX_TEXT_LENGTH:
+            self.send_text(block, channel=channel)
+        else:
+            self.send_file(text.encode(), title=title, filename=code_file_name(name), channel=channel)
 
     @abstractmethod
     def send_table(self, title: str, table: List[Dict], table_format: TableFormat = TableFormat.TABLE,

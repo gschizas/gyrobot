@@ -87,9 +87,9 @@ def disk_space(ctx: ExtendedContext):
 @click.pass_context
 def disk_space_ex(ctx):
     """Display free disk space"""
-    ctx.chat.send_text('```' + subprocess.check_output(
+    ctx.chat.send_code(subprocess.check_output(
         ['duf',
          '-only', 'local',
          '-output', 'mountpoint,size,avail,usage',
          '-style', 'unicode',
-         '-width', '120']).decode() + '```')
+         '-width', '120']).decode())

@@ -117,12 +117,13 @@ Use `ExtendedContext` (not plain `click.Context`) for typed access:
 ctx.chat.send_text("message")                        # plain text
 ctx.chat.send_text("error", is_error=True)           # error styling
 ctx.chat.send_file(data_bytes, filename="f.txt")     # file upload
+ctx.chat.send_code(text)                             # fenced block; sent as <command>.<YYYYMMDD-HHMM>.txt if too long
 ctx.chat.send_table("Title", list_of_dicts)          # table (auto-formats)
 ctx.chat.send_tables("Title", {"Sheet": list_of_dicts}, send_as_excel=True)
 ctx.chat.send_fields("header", [{"color": "#f00", "text": "..."}])
 ```
 
-Output written to `stdout` (e.g., `print()`) is automatically sent back as a code block.
+Output written to `stdout` (e.g., `print()`) is automatically sent back as a code block via `send_code`, named after the command (e.g. `github-teams.20261029-2006.txt`) and sent as a file if it exceeds the platform's `MAX_TEXT_LENGTH` (Slack/Discord/Telegram; Mattermost and Teams have no limit). Use `send_text` instead of `print` for output that shouldn't be fenced; over-long `send_text` also falls back to a file.
 
 ### Plugins (`PLUGIN` declaration)
 

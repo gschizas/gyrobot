@@ -166,7 +166,18 @@ def run_command(a_runner, args, context_obj: dict):
             current_chat.send_file(filename='error.txt', file_data=error_text.encode(), channel=channel_id)
 
     if result.output != '':
-        current_chat.send_text('```\n' + result.output.strip() + '```\n', channel=channel_id)
+        current_chat.send_code(result.output.strip(), name=_command_name(args), channel=channel_id)
+
+
+def _command_name(args: list[str]) -> str:
+    """Name of the command in ``args`` for file names, e.g. ``['github', 'teams', 'corp']`` -> ``github-teams``."""
+    names, command = [], commands.gyrobot
+    for arg in args:
+        command = getattr(command, 'commands', {}).get(arg)
+        if command is None:
+            break
+        names.append(arg)
+    return '-'.join(names) or (args[0] if args else '')
 
 
 def precmd(line):

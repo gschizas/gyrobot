@@ -26,6 +26,7 @@ app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
 
 
 class SlackConversation(Conversation):
+    MAX_TEXT_LENGTH = 4000  # Slack splits longer messages
     _MAILTO = re.compile(r'<mailto:(?P<address>[^|>]+)(?:\|[^>]*)?>')
 
     def clean_argument(self, text: str, kind: str) -> str:
@@ -39,6 +40,8 @@ class SlackConversation(Conversation):
         return channels_cache[self.team_id].get(self.channel_id)
 
     def send_text(self, text, is_error=False, icon_emoji=None, channel=None):
+        if self.overflow_to_file(text, channel):
+            return
         if is_error:
             icon_emoji = ':face_palm:'
         app.client.chat_postMessage(

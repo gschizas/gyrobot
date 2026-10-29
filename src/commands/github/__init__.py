@@ -61,7 +61,7 @@ def github_teams(ctx: ExtendedContext, team_prefix: str | None):
     generate_tree(root_item)
     text = tree.show(key=lambda x: x.identifier, line_type='ascii-ex', stdout=False)
 
-    ctx.chat.send_text('```\n' + text + '```\n')
+    ctx.chat.send_code(text)
 
 @github.command("members")
 @click.argument("team_slug")

@@ -56,6 +56,8 @@ def _send(chat_id: str, text: str) -> None:
 
 
 class TelegramConversation(Conversation):
+    MAX_TEXT_LENGTH = MAX_MESSAGE_LENGTH
+
     @property
     def channel_name(self) -> str | None:
         if self.channel_id not in channels_cache:
@@ -69,6 +71,8 @@ class TelegramConversation(Conversation):
         return channels_cache[self.channel_id]
 
     def send_text(self, text, is_error: bool = False, icon_emoji: str = None, channel=None) -> None:
+        if self.overflow_to_file(text, channel):
+            return
         if is_error:
             text = f"🤦 {text}"
         _send(channel or self.channel_id, text)
@@ -80,7 +84,7 @@ class TelegramConversation(Conversation):
             self.send_text(f"*{title}*\n(no rows)")
             return
         self.send_text(f"*{title}*")
-        for part in _chunks(tabulate(table, headers='keys', tablefmt='simple')):
+        for part in _chunks(tabulate(table, headers='keys', tablefmt='simple'), MAX_MESSAGE_LENGTH - 10):
             self.send_text(f"```\n{part}\n```")
 
     def send_tables(self, title: str, tables: Dict[str, List[Dict]],

@@ -66,6 +66,8 @@ def _code_block(text: str) -> str:
 
 
 class DiscordConversation(Conversation):
+    MAX_TEXT_LENGTH = MAX_MESSAGE_LENGTH
+
     @property
     def channel_name(self) -> str | None:
         channel = _client.get_channel(int(self.channel_id)) if _client else None
@@ -78,6 +80,8 @@ class DiscordConversation(Conversation):
         return ('#' if permissions.view_channel else '🔒') + channel.name
 
     def send_text(self, text, is_error: bool = False, icon_emoji: str = None, channel=None) -> None:
+        if self.overflow_to_file(text, channel):
+            return
         if is_error:
             text = f":face_palm: {text}"
         _run(_send(channel or self.channel_id, text))
