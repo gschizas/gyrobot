@@ -6,6 +6,7 @@ literal ``PLUGIN`` dict at the top of its own module (or package ``__init__``)::
     PLUGIN = {
         'requires': ['KUDOS_DATABASE_URL'],        # all of these env vars must be set
         'requires_any': ['WEGO_EXE', 'WEATHER_URL'],  # at least one of these
+        'requires_files': ['config/github.yml'],   # all of these files must exist (relative to the working directory)
         'dependencies': ['yfinance>=0.2.43'],      # pip requirements private to this plugin
         'priority': 10,                            # chat platforms only: order for ``chat: auto``
     }
@@ -61,6 +62,7 @@ class Plugin:
     requires_any: list[str] = field(default_factory=list)
     dependencies: list[str] = field(default_factory=list)
     priority: int = 100
+    requires_files: list[str] = field(default_factory=list)
 
     def merged_with(self, parent: 'Plugin') -> 'Plugin':
         return Plugin(
@@ -68,12 +70,15 @@ class Plugin:
             parent.requires + self.requires,
             parent.requires_any + self.requires_any,
             parent.dependencies + self.dependencies,
-            self.priority)
+            self.priority,
+            parent.requires_files + self.requires_files)
 
     def missing_environment(self) -> list[str]:
+        """Unmet env vars and files, as readable names."""
         missing = [name for name in self.requires if name not in os.environ]
         if self.requires_any and not any(name in os.environ for name in self.requires_any):
             missing.append(' or '.join(self.requires_any))
+        missing.extend(f"file {name}" for name in self.requires_files if not pathlib.Path(name).exists())
         return missing
 
     def missing_dependencies(self) -> list[str]:
@@ -137,7 +142,8 @@ def discover(kind: str) -> dict[str, Plugin]:
             list(declaration.get('requires', [])),
             list(declaration.get('requires_any', [])),
             list(declaration.get('dependencies', [])),
-            int(declaration.get('priority', 100)))
+            int(declaration.get('priority', 100)),
+            list(declaration.get('requires_files', [])))
     for name in sorted(found, key=lambda n: n.count('.')):
         parent = name.rpartition('.')[0]
         while parent:

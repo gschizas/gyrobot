@@ -133,6 +133,7 @@ Output written to `stdout` (e.g., `print()`) is automatically sent back as a cod
 PLUGIN = {
     'requires': ['SUBREDDIT_NAME'],                 # all env vars must be set
     'requires_any': ['WEGO_EXE', 'WEATHER_URL'],    # at least one
+    'requires_files': ['config/github.yml'],        # files that must exist (relative to the repo root)
     'dependencies': ['yfinance>=0.2.43'],           # pip libs private to this plugin
     'priority': 10,                                 # chat platforms only (chat: auto order)
 }
@@ -425,7 +426,7 @@ Provisioning itself is delegated to providers in `backend/providers/` (`github_c
 
 ### `backend/github_api.py` — GitHub API client (`GitHubApi` class)
 
-Lazy-initialised `requests.Session` using `GITHUB_TOKEN` + `GITHUB_ORG`. Mixes REST (v2022-11-28) and GraphQL calls. Key methods:
+Lazy-initialised `requests.Session` configured from `config/github.yml` (GitHub App signing key, client id/secret, enterprise, organization, personal access token). Mixes REST (v2022-11-28) and GraphQL calls. Key methods:
 - `get_org_teams()` / `get_ent_teams()` — org-level vs. enterprise-level teams
 - `get_org_team_members(team)` / `get_ent_team_members(team)` — members of a specific team
 - `get_org_members()` / `get_ent_members()` — all org/enterprise members
@@ -567,7 +568,5 @@ All runtime config lives outside the repo under mounted volumes:
 | `WEATHER_FONT` | Path to TTF font file used by the ANSI→PNG renderer |
 | `ALT_PROXY` | HTTP proxy for `joke` command |
 | `KUDOS_DATABASE_URL` | PostgreSQL DSN for `kudos` (SQLAlchemy) |
-| `GITHUB_TOKEN` | Bearer token for `backend/github_api.py` (`GitHubApi`); enables `commands/github/` and `onboard github`/`github_check` |
-| `GITHUB_ORG` | GitHub org/enterprise slug used by `backend/github_api.py`; required alongside `GITHUB_TOKEN` |
 | `APPROVAL_DATABASE_URL` | PostgreSQL DSN for the approval queue + account/provision storage (SQLAlchemy); enables `onboard`/`offboard`/`approvals` |
 | `APPROVAL_CONFIGURATION` | Path to the approval security YAML (under `config/` or absolute). Selects the active `environment`; per-environment `requesters`/`approvers`, their channels, `notify_channel` live in `.permissions.yml` |

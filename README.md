@@ -62,7 +62,7 @@ disable commands by name. Details are in [docs/INSTALLATION.md](docs/INSTALLATIO
 | Reddit commands | `SUBREDDIT_NAME` (`make` also needs `REDDIT_ALT_USER`) |
 | `deployment`, `cronjob`, `scaledown`, `actuator`, `mock`, `deploy` | `OPENSHIFT_DEPLOYMENT`, `OPENSHIFT_CRONJOB`, `OPENSHIFT_SCALEDOWN`, `OPENSHIFT_ACTUATOR_REFRESH`, `MOCK_CONFIGURATION`, `DOCKER_DEPLOY_CONFIGURATION` |
 | `onboard`, `offboard`, `approvals` | `APPROVAL_DATABASE_URL` |
-| `github` | `GITHUB_TOKEN`, `GITHUB_ORG` |
+| `github` | `config/github.yml` |
 | `jetbrains` | `JETBRAINS_TOKEN`, `JETBRAINS_CUSTOMER_CODE` |
 | `kudos` | `KUDOS_DATABASE_URL` |
 | `weather` | `WEGO_EXE` or `WEATHER_URL` |

@@ -45,7 +45,7 @@ The command looks the account up by its primary email.
 
 ## `github` (read-only)
 
-Needs `GITHUB_TOKEN` and `GITHUB_ORG`. Not gated by approval.
+Needs `config/github.yml`. Not gated by approval.
 
 | Command | Description |
 |---|---|

@@ -1,6 +1,4 @@
-PLUGIN = {'requires': ['GITHUB_TOKEN', 'GITHUB_ORG'], 'dependencies': ['treelib>=1.8.0']}
-
-import os
+PLUGIN = {'requires_files': ['config/github.yml'], 'dependencies': ['treelib>=1.8.0']}
 
 import click
 from treelib import Tree
@@ -12,12 +10,6 @@ from backend.account_storage import find_provisions_by_any_username, find_provis
 from backend.github_api import GitHubApi
 from commands.extended_context import ExtendedContext
 from commands.team_columns import team_level_columns
-
-if 'GITHUB_TOKEN' not in os.environ:
-    raise ImportError('GITHUB_TOKEN not found in environment')
-
-if 'GITHUB_ORG' not in os.environ:
-    raise ImportError('GITHUB_ORG not found in environment')
 
 
 @gyrobot.group('github', cls=DefaultCommandGroup)
