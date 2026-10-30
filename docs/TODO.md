@@ -89,6 +89,144 @@ accepted/expired are not visible in the web UI or API. Options:
    - Optionally drop the `"machineState"`, `"jobQueue"`, `"Votes"`, `"Answers"` and `"Receipts"` tables and
      `public.submissions`; they stay out of the Alembic baseline.
 
+## Per-instance configuration and data
+
+Several instances run from one checkout (`.env.d/<name>.env`), but `config/` and `data/` are shared between them,
+and `data/` files are told apart with `-<LOG_NAME>` suffixes. Decided, not started:
+
+- An **instance** is the same thing as an environment name (`.env.d/<name>.env`, the argument of `__main__`).
+- **Overlay lookup** for configuration: `config/<instance>/<file>` first, then `config/<file>`. Nothing is meant to
+  be shared in practice, but the fallback keeps existing single-instance setups working without a migration.
+- **`data/` becomes per instance too**: `data/<instance>/<file>`, and the `-<LOG_NAME>` suffixes go away
+  (`state_file`, `teams_conversations-<LOG_NAME>.yml`, ...). The cronjob stack, `crowd_users.yml` and the
+  `SHORTCUT_WORDS` files move there as well. None of the files once considered "likely shared"
+  (`team_mapping.yml`, `kubernetes_servers.yml`, `crowd_users.yml`, the covid data) should be shared.
+
+Scope:
+
+- One helper (e.g. `config_path(name)` / `data_path(name)`) replacing the hard-coded paths in `plugins.py`
+  (`plugins.yml` and the `requires_files` check), `backend/github_api.py`, `backend/email_domains.py`,
+  `backend/email_logging.py`, `backend/team_mapping.py`, `backend/configuration.py` (`read_config`,
+  `kubernetes_servers.yml`, `crowd_users.yml`), `backend/secret_store`, `webapp/config.py`,
+  `commands/reddit/__init__.py` (`enhanced_crowd_control.yml`, which is also written at runtime),
+  `commands/openshift/*` (cert files, cronjob stack, `docker_deploy.py`), `__main__.py` (`SHORTCUT_WORDS`),
+  `state_file.py`, `commands/generic/covid19.py` and `chat/teams.py`.
+- The scripts that read `config/` (`migrate_permissions.py`, `backfill_jetbrains.py`, `import_provisions.py`)
+  need the same helper plus an instance argument.
+- `run.sh`, `run.ps1`, the `Dockerfile` and `INSTALLATION.md` (which says everything is read from the repo root).
+- Existing inconsistency: `docker_deploy.py` reads `<config>.credentials.yaml`, everything else `.yml`.
+- `config/ldap.yml` and `config/users.ldif` are not read by any code (LDAP uses env vars); decide whether to delete.
+
+Open questions:
+
+1. **How does the code know the instance?** Export an env var (e.g. `INSTANCE`) in `__main__` and
+   `load_environment` (`LOG_NAME` is being removed, see the logs section). The web UI and REST API processes must
+   set it too.
+2. **Run without an instance name?** Fall back to plain `config/` and `data/`, or make the name mandatory?
+3. **Existing `data/` files**: migrate them (rename `*-<LOG_NAME>.yml` into `data/<instance>/`) with a one-off
+   script, or leave a fallback read of the old name?
+4. **Files written at runtime** (`enhanced_crowd_control.yml`, the cronjob stack): move the first from `config/` to
+   `data/<instance>/`, or keep it in `config/<instance>/`?
+5. **Paths given in env vars** (`*_CONFIGURATION`): resolve relative ones through the overlay, and keep absolute
+   paths working?
+6. **Plugin gating**: should `requires_files` resolve through the same overlay? `python src/plugins.py requirements
+   <env-name>` already knows the instance.
+7. **Credentials and permissions siblings** (`<name>.credentials.yml`, `<name>.permissions.yml`): resolve each
+   through the overlay independently, or together with the main file?
+8. **Containers**: mount one `config/<instance>` and `data/<instance>` per container, or the whole folders?
+
+## Per-instance logs
+
+Decided, not started:
+
+- Layout: `logs/<instance>/gyrobot.log` (INFO) and `logs/<instance>/gyrobot.debug.log` (DEBUG). The instance name
+  appears only in the folder, never in the file name. The weekly rotation (`LOG_ROLLOVER`, default `W0`) and the
+  separate debug file stay as they are.
+- The **web UI and REST API get their own log files** in the same folder, named after the app only
+  (e.g. `gyrobot-web.log`, `gyrobot-api.log`, plus their `.debug.log`). They never call `setup_logging` today.
+- **`LOG_NAME` is removed** (also from the `.env.d` files and the docs); the instance variable from the per-instance
+  work replaces it. `state_file` and `chat/teams.py` stop using it too.
+- **Old logs are zipped by hand** and the new scheme starts clean; no migration code.
+- **Debug log can be disabled** with an environment variable (name to be decided, e.g. `LOG_DEBUG=false`); the
+  default stays on.
+- Current naming (`setup_logging` in `src/bot_framework/common.py`) depends on how the process is started:
+  - `python src/__main__.py <env>`: `sys.argv[0]` is `__main__.py`, so it uses the checkout folder name (one level
+    above `src`), giving `<folder>-<instance>.log`. That is the Windows case.
+  - `python src` (a directory, presumably how it is started on Linux): `sys.argv[0]` is `src`, the `__main__`
+    branch is skipped, and the result is `src-<instance>.log`.
+- `setup_logging` is only called from `__main__.py`; `LOG_NAME` is passed to it as the suffix.
+
+Scope:
+
+- `setup_logging` takes an app name (`gyrobot`, `gyrobot-web`, `gyrobot-api`) and a log folder instead of deriving
+  the name from `sys.argv[0]` and the folder name; each entry point passes both, and the web UI and API call it.
+- The WinSW wrapper logs (`.out.log`, `.err.log`, `.wrapper.log`, see `INSTALLATION.md`) also go to `logs\`;
+  decide where they end up in the new structure.
+- Update `INSTALLATION.md`, `.github/copilot-instructions.md` (the logging, `LOG_NAME` and `state_file` rows), and
+  the logrotate or systemd/journal notes, if any.
+
+Open questions:
+
+1. **Name of the variable that disables the debug log**, and whether it should also allow a level
+   (e.g. `LOG_LEVEL`) instead of only on/off.
+2. **Where the logging code lives**: depends on the `bot_framework` decision below.
+
+## Dropping the `bot_framework` submodule
+
+Reddit is retiring the Data API and the remaining scripts are being migrated, so the submodule
+(`src/bot_framework`, `../bot_framework.git`) may no longer be needed. Not decided. What this repo still takes
+from it:
+
+| Used | Where | If the submodule goes |
+|---|---|---|
+| `yaml_wrapper.yaml` | 11 modules (`state_file`, `plugins`, `backend/*`, `webapp/config`, `secret_store`, `reddit`) | move the shared YAML instance into this repo (e.g. `src/yaml_wrapper.py`) and change the imports |
+| `common.setup_logging` | `__main__.py` | rewrite here as part of the per-instance logs work |
+| `common.normalize_text` | `__main__.py` (trigger-word matching) | move here; it downloads the Unicode confusables table on first use, so decide whether to vendor the file |
+| `praw_wrapper.praw_wrapper` | `__main__.py` (Reddit OAuth) | goes away with the Reddit commands |
+| `slack.SlackWrapper` | only used by `common.send_to_slack` | not needed |
+
+Open questions:
+
+1. **Does the Reddit support go away completely** (the `commands/reddit/` package, `praw`, the `.refreshtoken/`
+   folder, `REDDIT_*` variables, the `ctx.subreddit` / `ctx.reddit_session` properties, the Reddit rows in the docs),
+   or only the parts that need the Data API?
+2. **Do the other projects still use `bot_framework`?** If so, only the submodule reference is removed from here;
+   the code is copied, not deleted.
+3. **Order**: dropping the submodule is simplest after the Reddit decision, and before the logging rewrite, so
+   `setup_logging` is written once in its final place.
+4. **History**: remove the submodule cleanly (`git submodule deinit`, remove `.gitmodules` and the path), and update
+   `INSTALLATION.md` (`git submodule update --init`) and the Docker build.
+
+## Install under `/opt/<company>/`
+
+Wanted, not started: make the bot installable like another internal app, which has a `deploy/` folder with an
+Ubuntu install guide (`INSTALL-ubuntu.md`), a systemd unit and an Apache snippet
+(`O:\GSchizas\Documents\Source\Python\Eurobank\BookingParking\deploy`). What that app does, as a starting point:
+
+- App in `/opt/<company>/<app>`, a system user with `/opt/<company>` as its home, and `uv sync --frozen --no-dev`
+  with `UV_PYTHON_INSTALL_DIR=/opt/<company>/python` so the service does not depend on `/home`.
+- Settings in `/etc/<app>.env` (mode 600), read through the systemd `EnvironmentFile`.
+- A hardened systemd unit (`NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=strict`, `ProtectHome`) with
+  `Restart=on-failure` and `alembic upgrade head` as `ExecStartPre`.
+- Apache as the TLS reverse proxy in front of uvicorn on `127.0.0.1`.
+- An "Updating" section (`git pull`, `uv sync`, restart).
+
+Open questions:
+
+1. **Company name** to use in the path.
+2. **Several instances**: a systemd template unit (`gyrobot@<instance>`, which `INSTALLATION.md` already mentions)
+   with `/etc/<app>/<instance>.env`, and separate units for the bot, the web UI and the REST API?
+3. **Writable locations**: with `ProtectSystem=strict`, `config/`, `data/`, `logs/` and `.refreshtoken/` need
+   `ReadWritePaths=`, or must move to `/etc`, `/var/lib` and `/var/log`. Which layout?
+4. **Instance files** (`config/<instance>/`, `data/<instance>/`): inside the checkout or outside it (e.g.
+   `/etc/<app>/<instance>/`, `/var/lib/<app>/<instance>/`)? Depends on the per-instance work above, so do that
+   first.
+5. **Web UI and API**: reverse proxy through Apache with a root path (like the other app), or one port per
+   instance?
+6. **Plugin libraries**: `INSTALLATION.md` installs them per instance with `src/plugins.py requirements <env-name>`.
+   With one shared virtualenv in `/opt`, how are the instances' libraries installed together, and by whom?
+7. **Existing deployment files**: replace the stale `Dockerfile` and `run.*` scripts, or keep both styles?
+
 ## Other chat platforms
 
 Mattermost, Discord, Telegram and Teams gaps are tracked in `TODO-chat-platforms.md`.
