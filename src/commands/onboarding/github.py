@@ -1,12 +1,12 @@
 import datetime
-import os
 
 import click
 import requests
+from treelib import Tree
 
 from backend import bot_identity
-from backend.account_storage import (find_provisions_by_github_id, find_provisions_by_username,
-                                     get_last_status_times, get_or_create_account, get_pending_provisions,
+from backend.account_storage import (find_provisions_by_any_username, find_provisions_by_github_id,
+                                     find_provisions_by_username, get_last_status_times, get_or_create_account, get_pending_provisions,
                                      get_provisions, set_provision_status)
 from backend.accounts import Provision
 from backend.approval import requires_approval
@@ -19,9 +19,6 @@ from backend.providers import ProvisionRequest, PROVIDERS, RESOURCE_LABELS
 from commands import DefaultCommandGroup
 from commands.extended_context import ExtendedContext
 from commands.team_columns import team_level_columns
-
-if 'APPROVAL_DATABASE_URL' not in os.environ:
-    raise ImportError('APPROVAL_DATABASE_URL not found in environment')
 
 
 def _github_summary(params: dict) -> str:
@@ -100,10 +97,125 @@ def _github_validate(params: dict, ctx: ExtendedContext) -> str | None:
 
 @click.group('github', cls=DefaultCommandGroup)
 def github_group():
-    """Onboard a colleague for GitHub Copilot, or check/cancel pending invitations.
+    """Onboard a colleague for GitHub Copilot, check/cancel invitations, and inspect the GitHub enterprise.
 
     Without a subcommand this is "add": bot onboard github <username> <email> <team>
+
+    Read-only lookups (not gated by approval): teams, members, pending-invitations, expired.
     """
+
+
+@github_group.command('teams')
+@click.argument('team_prefix', required=False)
+@click.pass_context
+def github_teams(ctx: ExtendedContext, team_prefix: str | None):
+    """Display the GitHub enterprise teams as a tree, optionally only those starting with TEAM_PREFIX.
+
+    The parents of matching teams are shown too, to keep the tree readable.
+    """
+
+    def generate_tree(node_name, parent_node=None):
+        # Check if this node is a leaf (has no children)
+        is_leaf = node_name not in connections or len(connections[node_name]) == 0
+
+        # Use different display based on whether it's a leaf
+        display_name = f"📄 {node_name}" if is_leaf else f"📁 {node_name}"
+
+        parent = tree.create_node(display_name, node_name.lower(), parent=parent_node)
+        for branch_name in sorted(connections.get(node_name, []), key=lambda x: x.lower()):
+            generate_tree(branch_name, parent)
+
+    teams = GitHubApi().get_ent_teams()
+    if team_prefix:
+        prefix = team_prefix.lower().removeprefix('ent:')
+        teams = [t for t in teams if t['slug'].lower().removeprefix('ent:').startswith(prefix)]
+        if not teams:
+            ctx.chat.send_text(f"No teams found starting with {team_prefix}.")
+            return
+    connections, root_item, _slug_set = GitHubApi().build_team_connections(teams)
+
+    tree = Tree()
+    generate_tree(root_item)
+    text = tree.show(key=lambda x: x.identifier, line_type='ascii-ex', stdout=False)
+
+    ctx.chat.send_code(text)
+
+
+@github_group.command("members")
+@click.argument("team_slug")
+@click.option('-x', '--excel', 'as_excel', is_flag=True, help='Send the result as an Excel file')
+@click.pass_context
+def github_team_members(ctx: ExtendedContext, team_slug: str, as_excel: bool):
+    """Display members (login, email, team) of enterprise teams whose slug starts with TEAM_SLUG"""
+    members = GitHubApi().get_ent_team_members_by_prefix(team_slug)
+
+    if not members:
+        ctx.chat.send_text(f"No members found for teams starting with {team_slug}.")
+        return
+
+    # Fall back to the email recorded when the bot onboarded the user
+    missing = {m['login'] for m in members if not m['emails']}
+    fallback: dict[str, str] = {}
+    if missing:
+        try:
+            # Ordered by creation, so the most recent provision wins
+            for provision in find_provisions_by_username('github', list(missing)):
+                email = provision.data.get('email')
+                if email:
+                    fallback[provision.data['username'].lower()] = email
+        except Exception:
+            ctx.logger.warning('Could not look up fallback emails in the database', exc_info=True)
+
+    table = []
+    for m in sorted(members, key=lambda m: (m['team'], m['login'].lower())):
+        if m['emails']:
+            email, source = ', '.join(m['emails']), 'github'
+        elif m['login'].lower() in fallback:
+            email, source = fallback[m['login'].lower()], bot_identity.bot_name()
+        else:
+            email, source = '', ''
+        table.append({'Username': m['login'], 'Email': email, 'Email source': source, 'Team': m['team']})
+    ctx.chat.send_table(title=f'Members of teams starting with {team_slug}', table=table,
+                        table_format=TableFormat.EXCEL if as_excel else TableFormat.TABLE,
+                        formula_columns=team_level_columns)
+
+
+@github_group.command("pending-invitations")
+@click.argument("team_prefix", required=False)
+@click.option('-x', '--excel', 'as_excel', is_flag=True, help='Send the result as an Excel file')
+@click.pass_context
+def github_pending_invitations(ctx: ExtendedContext, team_prefix: str | None, as_excel: bool):
+    """Display pending invitations, optionally only for teams starting with TEAM_PREFIX"""
+    invitations = GitHubApi().get_pending_invitations()
+
+    if not invitations:
+        ctx.chat.send_text("No pending invitations found.")
+        return
+
+    usernames = [invite['login'] for invite in invitations]
+
+    db_rows = find_provisions_by_any_username(usernames)
+
+    users_by_username = {p.data['username']: p for p in db_rows}
+    for inv in invitations:
+        user = users_by_username.get(inv['login'])
+        if not user:
+            continue
+        inv['email'] = user.data['email']
+        inv['team'] = user.data['team']
+
+    if team_prefix:
+        prefix = team_prefix.lower().removeprefix('ent:')
+        # Only invitations made through the bot have a team on record
+        invitations = [inv for inv in invitations if inv.get('team', '').lower().removeprefix('ent:').startswith(prefix)]
+        if not invitations:
+            ctx.chat.send_text(f"No pending invitations found for teams starting with {team_prefix}.")
+            return
+
+    title = 'Pending Invitations' + (f' (teams starting with {team_prefix})' if team_prefix else '')
+    ctx.chat.send_table(title=title, table=invitations,
+                        table_format=TableFormat.EXCEL if as_excel else TableFormat.TABLE,
+                        formula_columns=team_level_columns)
 
 
 @github_group.command('add', default_command=True)

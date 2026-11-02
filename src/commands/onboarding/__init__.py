@@ -8,11 +8,10 @@ provisioning runs. Provisioning itself is delegated to the provider stubs in
 Account metadata and provisioning state are persisted to PostgreSQL via account_storage
 for tracking and deprovisioning workflows.
 """
-PLUGIN = {'requires': ['APPROVAL_DATABASE_URL']}
+PLUGIN = {'requires_files': ['config/github.yml'], 'dependencies': ['treelib>=1.8.0']}
 
 import copy
 import datetime
-import os
 
 import click
 
@@ -27,11 +26,6 @@ from backend.providers import slack_provision
 from backend.providers.base import ProvisionRequest
 from commands import gyrobot
 from commands.extended_context import ExtendedContext
-
-
-
-if 'APPROVAL_DATABASE_URL' not in os.environ:
-    raise ImportError('APPROVAL_DATABASE_URL not found in environment')
 
 from commands.onboarding import crowd,github,jetbrains,team
 

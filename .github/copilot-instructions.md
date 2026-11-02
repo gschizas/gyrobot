@@ -51,8 +51,7 @@ src/
     reddit/            # Reddit moderation commands
     openshift/         # OpenShift/Kubernetes deployment commands
     generic/           # Utility commands (binary, unicode, version, etc.)
-    github/            # GitHub integration (`github teams` — enterprise team tree)
-    onboarding/        # Onboard subcommands (github, crowd, jetbrains) — package, not a single file
+    onboarding/        # Onboard subcommands (github incl. teams/members lookups, crowd, jetbrains) — package, not a single file
   bot_framework/       # Shared utilities — GIT SUBMODULE (../bot_framework.git)
     common.py          # Logging setup, normalize_text
     praw_wrapper.py    # Reddit OAuth wrapper
@@ -436,7 +435,7 @@ Lazy-initialised `requests.Session` configured from `config/github.yml` (GitHub 
 - `add_users_to_ent_team(team_name, usernames)` — assign accepted users to an enterprise team
 - `invite_by_username(username)` / `invite_by_email(email)` — send enterprise invitations (via GraphQL mutation `_run_invite_mutation`)
 
-Used by `commands/github/` (`github teams` — renders the enterprise team hierarchy as a tree), `commands/onboarding/github.py` (validate + invite), and `backend/github_provisioning.py` (poll invitations, auto-assign teams).
+Used by `commands/onboarding/github.py` (`onboard github teams` renders the enterprise team hierarchy as a tree; also validate + invite) and `backend/github_provisioning.py` (poll invitations, auto-assign teams).
 
 ### `backend/github_provisioning.py` — GitHub invitation polling
 
@@ -568,5 +567,5 @@ All runtime config lives outside the repo under mounted volumes:
 | `WEATHER_FONT` | Path to TTF font file used by the ANSI→PNG renderer |
 | `ALT_PROXY` | HTTP proxy for `joke` command |
 | `KUDOS_DATABASE_URL` | PostgreSQL DSN for `kudos` (SQLAlchemy) |
-| `APPROVAL_DATABASE_URL` | PostgreSQL DSN for the approval queue + account/provision storage (SQLAlchemy); enables `onboard`/`offboard`/`approvals` |
+| `APPROVAL_DATABASE_URL` | PostgreSQL DSN for the approval queue + account/provision storage (SQLAlchemy); used at runtime by `onboard`/`offboard`/`approvals` (not a plugin gate for `onboard`) |
 | `APPROVAL_CONFIGURATION` | Path to the approval security YAML (under `config/` or absolute). Selects the active `environment`; per-environment `requesters`/`approvers`, their channels, `notify_channel` live in `.permissions.yml` |

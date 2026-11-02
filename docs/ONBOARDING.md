@@ -1,6 +1,6 @@
 # Onboarding and offboarding
 
-Needs `APPROVAL_DATABASE_URL`. Requests are stored in PostgreSQL (accounts, provisions, approval queue).
+Needs `config/github.yml`. The accounts and approval queue are stored in PostgreSQL (`APPROVAL_DATABASE_URL`), which is not used to gate the plugin.
 
 **Every `onboard`/`offboard` command is gated by the [approval queue](APPROVALS.md).** Issuing one checks that you
 are allowed to request it, validates it, and queues a pending request. Nothing is provisioned until an approver runs
@@ -26,6 +26,9 @@ Core concepts:
 | `onboard github check` | Checks the pending GitHub invitations: users who accepted are assigned to their team, expired invitations are marked. Not gated by approval. It also runs on a schedule. Old name: `onboard github_check`. |
 | `onboard github cancel <login\|email\|invitation_id>` | Withdraws a pending invitation and marks the provision `cancelled`. Old name: `onboard github_cancel`. |
 | `onboard github expired [team_prefix] [-x]` | Invitations that expired unaccepted, with invitation and expiry times (from the database, since GitHub no longer has them). Not gated by approval. |
+| `onboard github teams [team_prefix]` | The enterprise team hierarchy as a tree, optionally only teams whose slug starts with `team_prefix` (their parents are shown too). Read-only, not gated by approval. Needs `config/github.yml`. |
+| `onboard github members <team_slug> [-x]` | Members (login, email, team) of every enterprise team whose slug starts with `team_slug`. A missing GitHub email falls back to the one recorded when the bot onboarded the person. With `-x`, Excel with `team L2`/`team L3` columns. Read-only. |
+| `onboard github pending-invitations [team_prefix] [-x]` | Pending invitations, with email and team when the bot sent them. Read-only. |
 | `onboard jetbrains <email> <team_name>` | Assigns a free IntelliJ IDEA licence to the email. `team_name` is a core team (resolved through the team mapping) or a JetBrains team name, slug or id. Validation checks that the team has a free licence and that the person does not already hold one. |
 | `onboard crowd <username> <team>` | Queues a Crowd entry. The provider is still a stub. |
 | `onboard slack <email> <member_id...>` | Records Slack workspace membership for the email and member ids. The provider is still a stub. |
@@ -42,16 +45,6 @@ Removes everything the account holds and deactivates Slack:
   case is reported as failed.
 
 The command looks the account up by its primary email.
-
-## `github` (read-only)
-
-Needs `config/github.yml`. Not gated by approval.
-
-| Command | Description |
-|---|---|
-| `github teams [team_prefix]` | The enterprise team hierarchy as a tree, optionally only teams whose slug starts with `team_prefix` (their parents are shown too). |
-| `github members <team_slug> [-x]` | Members (login, email, team) of every enterprise team whose slug starts with `team_slug`. A missing GitHub email falls back to the one recorded when the bot onboarded the person. With `-x`, Excel with `team L2`/`team L3` columns. |
-| `github pending-invitations [team_prefix] [-x]` | Pending invitations, with email and team when the bot sent them. |
 
 ## `jetbrains` (read-only)
 
