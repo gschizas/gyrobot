@@ -239,6 +239,30 @@ def merge_provision_data(account_id: UUID, resource: str, extra: dict) -> None:
                         .values(data=ProvisionRow.data.op('||')(type_coerce(extra, JSONB)), updated_at=func.now()))
 
 
+def rename_github_team(old_team: str, new_team: str) -> tuple[int, int]:
+    """Rename a core/GitHub team on every account and GitHub provision that holds it (case-insensitive, ``ent:`` optional).
+
+    Returns ``(accounts, provisions)`` updated. History rows are written for each change.
+    """
+    old = old_team.strip().lower().removeprefix('ent:')
+    names = [old, 'ent:' + old]
+    with _session() as session, session.begin():
+        accounts = session.scalars(select(AccountRow).where(func.lower(AccountRow.team).in_(names))).all()
+        for row in accounts:
+            row.team = new_team
+            row.updated_at = datetime.now(timezone.utc)
+            _record_account_history(session, _to_account(row))
+        provisions = session.scalars(select(ProvisionRow).where(
+            ProvisionRow.resource == 'github',
+            func.lower(ProvisionRow.data['team'].astext).in_(names))).all()
+        for row in provisions:
+            row.data = {**row.data, 'team': new_team}
+            row.updated_at = datetime.now(timezone.utc)
+            session.add(ProvisionHistoryRow(account_id=row.account_id, resource=row.resource,
+                                            previous_status=row.status, status=row.status, data=row.data))
+    return len(accounts), len(provisions)
+
+
 def get_account_provisions(account_id: UUID) -> List[Provision]:
     """Get all provisions for an account (across all resources)."""
     with _session() as session:

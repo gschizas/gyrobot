@@ -1,4 +1,5 @@
 import datetime
+import re
 
 import click
 import requests
@@ -7,7 +8,7 @@ from treelib import Tree
 from backend import bot_identity
 from backend.account_storage import (find_provisions_by_any_username, find_provisions_by_github_id,
                                      find_provisions_by_username, get_last_status_times, get_or_create_account, get_pending_provisions,
-                                     get_provisions, set_provision_status)
+                                     get_provisions, rename_github_team, set_provision_status)
 from backend.accounts import Provision
 from backend.approval import requires_approval
 from backend.arguments import extract_email
@@ -16,6 +17,7 @@ from backend.email_domains import domain_in, is_allowed_email
 from backend.email_logging import send_email
 from backend.github_api import GitHubApi
 from backend.providers import ProvisionRequest, PROVIDERS, RESOURCE_LABELS
+from backend.team_mapping import normalize
 from commands import DefaultCommandGroup
 from commands.extended_context import ExtendedContext
 from commands.team_columns import team_level_columns
@@ -336,6 +338,67 @@ def github_cancel(ctx: ExtendedContext, identifier: str):
         lines.append(f"Database: provision of {provision.data.get('username')} marked as cancelled")
     else:
         lines.append("Database: no matching provision (invitation was not sent by the bot)")
+
+    message = '\n'.join(lines)
+    ctx.chat.send_text(message)
+    return message
+
+
+def _team_move_check(params: dict) -> str | None:
+    params['old_team'] = old = normalize(params['old_team'])
+    params['new_team'] = new = normalize(params['new_team'])
+    if not re.fullmatch(r'[a-z0-9]+(-[a-z0-9]+)*', new):
+        return f"'{new}' is not a valid team name (lowercase letters, digits and dashes)."
+    if old == new:
+        return "The old and new team names are the same."
+    slugs = {t['slug'].removeprefix('ent:').lower() for t in GitHubApi().get_ent_teams()}
+    if new in slugs:
+        # An earlier run may have renamed the team on GitHub and failed afterwards: allow finishing the database part
+        return None if old not in slugs else f"Team {new} already exists."
+    if old not in slugs:
+        return f"Team {old} not found."
+    return None
+
+
+def _team_move_summary(params: dict) -> str:
+    return f"rename GitHub team {params['old_team']} to {params['new_team']} and update the database"
+
+
+@github_group.command('team-move')
+@click.argument('old_team')
+@click.argument('new_team')
+@click.pass_context
+@requires_approval(summarize=_team_move_summary, validate=lambda params, ctx: _team_move_check(params))
+def github_team_move(ctx: ExtendedContext, old_team: str, new_team: str):
+    """Rename a GitHub enterprise team and update the accounts and GitHub provisions that hold it.
+
+    Both names are enterprise team slugs, without "ent:". Child teams (corp-red-alpha-xyz) are not renamed.
+    Other resources' teams (JetBrains, Crowd) are untouched; update config/team_mapping.yml if it names the old team.
+    If the team was already renamed on GitHub but the database update failed, running it again finishes the job.
+
+    USAGE: bot onboard github team-move <old_team> <new_team>
+    """
+    params = {'old_team': old_team, 'new_team': new_team}
+    if error := _team_move_check(params):
+        ctx.chat.send_text(error, is_error=True)
+        return f"Error: {error}"
+    old, new = params['old_team'], params['new_team']
+
+    api = GitHubApi()
+    lines = []
+    if old in {t['slug'].removeprefix('ent:').lower() for t in api.get_ent_teams()}:
+        result = api.rename_ent_team(old, new)
+        actual = result.get('slug', '').removeprefix('ent:')
+        if actual != new:
+            message = f"GitHub renamed the team, but its slug is now '{actual}', not '{new}'. Database not updated."
+            ctx.chat.send_text(message, is_error=True)
+            return f"Error: {message}"
+        lines.append(f"GitHub: team {old} renamed to {new}")
+    else:
+        lines.append(f"GitHub: team {new} already exists, nothing to rename")
+
+    accounts, provisions = rename_github_team(old, new)
+    lines.append(f"Database: {accounts} account(s) and {provisions} GitHub provision(s) updated")
 
     message = '\n'.join(lines)
     ctx.chat.send_text(message)

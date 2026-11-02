@@ -663,6 +663,15 @@ class GitHubApi():
         )
         result.raise_for_status()
 
+    def rename_ent_team(self, team_name: str, new_name: str) -> dict:
+        """Rename an enterprise team (its slug follows the name); raises ``requests.HTTPError`` on failure."""
+        result = self.ses_ent.patch(
+            f"https://api.github.com/enterprises/{self.enterprise}/teams/{self._ent_slug(team_name)}",
+            json={'name': new_name}
+        )
+        result.raise_for_status()
+        return result.json()
+
     def fill_enterprise_id(self) -> None:
         get_enterprise_id_query = """
         query GetEnterpriseId($slug: String!) {
