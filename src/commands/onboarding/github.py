@@ -107,11 +107,13 @@ def github_group():
 
 @github_group.command('teams')
 @click.argument('team_prefix', required=False)
+@click.option('-f', '--flat', is_flag=True, help='List the real teams (slugs) as a flat list, not a tree')
 @click.pass_context
-def github_teams(ctx: ExtendedContext, team_prefix: str | None):
+def github_teams(ctx: ExtendedContext, team_prefix: str | None, flat: bool):
     """Display the GitHub enterprise teams as a tree, optionally only those starting with TEAM_PREFIX.
 
     The parents of matching teams are shown too, to keep the tree readable.
+    With --flat, only the real teams are listed, sorted, one slug per line.
     """
 
     def generate_tree(node_name, parent_node=None):
@@ -132,6 +134,9 @@ def github_teams(ctx: ExtendedContext, team_prefix: str | None):
         if not teams:
             ctx.chat.send_text(f"No teams found starting with {team_prefix}.")
             return
+    if flat:
+        ctx.chat.send_code('\n'.join(sorted((t['slug'] for t in teams), key=str.lower)))
+        return
     connections, root_item, _slug_set = GitHubApi().build_team_connections(teams)
 
     tree = Tree()
