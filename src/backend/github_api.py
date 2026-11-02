@@ -761,8 +761,8 @@ class GitHubApi():
                 logger.debug("No pending GitHub invitations to check")
                 return results
 
-            pending_invitation_usernames = self.get_pending_invitations_usernames()
-            all_user_logins = {user['login'] for user in self.get_ent_members()}
+            pending_invitation_usernames = {u.lower() for u in self.get_pending_invitations_usernames()}
+            all_user_logins = {user['login'].lower() for user in self.get_ent_members()}
 
             logger.info(f"Checking {len(pending)} pending GitHub invitations")
             for provision in pending:
@@ -786,12 +786,12 @@ class GitHubApi():
                         continue
 
                     # Check GitHub invitation status
-                    if username in pending_invitation_usernames:
+                    if username.lower() in pending_invitation_usernames:
                         logger.debug(f"Invitation for {username} is still pending")
                         continue  # Invitation not yet accepted
 
 
-                    if username not in all_user_logins:
+                    if username.lower() not in all_user_logins:
                         created = provision.created_at
                         if created.tzinfo is None:
                             created = created.replace(tzinfo=datetime.timezone.utc)

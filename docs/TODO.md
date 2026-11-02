@@ -21,8 +21,7 @@ accepted/expired are not visible in the web UI or API. Options:
 1. **Repeated notifications on assignment failure**: if `add_users_to_ent_team` fails, the
    provision stays `invited` and every background cycle retries and re-notifies. Record
    `failed_at`/`last_error` in the provision data (or use a `failed` status) and only notify on change.
-2. **Case-sensitive login matching** in `check_github_invitations` (`username in all_user_logins`):
-   compare lowercased on both sides (older provisions may have the wrong casing).
+2. **DONE** Case-insensitive login matching in `check_github_invitations`.
 3. **Approvals-channel notification on failure**: the exception path in `_approve_one`
    (`commands/approvals.py`) should also notify the approvals channel.
 4. **Inconsistent validation errors** in `_github_validate`: user-not-found returns a message, but
