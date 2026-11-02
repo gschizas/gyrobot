@@ -56,7 +56,8 @@ def _github_validate(params: dict, ctx: ExtendedContext) -> str | None:
         github_client = GitHubApi()
 
     username = params['username']
-    team = 'ent:' + params['team'].lower()
+    params['team'] = params['team'].strip().lower().removeprefix('ent:')
+    team = 'ent:' + params['team']
 
     try:
         user = github_client.get_user_details(username)
@@ -135,7 +136,8 @@ def github_teams(ctx: ExtendedContext, team_prefix: str | None, flat: bool):
             ctx.chat.send_text(f"No teams found starting with {team_prefix}.")
             return
     if flat:
-        ctx.chat.send_code('\n'.join(sorted((t['slug'] for t in teams), key=str.lower)))
+        slugs = (t['slug'].removeprefix('ent:') for t in teams)
+        ctx.chat.send_code('\n'.join(sorted(slugs, key=str.lower)))
         return
     connections, root_item, _slug_set = GitHubApi().build_team_connections(teams)
 
