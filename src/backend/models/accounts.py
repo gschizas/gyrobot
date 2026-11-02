@@ -17,6 +17,7 @@ class AccountRow(Base):
     __table_args__ = (
         PrimaryKeyConstraint('id', name='accounts_pkey'),
         UniqueConstraint('primary_email', name='accounts_primary_email_key'),
+        Index('accounts_primary_email_lower_key', text('lower(primary_email)'), unique=True),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
@@ -35,6 +36,8 @@ class ProvisionRow(Base):
         PrimaryKeyConstraint('id', name='account_provisions_pkey'),
         UniqueConstraint('account_id', 'resource', name='account_provisions_account_id_resource_key'),
         Index('idx_account_provisions_resource_status', 'resource', 'status'),
+        Index('account_provisions_github_username_lower_key', text("lower(data->>'username')"), unique=True,
+              postgresql_where=text("resource = 'github'")),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
