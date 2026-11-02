@@ -1,15 +1,15 @@
-"""Mapping of the core team (the GitHub enterprise team slug) to each resource's own team.
+"""Mapping of the canonical team (the GitHub enterprise team slug) to each resource's own team.
 
-``config/team_mapping.yml`` holds one section per resource, each mapping core teams to that resource's team::
+``config/team_mapping.yml`` holds one section per resource, each mapping canonical teams to that resource's team::
 
     jetbrains:
       payments: payments-licences       # applies to payments and everything below it (payments-backend, ...)
     crowd:
       payments-backend: dev-payments
 
-Core teams are dash-separated hierarchies. A lookup tries the team itself, then each parent
+Canonical teams are dash-separated hierarchies. A lookup tries the team itself, then each parent
 (``payments-backend-api`` -> ``payments-backend`` -> ``payments``), so a resource with coarser teams
-needs only one entry. ``github`` needs no entry: the core team is already its team.
+needs only one entry. ``github`` needs no entry: the canonical team is already its team.
 """
 import pathlib
 
@@ -17,7 +17,7 @@ from bot_framework.yaml_wrapper import yaml
 
 MAPPING_FILE = pathlib.Path('config') / 'team_mapping.yml'
 
-# Resources whose team is the core team itself unless the mapping says otherwise
+# Resources whose team is the canonical team itself unless the mapping says otherwise
 IDENTITY_RESOURCES = ('github',)
 
 
@@ -33,16 +33,16 @@ def normalize(team: str) -> str:
 
 
 def mapped_teams(resource: str) -> list[str]:
-    """The resource's own teams that some core team is mapped to (a many-to-one mapping repeats values)."""
+    """The resource's own teams that some canonical team is mapped to (a many-to-one mapping repeats values)."""
     return list(dict.fromkeys(str(v) for v in (_load().get(resource) or {}).values()))
 
 
-def resolve_team(resource: str, core_team: str) -> str | None:
-    """The team of ``resource`` that corresponds to ``core_team``, or None if there is none."""
+def resolve_team(resource: str, canonical_team: str) -> str | None:
+    """The team of ``resource`` that corresponds to ``canonical_team``, or None if there is none."""
     mapping = {normalize(str(k)): str(v) for k, v in (_load().get(resource) or {}).items()}
-    parts = normalize(core_team).split('-')
+    parts = normalize(canonical_team).split('-')
     for length in range(len(parts), 0, -1):
         candidate = '-'.join(parts[:length])
         if candidate in mapping:
             return mapping[candidate]
-    return normalize(core_team) if resource in IDENTITY_RESOURCES else None
+    return normalize(canonical_team) if resource in IDENTITY_RESOURCES else None

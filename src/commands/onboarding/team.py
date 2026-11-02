@@ -43,7 +43,7 @@ def _move_validate(params: dict, ctx: ExtendedContext) -> str | None:
 def onboard_move(ctx: ExtendedContext, email: str, team: str):
     """Move a colleague to another team on every resource they hold.
 
-    TEAM is the core team, i.e. the GitHub enterprise team slug (without "ent:"). Each resource's own team
+    TEAM is the canonical team, i.e. the GitHub enterprise team slug (without "ent:"). Each resource's own team
     is found through config/team_mapping.yml. The account's team is only updated if every resource succeeded;
     after fixing a failure the command can simply be run again.
 

@@ -30,7 +30,7 @@ def _jetbrains_validate(params: dict, ctx: ExtendedContext) -> str | None:
     if existing and existing.status in LIVE_STATUSES:
         return f"{email} already has a JetBrains licence (team: {existing.data.get('team_name', 'unknown')})."
 
-    # The argument is a core team (via config/team_mapping.yml) or else a JetBrains team name/slug/id
+    # The argument is a canonical team (via config/team_mapping.yml) or else a JetBrains team name/slug/id
     requested = params['team_name']
     api = JetBrainsApi()
     mapped = resolve_team('jetbrains', requested)
@@ -57,7 +57,7 @@ def _jetbrains_validate(params: dict, ctx: ExtendedContext) -> str | None:
 def onboard_jetbrains(ctx: ExtendedContext, email: str, team_name: str):
     """Onboard a colleague for JetBrains IntelliJ IDEA.
 
-    TEAM_NAME is a core team (mapped through config/team_mapping.yml) or a JetBrains team name, slug or id.
+    TEAM_NAME is a canonical team (mapped through config/team_mapping.yml) or a JetBrains team name, slug or id.
 
     USAGE: bot onboard jetbrains <email> <team_name>
     """

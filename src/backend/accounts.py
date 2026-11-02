@@ -13,7 +13,7 @@ class Account:
         id: Unique account identifier (UUID)
         name: Account holder's name (optional)
         primary_email: Primary email address (used as key for lookups)
-        team: Core team (the GitHub enterprise team slug, without ``ent:``); each resource maps it to its own team
+        team: Canonical team (the GitHub enterprise team slug, without ``ent:``); each resource maps it to its own team
         created_at: Account creation timestamp
         updated_at: Last update timestamp
         metadata: Additional flexible data (dict)

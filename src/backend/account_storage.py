@@ -240,7 +240,7 @@ def merge_provision_data(account_id: UUID, resource: str, extra: dict) -> None:
 
 
 def rename_github_team(old_team: str, new_team: str) -> tuple[int, int]:
-    """Rename a core/GitHub team on every account and GitHub provision that holds it (case-insensitive, ``ent:`` optional).
+    """Rename a canonical/GitHub team on every account and GitHub provision that holds it (case-insensitive, ``ent:`` optional).
 
     Returns ``(accounts, provisions)`` updated. History rows are written for each change.
     """

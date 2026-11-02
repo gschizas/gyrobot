@@ -30,12 +30,12 @@ Two helpers create the mapping files to fill in by hand (they refuse to overwrit
     --write-email-map FILE   CSV of the outside-domain emails still unmapped: external_email,account_email (blank, to
                              fill in), holder_name, candidates (accounts with the same name, for reference only).
                              Rows with a blank account_email are ignored when the file is passed back through --map.
-    --write-team-map FILE    YAML ``jetbrains:`` section with one placeholder entry per JetBrains team that no core
-                             team maps to yet. Replace each placeholder key with a core team (add more lines for
-                             further core teams of the same JetBrains team) and merge it into
+    --write-team-map FILE    YAML ``jetbrains:`` section with one placeholder entry per JetBrains team that no canonical
+                             team maps to yet. Replace each placeholder key with a canonical team (add more lines for
+                             further canonical teams of the same JetBrains team) and merge it into
                              config/team_mapping.yml.
-    --report-misplaced CSV   Lists holders whose core team maps (via team_mapping.yml, parents included) to a
-                             different JetBrains team than the one they hold a licence in, plus the core teams that
+    --report-misplaced CSV   Lists holders whose canonical team maps (via team_mapping.yml, parents included) to a
+                             different JetBrains team than the one they hold a licence in, plus the canonical teams that
                              have no jetbrains mapping (cannot judge). Also written to a new CSV. Report only.
 """
 import argparse
@@ -74,12 +74,12 @@ def write_email_map(path: str, unmapped: list[tuple[str, str, list[str]]]) -> No
 def write_team_map(path: str, teams: list, hints: dict) -> None:
     try:
         with open(path, 'x', encoding='utf8') as f:
-            f.write("# Replace each FILL-IN key with a core team (it also covers the teams below it), then merge into\n"
-                    "# config/team_mapping.yml. Several core teams may point to the same JetBrains team.\njetbrains:\n")
+            f.write("# Replace each FILL-IN key with a canonical team (it also covers the teams below it), then merge into\n"
+                    "# config/team_mapping.yml. Several canonical teams may point to the same JetBrains team.\njetbrains:\n")
             for team in teams:
-                known = ', '.join(f"{core} ({n})" for core, n in hints.get(team.id, Counter()).most_common())
+                known = ', '.join(f"{canonical} ({n})" for canonical, n in hints.get(team.id, Counter()).most_common())
                 f.write(f"  # {team.name}: id {team.id}, {team.total_licenses} licences, {team.unassigned_licenses} free"
-                        f"{'; core teams of its known holders: ' + known if known else ''}\n")
+                        f"{'; canonical teams of its known holders: ' + known if known else ''}\n")
                 f.write(f"  {json.dumps(f'FILL-IN-{team.id}')}: {json.dumps(team.name)}\n")
     except FileExistsError:
         sys.exit(f"{path} already exists; delete it first so a filled-in file is never overwritten")
@@ -87,21 +87,21 @@ def write_team_map(path: str, teams: list, hints: dict) -> None:
 
 
 def report_misplaced(path: str, misplaced: list, cannot_judge: list) -> None:
-    print(f"\n{len(misplaced)} holder(s) in a JetBrains team other than the one their core team maps to:")
-    for email, core, actual, expected in sorted(misplaced, key=lambda m: (m[2], m[1], m[0])):
-        print(f"  {email:40} core team {core}: holds a licence in {actual}, expected {expected}")
+    print(f"\n{len(misplaced)} holder(s) in a JetBrains team other than the one their canonical team maps to:")
+    for email, canonical, actual, expected in sorted(misplaced, key=lambda m: (m[2], m[1], m[0])):
+        print(f"  {email:40} canonical team {canonical}: holds a licence in {actual}, expected {expected}")
     if cannot_judge:
-        print(f"\n{len(cannot_judge)} holder(s) whose core team has no jetbrains mapping (cannot judge):")
-        for core, count in Counter(c[1] for c in cannot_judge).most_common():
-            print(f"  {core}: {count}")
+        print(f"\n{len(cannot_judge)} holder(s) whose canonical team has no jetbrains mapping (cannot judge):")
+        for canonical, count in Counter(c[1] for c in cannot_judge).most_common():
+            print(f"  {canonical}: {count}")
     try:
         with open(path, 'x', newline='', encoding='utf8') as f:
             writer = csv.writer(f)
-            writer.writerow(['status', 'email', 'core_team', 'jetbrains_team', 'expected_jetbrains_team'])
-            for email, core, actual, expected in misplaced:
-                writer.writerow(['misplaced', email, core, actual, expected])
-            for email, core, actual in cannot_judge:
-                writer.writerow(['cannot_judge', email, core, actual, ''])
+            writer.writerow(['status', 'email', 'canonical_team', 'jetbrains_team', 'expected_jetbrains_team'])
+            for email, canonical, actual, expected in misplaced:
+                writer.writerow(['misplaced', email, canonical, actual, expected])
+            for email, canonical, actual in cannot_judge:
+                writer.writerow(['cannot_judge', email, canonical, actual, ''])
     except FileExistsError:
         sys.exit(f"{path} already exists; delete it first")
     print(f"wrote {len(misplaced) + len(cannot_judge)} row(s) to {path}")
@@ -114,8 +114,8 @@ def main() -> None:
     parser.add_argument('--map', metavar='CSV', help='external_email,account_email pairs for licences held by '
                                                       'emails outside the allowed domains')
     parser.add_argument('--write-email-map', metavar='FILE', help='write the still unmapped outside-domain emails to a new CSV')
-    parser.add_argument('--write-team-map', metavar='FILE', help='write the JetBrains teams no core team maps to, to a new YAML')
-    parser.add_argument('--report-misplaced', metavar='CSV', help='list holders whose core team maps to a different '
+    parser.add_argument('--write-team-map', metavar='FILE', help='write the JetBrains teams no canonical team maps to, to a new YAML')
+    parser.add_argument('--report-misplaced', metavar='CSV', help='list holders whose canonical team maps to a different '
                                                                    'JetBrains team than the one they hold a licence in; also writes a new CSV')
     args = parser.parse_args()
     for target in (args.write_email_map, args.write_team_map, args.report_misplaced):
@@ -145,11 +145,11 @@ def main() -> None:
     counts = {'create': 0, 'complete': 0, 'already': 0, 'not live': 0, 'link': 0, 'external': 0, 'duplicate': 0}
     seen: dict = {}  # account id -> the email whose licence was handled in this run (one provision per account)
     unmapped_users: list[tuple[str, str, list[str]]] = []
-    team_hints: dict = {}  # JetBrains team id -> Counter of the core teams of its known holders
+    team_hints: dict = {}  # JetBrains team id -> Counter of the canonical teams of its known holders
     jetbrains_teams = JetBrainsApi().get_teams()
     team_identifiers = {t.id: {t.name.lower(), str(t.id), t.slug} for t in jetbrains_teams}
-    misplaced: list[tuple[str, str, str, str]] = []  # email, core team, JetBrains team, expected team
-    cannot_judge: list[tuple[str, str, str]] = []  # core team has no jetbrains mapping
+    misplaced: list[tuple[str, str, str, str]] = []  # email, canonical team, JetBrains team, expected team
+    cannot_judge: list[tuple[str, str, str]] = []  # canonical team has no jetbrains mapping
     for email, licenses in sorted(by_email.items()):
         lic = licenses[0]
         holder_name = (lic.get('assignee') or {}).get('name') or ''
@@ -236,7 +236,7 @@ def main() -> None:
     unmapped_teams = [t for t in jetbrains_teams
                       if not mapped_values & {t.name.lower(), str(t.id), t.slug}]
     if unmapped_teams:
-        print(f"\n{len(unmapped_teams)} JetBrains team(s) without a core team in config/team_mapping.yml:")
+        print(f"\n{len(unmapped_teams)} JetBrains team(s) without a canonical team in config/team_mapping.yml:")
         for team in unmapped_teams:
             print(f"  {team.name} (id {team.id}, {team.total_licenses} licences)")
     if args.write_team_map:

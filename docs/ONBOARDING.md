@@ -9,12 +9,12 @@ web UI and REST API, see [WEB-AND-API.md](WEB-AND-API.md).
 
 Core concepts:
 
-- **Account**: one person, identified by their primary email, with a core team (the GitHub enterprise team slug,
+- **Account**: one person, identified by their primary email, with a canonical team (the GitHub enterprise team slug,
   without `ent:`). An account may carry extra addresses (`additional_emails`).
 - **Provision**: one resource held by an account (`github`, `jetbrains`, `crowd`, `slack`) with a status such as
   `invited`, `active`, `assigned`, `expired`, `cancelled` or `deprovisioned`.
-- **Team mapping** (`config/team_mapping.yml`): maps a core team to each resource's own team. A mapping also covers the
-  sub-teams under it, and several core teams may point at one JetBrains team.
+- **Team mapping** (`config/team_mapping.yml`): maps a canonical team to each resource's own team. A mapping also covers the
+  sub-teams under it, and several canonical teams may point at one JetBrains team.
 - **Allowed email domains** (`allowed_email_domains` in `config/github.yml`): the domains accepted for onboarding.
   Comparison ignores case. Empty means no restriction.
 
@@ -29,10 +29,10 @@ Core concepts:
 | `onboard github teams [team_prefix]` | The enterprise team hierarchy as a tree, optionally only teams whose slug starts with `team_prefix` (their parents are shown too). Read-only, not gated by approval. Needs `config/github.yml`. |
 | `onboard github members <team_slug> [-x]` | Members (login, email, team) of every enterprise team whose slug starts with `team_slug`. A missing GitHub email falls back to the one recorded when the bot onboarded the person. With `-x`, Excel with `team L2`/`team L3` columns. Read-only. |
 | `onboard github pending-invitations [team_prefix] [-x]` | Pending invitations, with email and team when the bot sent them. Read-only. |
-| `onboard jetbrains <email> <team_name>` | Assigns a free IntelliJ IDEA licence to the email. `team_name` is a core team (resolved through the team mapping) or a JetBrains team name, slug or id. Validation checks that the team has a free licence and that the person does not already hold one. |
+| `onboard jetbrains <email> <team_name>` | Assigns a free IntelliJ IDEA licence to the email. `team_name` is a canonical team (resolved through the team mapping) or a JetBrains team name, slug or id. Validation checks that the team has a free licence and that the person does not already hold one. |
 | `onboard crowd <username> <team>` | Queues a Crowd entry. The provider is still a stub. |
 | `onboard slack <email> <member_id...>` | Records Slack workspace membership for the email and member ids. The provider is still a stub. |
-| `onboard move <email> <team>` | Moves a person to another core team on every resource they hold, using the team mapping for each resource. The account's team is updated only if every resource succeeded, so a failed move can simply be run again. |
+| `onboard move <email> <team>` | Moves a person to another canonical team on every resource they hold, using the team mapping for each resource. The account's team is updated only if every resource succeeded, so a failed move can simply be run again. |
 
 ## `offboard <email>`
 
@@ -62,6 +62,6 @@ Run from the repository root with `uv run python scripts/<name>.py <env-name>`. 
 
 | Script | Description |
 |---|---|
-| `backfill_jetbrains.py` | Records existing JetBrains licences as `active` provisions. `--apply` writes. `--map CSV` links licences held by outside-domain emails to accounts. `--write-email-map FILE` and `--write-team-map FILE` write blank templates to fill in. `--report-misplaced CSV` lists people whose core team maps to a different JetBrains team than the one they hold. |
+| `backfill_jetbrains.py` | Records existing JetBrains licences as `active` provisions. `--apply` writes. `--map CSV` links licences held by outside-domain emails to accounts. `--write-email-map FILE` and `--write-team-map FILE` write blank templates to fill in. `--report-misplaced CSV` lists people whose canonical team maps to a different JetBrains team than the one they hold. |
 | `backfill_github_ids.py` | Fills in the GitHub user ids of existing GitHub provisions. |
 | `migrate_permissions.py` | Seeds `permission_rules` from the old YAML files (`--to-db`). |
