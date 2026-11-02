@@ -49,9 +49,10 @@ def get_account(account_id: UUID) -> Optional[Account]:
 
 
 def get_account_by_email(email: str) -> Optional[Account]:
-    """Retrieve account by primary email."""
+    """Retrieve account by primary email (case-insensitive; the oldest account wins if several differ only in case)."""
     with _session() as session:
-        row = session.scalars(select(AccountRow).where(AccountRow.primary_email == email)).first()
+        row = session.scalars(select(AccountRow).where(func.lower(AccountRow.primary_email) == email.strip().lower())
+                              .order_by(AccountRow.created_at)).first()
         return _to_account(row) if row else None
 
 
