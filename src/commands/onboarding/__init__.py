@@ -12,10 +12,12 @@ PLUGIN = {'requires_files': ['config/github.yml'], 'dependencies': ['treelib>=1.
 
 import copy
 import datetime
+import json
 
 import click
 
 from backend.account_storage import (
+    find_account_by_any_email, get_account_provisions, get_provision_history,
     get_or_create_account, get_account_by_email, set_provision_status, get_active_provisions
 )
 from backend.accounts import Provision
@@ -128,7 +130,61 @@ def offboard(ctx: ExtendedContext, email: str):
     return '\n'.join(f"{row['Resource']}: {row['Result']}" for row in results)
 
 
+@onboard.command('whois')
+@click.argument('email')
+@click.pass_context
+def onboard_whois(ctx: ExtendedContext, email: str):
+    """Show everything stored about a person: account, every provision and the status history.
+
+    EMAIL is the primary or an additional email address. Read-only, not gated by approval.
+    Aliases: info, show, lookup.
+
+    USAGE: bot onboard whois <email>
+    """
+    email = extract_email(ctx, email) or email.strip()
+    account = find_account_by_any_email(email)
+    if not account:
+        ctx.chat.send_text(f"No account found for {email}", is_error=True)
+        return
+
+    metadata = dict(account.metadata)
+    additional = metadata.pop('additional_emails', [])
+    fields = [
+        {'Field': 'Name', 'Value': account.name or ''},
+        {'Field': 'Primary email', 'Value': account.primary_email or ''},
+        {'Field': 'Additional emails', 'Value': ', '.join(additional)},
+        {'Field': 'Canonical team', 'Value': account.team or ''},
+        {'Field': 'Created', 'Value': f"{account.created_at:%Y-%m-%d %H:%M}"},
+        {'Field': 'Updated', 'Value': f"{account.updated_at:%Y-%m-%d %H:%M}"},
+        {'Field': 'Account id', 'Value': str(account.id)},
+    ]
+    if metadata:
+        fields.append({'Field': 'Other metadata', 'Value': json.dumps(metadata, ensure_ascii=False, default=str)})
+    ctx.chat.send_table(title=f'Account of {email}', table=fields)
+
+    provisions = get_account_provisions(account.id)
+    if provisions:
+        ctx.chat.send_table(title='Provisions', table=[
+            {'Resource': RESOURCE_LABELS.get(p.resource, p.resource), 'Status': p.status,
+             'Created': f"{p.created_at:%Y-%m-%d %H:%M}", 'Updated': f"{p.updated_at:%Y-%m-%d %H:%M}",
+             'Data': json.dumps(p.data, ensure_ascii=False, default=str), 'Provision id': str(p.id)}
+            for p in provisions])
+    else:
+        ctx.chat.send_text("No provisions.")
+
+    history = get_provision_history(account.id)
+    if history:
+        ctx.chat.send_table(title='Status history', table=[
+            {'When': f"{h['recorded_at']:%Y-%m-%d %H:%M}", 'Resource': RESOURCE_LABELS.get(h['resource'], h['resource']),
+             'From': h['previous_status'] or '', 'To': h['status']}
+            for h in history])
+
+
 onboard.add_command(github.github_group)
+for _alias_name in ('info', 'show', 'lookup'):
+    _alias = copy.copy(onboard_whois)
+    _alias.hidden = True
+    onboard.add_command(_alias, _alias_name)
 # Old top-level names, kept (hidden) for existing habits and scripts
 for _old_name, _command in (('github_check', github.github_check), ('github_cancel', github.github_cancel)):
     _alias = copy.copy(_command)
