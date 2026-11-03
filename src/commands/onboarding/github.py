@@ -6,7 +6,8 @@ import requests
 from treelib import Tree
 
 from backend import bot_identity
-from backend.account_storage import (find_provisions_by_any_username, find_provisions_by_github_id,
+from backend.account_storage import (find_provisions_by_any_username, find_provisions_by_github_id, get_account_by_email,
+                                     get_provision, LIVE_STATUSES,
                                      find_provisions_by_username, get_last_status_times, get_or_create_account, get_pending_provisions,
                                      get_provisions, rename_github_team, set_provision_status)
 from backend.accounts import Provision
@@ -340,6 +341,77 @@ def github_cancel(ctx: ExtendedContext, identifier: str):
         lines.append("Database: no matching provision (invitation was not sent by the bot)")
 
     message = '\n'.join(lines)
+    ctx.chat.send_text(message)
+    return message
+
+
+ANY_STATUS = LIVE_STATUSES + ('expired', 'cancelled', 'deprovisioned', 'failed')
+
+
+def _set_email_summary(params: dict) -> str:
+    return f"record the email {params['email']} for existing GitHub user {params['username']}"
+
+
+def _set_email_validate(params: dict, ctx: ExtendedContext) -> str | None:
+    global github_client
+    if github_client is None:
+        github_client = GitHubApi()
+
+    email = extract_email(ctx, params['email'])
+    if not email:
+        return f"'{params['email']}' is not a valid email address."
+    params['email'] = email
+    if not is_allowed_email(email, github_client.allowed_email_domains):
+        return f"Invalid Email Domain {email.split('@')[1]}."
+
+    try:
+        user = github_client.get_user_details(params['username'])
+    except requests.exceptions.HTTPError as r:
+        return f"User {params['username']} not found.\n" + r.args[0]
+    params['username'] = user.get('login', params['username'])
+
+    if existing := find_provisions_by_username('github', [params['username']], statuses=ANY_STATUS):
+        return (f"{params['username']} already has a GitHub provision (status: {existing[0].status}, "
+                f"email: {existing[0].data.get('email', 'unknown')}).")
+    if (account := get_account_by_email(email)) and get_provision(account.id, 'github'):
+        return f"{email} already belongs to an account with a GitHub provision."
+    return None
+
+
+@github_group.command('set-email')
+@click.argument('username')
+@click.argument('email')
+@click.pass_context
+@requires_approval(summarize=_set_email_summary, validate=_set_email_validate)
+def github_set_email(ctx: ExtendedContext, username: str, email: str):
+    """Record the email of a GitHub user who is already a member but unknown to the bot.
+
+    Creates (or reuses) the account for EMAIL and an active GitHub provision for USERNAME, the way the
+    import script does. The team is recorded only if the user is in exactly one enterprise team.
+    The users that need this are the blanks of "onboard github members"; the web UI lists them too.
+
+    USAGE: bot onboard github set-email <username> <email>
+    """
+    api = GitHubApi()
+    data = {'username': username, 'email': email, 'recorded_by': ctx.chat.user_id,
+            'recorded_at': datetime.datetime.now(tz=datetime.timezone.utc).isoformat()}
+    try:
+        data['github_id'] = api.get_user_details(username)['id']
+    except Exception as e:
+        ctx.logger.warning(f"Could not look up GitHub id of {username}: {e}")
+
+    team = None
+    try:
+        teams = api.get_ent_team_logins().get(username.lower(), [])
+        if len(teams) == 1:
+            team = data['team'] = teams[0]
+    except Exception as e:
+        ctx.logger.warning(f"Could not look up the teams of {username}: {e}")
+
+    account = get_or_create_account(primary_email=email, name=username, team=team)
+    set_provision_status(account.id, 'github', 'active', data)
+
+    message = f"Recorded {email} for {username}" + (f" (team {team})" if team else " (no single team, left empty)")
     ctx.chat.send_text(message)
     return message
 

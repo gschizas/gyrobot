@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block title %}Fill in missing emails - Result{% endblock %}
+{% block content %}
+<h1>Missing emails</h1>
+<p>{{ rows|length }} request(s) submitted.</p>
+
+{% for row in rows %}
+<div class="bulk-row">
+    <h2>{{ row.username }}</h2>
+    <p>Email: {{ row.email }}</p>
+    {{ macros.render_command_result(row.result) }}
+</div>
+{% endfor %}
+
+<p>
+    <a href="{{ request.url_for('missing_emails_form') }}">&larr; Back to the list</a> |
+    <a href="{{ request.url_for('dashboard') }}">Back to onboarding</a>
+</p>
+{% endblock %}

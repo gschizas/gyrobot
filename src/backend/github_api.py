@@ -8,7 +8,7 @@ import jwt
 import requests
 
 from backend import email_domains
-from backend.account_storage import get_pending_provisions, get_account, set_provision_status
+from backend.account_storage import find_provisions_by_username, get_pending_provisions, get_account, set_provision_status
 from backend.notifications import notify
 from bot_framework.yaml_wrapper import yaml
 
@@ -578,6 +578,22 @@ class GitHubApi():
         for row in rows:
             row["emails"] = emails.get(row["login"].lower(), [])
         return rows
+
+    def get_members_without_email(self) -> list[dict]:
+        """Enterprise members with no verified email on GitHub and none recorded in the database.
+
+        Returns ``[{"login", "teams"}]`` sorted by login; these are the blanks of ``onboard github members``.
+        """
+        teams_by_login: dict[str, dict] = {}
+        for row in self.get_ent_team_members_by_prefix(""):
+            entry = teams_by_login.setdefault(row["login"].lower(), {"login": row["login"], "teams": [], "emails": []})
+            entry["teams"].append(row["team"])
+            entry["emails"].extend(row["emails"])
+        candidates = [e for e in teams_by_login.values() if not e["emails"]]
+        recorded = {p.data["username"].lower() for p in find_provisions_by_username("github", [e["login"] for e in candidates])
+                    if p.data.get("email") and p.data.get("username")}
+        return sorted(({"login": e["login"], "teams": sorted(e["teams"])} for e in candidates
+                       if e["login"].lower() not in recorded), key=lambda e: e["login"].lower())
 
     def get_ent_team_logins(self, ses: requests.Session | None = None) -> dict[str, list[str]]:
         """Map lowercased login -> enterprise team slugs (without the ``ent:`` prefix), via GraphQL."""

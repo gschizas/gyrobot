@@ -383,6 +383,8 @@ def onboard_crowd(ctx, username, team):
 | `onboard github check` | Manually reconcile pending GitHub invitations: auto-assigns accepted users to their team (also the target of a scheduled/manual re-check, not gated by approval); hidden alias `onboard github_check` |
 | `onboard github cancel <login\|email\|invitation_id>` | Queue withdrawal of a pending GitHub invitation (approval-gated); hidden alias `onboard github_cancel` |
 | `onboard github expired [team_prefix] [-x]` | List invitations that expired unaccepted (read from the database, since GitHub no longer has them); not gated by approval |
+| `onboard github set-email <username> <email>` | Record the email of a GitHub member unknown to the bot (account + `active` provision); approval-gated; also driven by the web UI page `/onboarding/github/missing-emails` |
+| `onboard whois <email>` | Show everything stored about a person (account, provisions, history); aliases `info`, `show`, `lookup`; not gated by approval |
 | `onboard crowd <username> <team>` | Queue a Crowd entry |
 | `onboard jetbrains <email> <team_name>` | Queue a JetBrains IntelliJ IDEA licence; `team_name` is a canonical team (mapped via `config/team_mapping.yml`) or a JetBrains team name/slug/id; validation checks the team has a free licence |
 | `jetbrains teams` / `jetbrains members [team] [-x]` | List JetBrains teams / the licences (assigned and free, with a status column) of a team or of all teams; JetBrains has no invitations |

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Fill in missing emails - GyroBot Onboarding{% endblock %}
+{% block content %}
+<h1>GitHub members without an email</h1>
+<p>These GitHub enterprise members have no verified email on GitHub and none recorded in the database.
+Fill in the email of each person you know; rows left blank are skipped. Every email is queued for approval as a
+separate request, exactly like <code>onboard github set-email</code> in chat.</p>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+{% if members %}
+<form method="post" action="{{ request.url_for('missing_emails_submit') }}">
+<table>
+    <thead>
+        <tr><th>GitHub username</th><th>Team(s)</th><th>Email address</th></tr>
+    </thead>
+    <tbody>
+        {% for member in members %}
+        <tr>
+            <td>{{ member.login }}<input type="hidden" name="username" value="{{ member.login }}"></td>
+            <td>{{ member.teams|join(', ') }}</td>
+            <td><input type="text" name="email" placeholder="{{ email_placeholder }}"></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<button type="submit">Submit all</button>
+</form>
+{% elif not error %}
+<p>Every member has an email.</p>
+{% endif %}
+<p><a href="{{ request.url_for('dashboard') }}">&larr; Back to onboarding</a></p>
+{% endblock %}

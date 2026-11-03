@@ -297,6 +297,40 @@ async def github_bulk_submit(request: Request):
     return templates.TemplateResponse(request, 'bulk_result.html', {'user': user, 'rows': rows})
 
 
+@router.get('/onboarding/github/missing-emails', include_in_schema=False)
+def missing_emails_form(request: Request):
+    if redirect := _require_login(request):
+        return redirect
+    try:
+        members, error = GitHubApi().get_members_without_email(), None
+    except Exception as ex:
+        logger.warning(f"Failed to list GitHub members without an email: {ex!r}")
+        members, error = [], f"Could not load the GitHub members ({ex})."
+    return templates.TemplateResponse(request, 'missing_emails.html', {
+        'user': _current_user(request), 'members': members, 'error': error,
+        'email_placeholder': _github_email_placeholder()})
+
+
+@router.post('/onboarding/github/missing-emails', include_in_schema=False)
+async def missing_emails_submit(request: Request):
+    if redirect := _require_login(request):
+        return redirect
+
+    form_data = await request.form()
+    user = _current_user(request)
+    rows = []
+    for username, email in zip(form_data.getlist('username'), form_data.getlist('email')):
+        username, email = username.strip(), email.strip()
+        if not (username and email):
+            continue  # nothing filled in for this user
+        result = run_bot_command(
+            ['onboard', 'github', 'set-email', username, email], user_id=user,
+            channel_name=config.web_channel_name(), team_name=config.web_team_name())
+        rows.append({'username': username, 'email': email, 'result': result})
+
+    return templates.TemplateResponse(request, 'missing_emails_result.html', {'user': user, 'rows': rows})
+
+
 @router.get('/onboarding/move/bulk', include_in_schema=False)
 def move_bulk_form(request: Request):
     if redirect := _require_login(request):
