@@ -11,6 +11,8 @@ import json
 import logging
 import pathlib
 import re
+import threading
+import time
 from typing import Optional
 
 import requests
@@ -297,18 +299,63 @@ async def github_bulk_submit(request: Request):
     return templates.TemplateResponse(request, 'bulk_result.html', {'user': user, 'rows': rows})
 
 
-@router.get('/onboarding/github/missing-emails', include_in_schema=False)
-def missing_emails_form(request: Request):
-    if redirect := _require_login(request):
-        return redirect
+MISSING_EMAILS_PAGE_SIZE = 20
+MISSING_EMAILS_TTL = 30 * 60  # seconds a finished scan stays cached
+# One scan shared by all users; state is per process, so this assumes a single uvicorn worker.
+_missing_job: dict = {}
+_missing_lock = threading.Lock()
+
+
+def _run_missing_job(job: dict):
+    def progress(message, done, total):
+        job.update(message=message, done=done, total=total)
+
     try:
-        members, error = GitHubApi().get_members_without_email(), None
+        job['members'] = GitHubApi().get_members_without_email(progress)
+        job['status'] = 'done'
     except Exception as ex:
         logger.warning(f"Failed to list GitHub members without an email: {ex!r}")
-        members, error = [], f"Could not load the GitHub members ({ex})."
-    return templates.TemplateResponse(request, 'missing_emails.html', {
-        'user': _current_user(request), 'members': members, 'error': error,
-        'email_placeholder': _github_email_placeholder()})
+        job.update(status='error', error=f"Could not load the GitHub members ({ex}).")
+    job['finished'] = time.time()
+
+
+def _missing_job_get(restart: bool = False) -> dict:
+    """The current scan, starting a new one if there is none, it is stale, or ``restart`` is set."""
+    global _missing_job
+    with _missing_lock:
+        job = _missing_job
+        stale = job.get('status') != 'running' and time.time() - job.get('finished', 0) > MISSING_EMAILS_TTL
+        if not job or stale or (restart and job.get('status') != 'running'):
+            job = _missing_job = {'status': 'running', 'message': 'Starting', 'done': 0, 'total': 0,
+                                  'members': [], 'error': None}
+            threading.Thread(target=_run_missing_job, args=(job,), daemon=True).start()
+        return job
+
+
+@router.get('/onboarding/github/missing-emails/status', include_in_schema=False)
+def missing_emails_status(request: Request):
+    if not _current_user(request):
+        return JSONResponse({'status': 'unauthorized'}, status_code=status.HTTP_401_UNAUTHORIZED)
+    job = _missing_job_get()
+    return {k: job.get(k) for k in ('status', 'message', 'done', 'total', 'error')}
+
+
+@router.get('/onboarding/github/missing-emails', include_in_schema=False)
+def missing_emails_form(request: Request, page: int = 1, refresh: bool = False):
+    if redirect := _require_login(request):
+        return redirect
+    job = _missing_job_get(restart=refresh)
+    context = {'user': _current_user(request), 'job': job, 'error': job.get('error'),
+               'email_placeholder': _github_email_placeholder(), 'members': [], 'page': 1, 'pages': 1,
+               'total_members': 0}
+    if job['status'] == 'done':
+        members = job['members']
+        pages = max(1, -(-len(members) // MISSING_EMAILS_PAGE_SIZE))
+        page = min(max(page, 1), pages)
+        start = (page - 1) * MISSING_EMAILS_PAGE_SIZE
+        context.update(members=members[start:start + MISSING_EMAILS_PAGE_SIZE], page=page, pages=pages,
+                       total_members=len(members))
+    return templates.TemplateResponse(request, 'missing_emails.html', context)
 
 
 @router.post('/onboarding/github/missing-emails', include_in_schema=False)
@@ -327,6 +374,11 @@ async def missing_emails_submit(request: Request):
             ['onboard', 'github', 'set-email', username, email], user_id=user,
             channel_name=config.web_channel_name(), team_name=config.web_team_name())
         rows.append({'username': username, 'email': email, 'result': result})
+
+    submitted = {r['username'].lower() for r in rows}
+    with _missing_lock:
+        if _missing_job.get('status') == 'done':
+            _missing_job['members'] = [m for m in _missing_job['members'] if m['login'].lower() not in submitted]
 
     return templates.TemplateResponse(request, 'missing_emails_result.html', {'user': user, 'rows': rows})
 

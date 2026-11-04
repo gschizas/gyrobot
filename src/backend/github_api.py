@@ -501,8 +501,12 @@ class GitHubApi():
             raise RuntimeError(f"GraphQL errors: {data['errors']}")
         return data["data"]
 
-    def get_verified_emails(self, logins: list[str], ses: requests.Session | None = None) -> dict[str, list[str]]:
-        """Map lowercased login -> verified-domain emails (across all organizations) for just the given users."""
+    def get_verified_emails(self, logins: list[str], ses: requests.Session | None = None,
+                            progress=None) -> dict[str, list[str]]:
+        """Map lowercased login -> verified-domain emails (across all organizations) for just the given users.
+
+        ``progress(message, done, total)``, if given, is called after each batch of users.
+        """
         ses = ses or self.ses_usr
         org_logins = self.get_org_logins(ses)
         emails: dict[str, list[str]] = {}
@@ -519,17 +523,28 @@ class GitHubApi():
             for i, login in enumerate(batch):
                 user = data.get(f"u{i}") or {}
                 emails[login.lower()] = self.extract_verified_emails(user, len(org_logins))
+            if progress:
+                progress("Reading the verified emails of the members", min(start + batch_size, len(logins)), len(logins))
         return emails
 
-    def get_ent_team_members_by_prefix(self, prefix: str, ses: requests.Session | None = None) -> list[dict]:
+    def get_ent_team_members_by_prefix(self, prefix: str, ses: requests.Session | None = None,
+                                       progress=None) -> list[dict]:
         """Members of every enterprise team whose slug starts with ``prefix`` (case-insensitive, ``ent:`` optional).
 
         Returns ``[{"login", "team", "emails"}]`` with one entry per user per matching team.
         Only the matching teams' members, and only those members' emails, are fetched.
+        ``progress(message, done, total)``, if given, reports the team and email phases.
         """
         ses = ses or self.ses_usr
-        prefix = prefix.lower().removeprefix("ent:")
+        rows = self._ent_team_member_rows(prefix, ses, progress)
+        emails = self.get_verified_emails(sorted({r["login"] for r in rows}), ses, progress)
+        for row in rows:
+            row["emails"] = emails.get(row["login"].lower(), [])
+        return rows
 
+    def _ent_team_member_rows(self, prefix: str, ses: requests.Session, progress=None) -> list[dict]:
+        """``[{"login", "team"}]``, one per user per enterprise team whose slug starts with ``prefix``."""
+        prefix = prefix.lower().removeprefix("ent:")
         teams_query = """
         query($slug: String!, $cursor: String) {
           enterprise(slug: $slug) {
@@ -553,6 +568,8 @@ class GitHubApi():
         }
         """
 
+        if progress:
+            progress("Listing the enterprise teams", 0, 0)
         matching, cursor = [], None
         while True:
             teams = self._graphql(ses, teams_query, {"slug": self.enterprise, "cursor": cursor}
@@ -563,7 +580,9 @@ class GitHubApi():
             cursor = teams["pageInfo"]["endCursor"]
 
         rows = []
-        for slug in sorted(matching):
+        for done, slug in enumerate(sorted(matching)):
+            if progress:
+                progress("Reading the members of each team", done, len(matching))
             cursor = None
             while True:
                 members = self._graphql(ses, members_query, {"slug": self.enterprise, "team": slug, "cursor": cursor}
@@ -573,27 +592,27 @@ class GitHubApi():
                 if not members["pageInfo"]["hasNextPage"]:
                     break
                 cursor = members["pageInfo"]["endCursor"]
-
-        emails = self.get_verified_emails(sorted({r["login"] for r in rows}), ses)
-        for row in rows:
-            row["emails"] = emails.get(row["login"].lower(), [])
         return rows
-
-    def get_members_without_email(self) -> list[dict]:
+    def get_members_without_email(self, progress=None) -> list[dict]:
         """Enterprise members with no verified email on GitHub and none recorded in the database.
 
         Returns ``[{"login", "teams"}]`` sorted by login; these are the blanks of ``onboard github members``.
+        Users whose email the database already has are not looked up on GitHub, which saves most of the work.
+        ``progress(message, done, total)``, if given, is called while the data is read.
         """
+        ses = self.ses_usr
         teams_by_login: dict[str, dict] = {}
-        for row in self.get_ent_team_members_by_prefix(""):
-            entry = teams_by_login.setdefault(row["login"].lower(), {"login": row["login"], "teams": [], "emails": []})
+        for row in self._ent_team_member_rows("", ses, progress):
+            entry = teams_by_login.setdefault(row["login"].lower(), {"login": row["login"], "teams": []})
             entry["teams"].append(row["team"])
-            entry["emails"].extend(row["emails"])
-        candidates = [e for e in teams_by_login.values() if not e["emails"]]
-        recorded = {p.data["username"].lower() for p in find_provisions_by_username("github", [e["login"] for e in candidates])
+
+        recorded = {p.data["username"].lower() for p in find_provisions_by_username(
+                        "github", [e["login"] for e in teams_by_login.values()])
                     if p.data.get("email") and p.data.get("username")}
+        candidates = [e for key, e in teams_by_login.items() if key not in recorded]
+        emails = self.get_verified_emails([e["login"] for e in candidates], ses, progress)
         return sorted(({"login": e["login"], "teams": sorted(e["teams"])} for e in candidates
-                       if e["login"].lower() not in recorded), key=lambda e: e["login"].lower())
+                       if not emails.get(e["login"].lower())), key=lambda e: e["login"].lower())
 
     def get_ent_team_logins(self, ses: requests.Session | None = None) -> dict[str, list[str]]:
         """Map lowercased login -> enterprise team slugs (without the ``ent:`` prefix), via GraphQL."""

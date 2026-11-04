@@ -6,6 +6,26 @@
 Fill in the email of each person you know; rows left blank are skipped. Every email is queued for approval as a
 separate request, exactly like <code>onboard github set-email</code> in chat.</p>
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
+{% if job.status == 'running' %}
+<p id="progress">Loading&hellip; <span id="msg">{{ job.message }}</span></p>
+<script>
+async function poll() {
+    try {
+        const r = await fetch("{{ request.url_for('missing_emails_status') }}");
+        if (r.status === 401) { location.reload(); return; }
+        const s = await r.json();
+        if (s.status !== 'running') { location.reload(); return; }
+        document.getElementById('msg').textContent =
+            s.message + (s.total ? ' (' + s.done + ' of ' + s.total + ')' : '');
+    } catch (e) {}
+    setTimeout(poll, 2000);
+}
+poll();
+</script>
+{% elif job.status == 'done' %}
+<p>{{ total_members }} member(s) without an email.
+<a href="{{ request.url_for('missing_emails_form') }}?refresh=true">Refresh from GitHub</a></p>
+{% endif %}
 {% if members %}
 <form method="post" action="{{ request.url_for('missing_emails_submit') }}">
 <table>
@@ -24,7 +44,13 @@ separate request, exactly like <code>onboard github set-email</code> in chat.</p
 </table>
 <button type="submit">Submit all</button>
 </form>
-{% elif not error %}
+{% if pages > 1 %}
+<p>Page {{ page }} of {{ pages }}:
+{% if page > 1 %}<a href="?page={{ page - 1 }}">&larr; Previous</a>{% endif %}
+{% if page < pages %}<a href="?page={{ page + 1 }}">Next &rarr;</a>{% endif %}
+(fill in and submit each page separately)</p>
+{% endif %}
+{% elif job.status == 'done' %}
 <p>Every member has an email.</p>
 {% endif %}
 <p><a href="{{ request.url_for('dashboard') }}">&larr; Back to onboarding</a></p>
