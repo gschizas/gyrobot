@@ -27,10 +27,19 @@ poll();
 <a href="{{ request.url_for('missing_emails_form') }}?refresh=true">Refresh from GitHub</a></p>
 {% endif %}
 {% if members %}
+<p>
+    <input type="search" id="filter" placeholder="Filter by username or team" size="30">
+    <span id="count"></span>
+    <span id="filled"></span>
+</p>
 <form method="post" action="{{ request.url_for('missing_emails_submit') }}">
-<table>
+<table id="members">
     <thead>
-        <tr><th>GitHub username</th><th>Team(s)</th><th>Email address</th></tr>
+        <tr>
+            <th><a href="#" data-sort="0">GitHub username</a></th>
+            <th><a href="#" data-sort="1">Team(s)</a></th>
+            <th><a href="#" data-sort="2">Email address</a></th>
+        </tr>
     </thead>
     <tbody>
         {% for member in members %}
@@ -42,14 +51,66 @@ poll();
         {% endfor %}
     </tbody>
 </table>
-<button type="submit">Submit all</button>
+<p>
+    <button type="button" id="prev">&larr; Previous</button>
+    <span id="pageinfo"></span>
+    <button type="button" id="next">Next &rarr;</button>
+</p>
+<button type="submit">Submit all filled-in rows</button>
 </form>
-{% if pages > 1 %}
-<p>Page {{ page }} of {{ pages }}:
-{% if page > 1 %}<a href="?page={{ page - 1 }}">&larr; Previous</a>{% endif %}
-{% if page < pages %}<a href="?page={{ page + 1 }}">Next &rarr;</a>{% endif %}
-(fill in and submit each page separately)</p>
-{% endif %}
+<script>
+(function () {
+    const PAGE = 20;
+    const body = document.querySelector('#members tbody');
+    const rows = Array.from(body.rows);
+    const filter = document.getElementById('filter');
+    let page = 1, sortCol = 0, sortDir = 1;
+
+    const text = (row, col) => {
+        const cell = row.cells[col];
+        const input = cell.querySelector('input[name=email]');
+        return (input ? input.value : cell.textContent).trim().toLowerCase();
+    };
+    const filled = () => rows.filter(r => r.querySelector('input[name=email]').value.trim()).length;
+
+    function render() {
+        const q = filter.value.trim().toLowerCase();
+        const shown = rows.filter(r => !q || text(r, 0).includes(q) || text(r, 1).includes(q));
+        shown.sort((a, b) => {
+            const x = text(a, sortCol), y = text(b, sortCol);
+            // empty emails sort last when ascending, so filled-in rows group together
+            return (x < y ? -1 : x > y ? 1 : 0) * sortDir;
+        });
+        const pages = Math.max(1, Math.ceil(shown.length / PAGE));
+        page = Math.min(page, pages);
+        rows.forEach(r => r.style.display = 'none');
+        shown.slice((page - 1) * PAGE, page * PAGE).forEach(r => { r.style.display = ''; body.appendChild(r); });
+        document.getElementById('count').textContent = shown.length + ' of ' + rows.length + ' shown';
+        document.getElementById('filled').textContent = filled() + ' filled in';
+        document.getElementById('pageinfo').textContent = 'Page ' + page + ' of ' + pages;
+        document.getElementById('prev').disabled = page <= 1;
+        document.getElementById('next').disabled = page >= pages;
+    }
+
+    filter.addEventListener('input', () => { page = 1; render(); });
+    document.getElementById('prev').addEventListener('click', () => { page--; render(); });
+    document.getElementById('next').addEventListener('click', () => { page++; render(); });
+    body.addEventListener('input', () => {
+        document.getElementById('filled').textContent = filled() + ' filled in';
+    });
+    document.querySelectorAll('[data-sort]').forEach(a => a.addEventListener('click', e => {
+        e.preventDefault();
+        const col = Number(a.dataset.sort);
+        sortDir = col === sortCol ? -sortDir : 1;
+        sortCol = col;
+        page = 1;
+        render();
+    }));
+    // Enter in a field must not submit the whole form by accident
+    body.addEventListener('keydown', e => { if (e.key === 'Enter') e.preventDefault(); });
+    render();
+})();
+</script>
 {% elif job.status == 'done' %}
 <p>Every member has an email.</p>
 {% endif %}

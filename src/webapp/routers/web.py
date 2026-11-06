@@ -299,7 +299,6 @@ async def github_bulk_submit(request: Request):
     return templates.TemplateResponse(request, 'bulk_result.html', {'user': user, 'rows': rows})
 
 
-MISSING_EMAILS_PAGE_SIZE = 20
 MISSING_EMAILS_TTL = 30 * 60  # seconds a finished scan stays cached
 # One scan shared by all users; state is per process, so this assumes a single uvicorn worker.
 _missing_job: dict = {}
@@ -341,20 +340,15 @@ def missing_emails_status(request: Request):
 
 
 @router.get('/onboarding/github/missing-emails', include_in_schema=False)
-def missing_emails_form(request: Request, page: int = 1, refresh: bool = False):
+def missing_emails_form(request: Request, refresh: bool = False):
     if redirect := _require_login(request):
         return redirect
     job = _missing_job_get(restart=refresh)
     context = {'user': _current_user(request), 'job': job, 'error': job.get('error'),
-               'email_placeholder': _github_email_placeholder(), 'members': [], 'page': 1, 'pages': 1,
-               'total_members': 0}
+               'email_placeholder': _github_email_placeholder(), 'members': [], 'total_members': 0}
     if job['status'] == 'done':
-        members = job['members']
-        pages = max(1, -(-len(members) // MISSING_EMAILS_PAGE_SIZE))
-        page = min(max(page, 1), pages)
-        start = (page - 1) * MISSING_EMAILS_PAGE_SIZE
-        context.update(members=members[start:start + MISSING_EMAILS_PAGE_SIZE], page=page, pages=pages,
-                       total_members=len(members))
+        # All rows go to the page; filtering, sorting and paging happen in the browser so one submit covers them all
+        context.update(members=job['members'], total_members=len(job['members']))
     return templates.TemplateResponse(request, 'missing_emails.html', context)
 
 
