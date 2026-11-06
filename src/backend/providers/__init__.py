@@ -8,7 +8,7 @@ implementations here are stubs that log the intended action and return a message
 the real API integrations belong where the ``# TODO`` markers are.
 """
 from backend.providers.base import ProvisionRequest
-from backend.providers import crowd, github_copilot, jetbrains, slack_provision
+from backend.providers import azdo, crowd, github_copilot, jetbrains, slack_provision
 
 # Resource key -> provider module (must expose provision/deprovision).
 PROVIDERS = {
@@ -16,6 +16,7 @@ PROVIDERS = {
     'jetbrains': jetbrains,
     'crowd': crowd,
     'slack': slack_provision,
+    'azdo': azdo,
 }
 
 # Human-readable labels for each resource key.
@@ -24,6 +25,7 @@ RESOURCE_LABELS = {
     'jetbrains': 'JetBrains IntelliJ IDEA licence',
     'crowd': 'Crowd entry',
     'slack': 'Slack membership',
+    'azdo': 'Azure DevOps access',
 }
 
 __all__ = ['ProvisionRequest', 'PROVIDERS', 'RESOURCE_LABELS', 'slack_provision']

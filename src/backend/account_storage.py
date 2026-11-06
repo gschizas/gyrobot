@@ -73,6 +73,12 @@ def find_accounts_by_name(name: str) -> List[Account]:
         return [_to_account(row) for row in rows]
 
 
+def get_all_accounts() -> List[Account]:
+    """Every account, oldest first."""
+    with _session() as session:
+        return [_to_account(row) for row in session.scalars(select(AccountRow).order_by(AccountRow.created_at))]
+
+
 def add_additional_email(account_id: UUID, email: str) -> Optional[Account]:
     """Record ``email`` as another address of the account (``metadata['additional_emails']``)."""
     account = get_account(account_id)
