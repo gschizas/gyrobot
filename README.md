@@ -30,7 +30,7 @@ bot help <command>            # same as: bot <command> --help
 | Reddit moderation | `modqueue`, `usernotes`, `nuke`, `archive`, `history`, `comment_source`, `deleted_comment_source`, `configure_enhanced_crowd_control`, `add_domain_tag`, `add_policy`, `youtube_post_info`, `unicode_post`, `make` | [docs/REDDIT.md](docs/REDDIT.md) |
 | OpenShift / Kubernetes | `deployment`, `cronjob`, `scaledown`, `actuator`, `mock`, `deploy` | [docs/OPENSHIFT.md](docs/OPENSHIFT.md) |
 | Onboarding | `onboard github/jetbrains/crowd/slack/move`, `offboard`, `github`, `jetbrains` | [docs/ONBOARDING.md](docs/ONBOARDING.md) |
-| Azure DevOps reporting | `azdo report/users/whois/link` (aliases `devops`, `azuredevops`) | [docs/AZURE_DEVOPS.md](docs/AZURE_DEVOPS.md) |
+| Azure DevOps reporting | `onboard azdo report/users/whois/link` (aliases `onboard devops`, `onboard azuredevops`) | [docs/AZURE_DEVOPS.md](docs/AZURE_DEVOPS.md) |
 | Approval queue | `approvals list/show/approve/reject` | [docs/APPROVALS.md](docs/APPROVALS.md) |
 | Permissions | `permissions reload/show` | [docs/PERMISSIONS.md](docs/PERMISSIONS.md) |
 | Web UI and REST API | onboarding forms, permission rule management, `/api/...` endpoints | [docs/WEB-AND-API.md](docs/WEB-AND-API.md) |

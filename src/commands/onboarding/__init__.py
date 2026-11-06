@@ -13,6 +13,7 @@ PLUGIN = {'requires_files': ['config/github.yml'], 'dependencies': ['treelib>=1.
 import copy
 import datetime
 import json
+import pathlib
 
 import click
 
@@ -190,6 +191,14 @@ for _old_name, _command in (('github_check', github.github_check), ('github_canc
     _alias = copy.copy(_command)
     _alias.hidden = True
     onboard.add_command(_alias, _old_name)
+if pathlib.Path('config/azdo.yml').exists():
+    from commands.onboarding import azdo
+    onboard.add_command(azdo.azdo)
+    for _alias_name in ('devops', 'azuredevops'):
+        _alias = copy.copy(azdo.azdo)
+        _alias.hidden = True
+        onboard.add_command(_alias, _alias_name)
+    onboard.add_command(azdo.ado)
 onboard.add_command(team.onboard_move)
 onboard.add_command(crowd.onboard_crowd)
 onboard.add_command(jetbrains.onboard_jetbrains)

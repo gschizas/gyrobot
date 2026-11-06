@@ -1,22 +1,22 @@
 # Azure DevOps reporting
 
-`azdo` (aliases `devops`, `azuredevops`) reports how many users each canonical team has in Azure DevOps and at which
+`onboard azdo` (aliases `onboard devops`, `onboard azuredevops`) reports how many users each canonical team has in Azure DevOps and at which
 **access level** (the level is what costs money). There is nothing to onboard or offboard: users arrive through
 Entra ID, which is synchronised with Active Directory, and leave the same way.
 
 The bot reads the user entitlements of the organisation, matches each user to an account by email (the primary
 email or one of `additional_emails`) and takes the canonical team from the account. Everything is read-only
-except `azdo link`.
+except `onboard azdo link`.
 
 ## Commands
 
 | Command | Description |
 |---|---|
-| `azdo report [-x]` | One row per canonical team: users per access level, total and (with prices configured) cost per month, plus a TOTAL row. Users matching no account are counted under `unknown` and listed in a second table; accounts without a team are under `(no team)`. |
-| `azdo users [team] [-x]` | The users of the canonical teams starting with `team` (all if omitted; `unknown` for unmatched users): email, name, team, access level, licensing source, status and last access date. |
-| `azdo whois <email>` | One user's details and how their access level changed over time. The email may be the Azure DevOps one or any email of the person's account. |
-| `azdo link <azdo email> <account email>` | Attach an unmatched Azure DevOps user to a person as an additional email. Approval-gated; validation checks the Azure DevOps user exists and the address belongs to no account yet. |
-| `ado` | Not Azure DevOps. Try it. |
+| `onboard azdo report [-x]` | One row per canonical team: users per access level, total and (with prices configured) cost per month, plus a TOTAL row. Users matching no account are counted under `unknown` and listed in a second table; accounts without a team are under `(no team)`. |
+| `onboard azdo users [team] [-x]` | The users of the canonical teams starting with `team` (all if omitted; `unknown` for unmatched users): email, name, team, access level, licensing source, status and last access date. |
+| `onboard azdo whois <email>` | One user's details and how their access level changed over time. The email may be the Azure DevOps one or any email of the person's account. |
+| `onboard azdo link <azdo email> <account email>` | Attach an unmatched Azure DevOps user to a person as an additional email. Approval-gated; validation checks the Azure DevOps user exists and the address belongs to no account yet. |
+| `onboard ado` | Not Azure DevOps. Try it. |
 
 Reading takes a few seconds (100 users per request); the result is reused for five minutes.
 
@@ -24,7 +24,7 @@ Reading takes a few seconds (100 users per request); the result is reused for fi
 
 Every read also records each matched person's access level as an `azdo` provision of their account: `active`
 while they are in Azure DevOps, `deprovisioned` once they are gone. Only changes are written, so the provision
-history (`onboard whois`, `azdo whois`) shows when an access level changed. `offboard` knows the resource and
+history (`onboard whois`, `onboard azdo whois`) shows when an access level changed. `offboard` knows the resource and
 reports that there is nothing to do; the next read sets it back to `active` if the person is still in Azure DevOps.
 `last_accessed` is kept in the data but a change in it alone is not recorded.
 
@@ -41,7 +41,7 @@ costs:                            # optional: price per user per month, by acces
   Basic + Test Plans: 52
 ```
 
-Access level names are the ones `azdo report` prints. A level with no price counts as 0 and is listed under the report.
+Access level names are the ones `onboard azdo report` prints. A level with no price counts as 0 and is listed under the report.
 
 `config/azdo.credentials.yml` (keep it out of git):
 
@@ -76,9 +76,9 @@ Better for a service, since it does not belong to a person and does not expire w
 
 Rules are keyed on the module path, so each command needs one:
 
-- `commands.azdo:azdo_report`, `azdo_users`, `azdo_whois`
-- `commands.azdo:azdo_link` (requester and approver rules, like the other approval-gated commands)
-- `commands.azdo:ado` (the joke)
+- `commands.onboarding.azdo:azdo_report`, `azdo_users`, `azdo_whois`
+- `commands.onboarding.azdo:azdo_link` (requester and approver rules, like the other approval-gated commands)
+- `commands.onboarding.azdo:ado` (the joke)
 
 ## Notes
 

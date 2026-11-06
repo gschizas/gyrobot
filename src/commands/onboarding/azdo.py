@@ -3,9 +3,9 @@
 Users come from Entra ID, so there is nothing to onboard or offboard; the commands only read Azure DevOps
 (see ``backend.azdo_api``), match people to accounts by email and keep a snapshot of each person's access level
 (``backend.azdo_sync``). See docs/AZURE_DEVOPS.md.
-"""
-PLUGIN = {'requires_files': ['config/azdo.yml']}
 
+``commands.onboarding`` attaches ``azdo_group`` and ``ado`` to ``onboard`` only if ``config/azdo.yml`` exists.
+"""
 import os
 from collections import Counter
 
@@ -18,7 +18,7 @@ from backend.azdo_api import AzdoApi
 from backend.azdo_sync import NO_TEAM, UNKNOWN_TEAM, sync_members
 from backend.constants import TableFormat
 from backend.team_mapping import normalize
-from commands import gyrobot, ClickAliasedGroup
+from commands import ClickAliasedGroup
 from commands.extended_context import ExtendedContext
 
 if 'APPROVAL_DATABASE_URL' not in os.environ:
@@ -35,18 +35,18 @@ It was replaced by *ADO.NET* in 2002, which shares nothing with ADO except three
 by everything else. Please do not confuse it with Azure DevOps, which is a different product with a different \
 (and, one hopes, lower) body count.
 
-If you meant Azure DevOps, the command is `azdo` (or `devops`). Try `azdo report`."""
+If you meant Azure DevOps, the command is `onboard azdo` (or `onboard devops`). Try `onboard azdo report`."""
 
 
-@gyrobot.command('ado', context_settings={'ignore_unknown_options': True})
+@click.command('ado', context_settings={'ignore_unknown_options': True})
 @click.argument('ignored', nargs=-1, type=click.UNPROCESSED)
 @click.pass_context
 def ado(ctx: ExtendedContext, ignored: tuple):
-    """Not what you think. Use azdo for Azure DevOps."""
+    """Not what you think. Use onboard azdo for Azure DevOps."""
     ctx.chat.send_text(ADO_MESSAGE)
 
 
-@gyrobot.group('azdo', cls=ClickAliasedGroup, aliases=['devops', 'azuredevops'])
+@click.group('azdo', cls=ClickAliasedGroup)
 @click.pass_context
 def azdo(ctx: ExtendedContext):
     """Report on Azure DevOps users per canonical team and access level (read-only, except "link")"""
@@ -77,9 +77,9 @@ def azdo_report(ctx: ExtendedContext, as_excel: bool):
     """Users per canonical team and access level, with the monthly cost if config/azdo.yml has prices.
 
     Users whose email matches no account are counted under "unknown" and listed separately;
-    attach them to a person with "azdo link". Also records each person's access level for the history.
+    attach them to a person with "onboard azdo link". Also records each person's access level for the history.
 
-    USAGE: bot azdo report [-x]
+    USAGE: bot onboard azdo report [-x]
     """
     members = _members(ctx)
     if members is None:
@@ -112,7 +112,7 @@ def azdo_report(ctx: ExtendedContext, as_excel: bool):
         if unpriced:
             notes.append(f"No price is configured for: {', '.join(unpriced)} (counted as 0).")
     if unknown:
-        notes.append("Attach unknown users to a person with `azdo link <azdo email> <account email>`.")
+        notes.append("Attach unknown users to a person with `onboard azdo link <azdo email> <account email>`.")
 
     if as_excel:
         ctx.chat.send_tables(title, {'Report': table, **({'Unknown users': unknown} if unknown else {})},
@@ -134,7 +134,7 @@ def azdo_users(ctx: ExtendedContext, team: str | None, as_excel: bool):
 
     TEAM may be "unknown" for users matching no account.
 
-    USAGE: bot azdo users [team] [-x]
+    USAGE: bot onboard azdo users [team] [-x]
     """
     members = _members(ctx)
     if members is None:
@@ -161,7 +161,7 @@ def azdo_whois(ctx: ExtendedContext, email: str):
 
     EMAIL is the Azure DevOps email, or the primary or an additional email of the person's account.
 
-    USAGE: bot azdo whois <email>
+    USAGE: bot onboard azdo whois <email>
     """
     email = extract_email(ctx, email) or email.strip()
     members = _members(ctx)
@@ -191,7 +191,7 @@ def azdo_whois(ctx: ExtendedContext, email: str):
         {'Field': 'Last accessed', 'Value': member['last_accessed'] or 'never'},
     ])
     if not account:
-        ctx.chat.send_text("Attach this user to a person with `azdo link`.")
+        ctx.chat.send_text("Attach this user to a person with `onboard azdo link`.")
         return
 
     changes, last = [], None
@@ -242,10 +242,10 @@ def _link_validate(params: dict, ctx: ExtendedContext) -> str | None:
 def azdo_link(ctx: ExtendedContext, azdo_email: str, account_email: str):
     """Attach an Azure DevOps user that matches no account to a person, as an additional email.
 
-    AZDO_EMAIL is the user's email in Azure DevOps (see "unknown" in "azdo report"); ACCOUNT_EMAIL is the
+    AZDO_EMAIL is the user's email in Azure DevOps (see "unknown" in "onboard azdo report"); ACCOUNT_EMAIL is the
     primary or an additional email of the person. Queued for approval.
 
-    USAGE: bot azdo link <azdo_email> <account_email>
+    USAGE: bot onboard azdo link <azdo_email> <account_email>
     """
     account = find_account_by_any_email(account_email)
     if not account:
