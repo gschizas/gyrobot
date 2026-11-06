@@ -130,25 +130,27 @@ def kudos_view(ctx: ExtendedContext, days_to_check: int, channel: str,
     if len(table) == 0:
         ctx.chat.send_text("No kudos yet!")
     else:
+        title = "Kudos" if not show_givers else "Kudos givers"
+        title_size = 18 if not show_givers else 14
         if output_format == 'video':
-            video_file = _create_kudos_video(table)
-            ctx.chat.send_file(video_file, title="Kudos", filename="kudos.mp4")
+            video_file = _create_kudos_video(table, title_size)
+            ctx.chat.send_file(video_file, title=title, filename="kudos.mp4")
         elif output_format == 'image':
-            image_file = _create_kudos_image(table)
-            ctx.chat.send_file(image_file, title="Kudos", filename="kudos.png")
+            image_file = _create_kudos_image(table, title_size)
+            ctx.chat.send_file(image_file, title=title, filename="kudos.png")
         elif output_format == 'excel':
-            ctx.chat.send_table(title="Kudos", table=table, table_format=TableFormat.EXCEL)
+            ctx.chat.send_table(title=title, table=table, table_format=TableFormat.EXCEL)
         else:
-            ctx.chat.send_table(title="Kudos", table=table, table_format=TableFormat.TABLE)
+            ctx.chat.send_table(title=title, table=table, table_format=TableFormat.TABLE)
 
 
-def _create_kudos_image(high_scores):
+def _create_kudos_image(high_scores, title_size):
     width, height = 320, 480
 
     high_scores = high_scores[:16]
 
     score_font = ImageFont.truetype("img/kudos/amstrad_cpc464.ttf", 12)
-    title_font = ImageFont.truetype("img/kudos/amstrad_cpc464.ttf", 18)
+    title_font = ImageFont.truetype("img/kudos/amstrad_cpc464.ttf", title_size)
 
     # Create a new image
     bg = Image.open("img/kudos/wallpaper.jpg").resize((width, height))
@@ -185,7 +187,7 @@ def _create_kudos_image(high_scores):
     return byte_arr
 
 
-def _create_kudos_video(high_scores):
+def _create_kudos_video(high_scores, title_size):
     width, height = 320, 480
 
     frame = 0
@@ -202,7 +204,7 @@ def _create_kudos_video(high_scores):
     final_x_pos = 20
 
     score_font = ImageFont.truetype("img/kudos/amstrad_cpc464.ttf", 12)
-    title_font = ImageFont.truetype("img/kudos/amstrad_cpc464.ttf", 18)
+    title_font = ImageFont.truetype("img/kudos/amstrad_cpc464.ttf", title_size)
     images = []
     bg = Image.open("img/kudos/wallpaper.jpg").resize((width, height))
     state = "flying in"
