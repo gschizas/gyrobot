@@ -1,6 +1,7 @@
 import datetime
 import logging
 import pathlib
+import threading
 import time
 from typing import Dict, Any, Iterable, Optional
 
@@ -67,6 +68,7 @@ class GitHubApi():
     _jwt_token: str | None = None
     _iat: int | None = None
     _exp: int | None = None
+    _init_lock = threading.RLock()
 
     def __new__(cls):
         if cls._instance is None:
@@ -74,10 +76,9 @@ class GitHubApi():
         return cls._instance
 
     def _ses_check_expiration(self):
-        if self._iat is None or self._exp is None or self._jwt_token is None:
-            self._init_sessions()
-        if self._exp < int(time.time()):
-            self._init_sessions()
+        with self._init_lock:
+            if self._iat is None or self._exp is None or self._jwt_token is None or self._exp < int(time.time()):
+                self._init_sessions()
 
     @property
     def ses_ent(self) -> requests.Session:
@@ -134,8 +135,19 @@ class GitHubApi():
 
         installations_page = self.ses_inst.get(f"{GITHUB_API_URL}/app/installations")
         installations = installations_page.json()
-        ent_inst_id = [inst for inst in installations if inst['target_type'] == 'Enterprise'][0]['id']
-        org_inst_id = [inst for inst in installations if inst['target_type'] == 'Organization'][0]['id']
+        if not installations_page.ok or not isinstance(installations, list):
+            raise RuntimeError(f"GitHub refused the app login (HTTP {installations_page.status_code}): "
+                               f"{str(installations)[:200]}")
+
+        def installation_id(target_type: str):
+            found = [inst['id'] for inst in installations if inst['target_type'] == target_type]
+            if not found:
+                kinds = sorted({inst['target_type'] for inst in installations}) or 'none'
+                raise RuntimeError(f"The GitHub App has no {target_type} installation (installations seen: {kinds})")
+            return found[0]
+
+        ent_inst_id = installation_id('Enterprise')
+        org_inst_id = installation_id('Organization')
         access_tokens_ent = self.ses_inst.post(f"{GITHUB_API_URL}/app/installations/{ent_inst_id}/access_tokens")
         access_tokens_org = self.ses_inst.post(f"{GITHUB_API_URL}/app/installations/{org_inst_id}/access_tokens")
 
