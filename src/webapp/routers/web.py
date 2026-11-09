@@ -130,8 +130,8 @@ def login_form(request: Request):
 
 @router.post('/login', include_in_schema=False)
 def login_submit(request: Request, username: str = Form(...), password: str = Form(...)):
-    if ldap_authenticate(username, password):
-        request.session['user'] = username
+    if user := ldap_authenticate(username, password):
+        request.session['user'] = user
         return RedirectResponse(url=request.url_for('dashboard'), status_code=status.HTTP_302_FOUND)
     return templates.TemplateResponse(
         request, 'login.html', {'error': 'Invalid username or password'},
