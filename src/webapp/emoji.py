@@ -6,9 +6,12 @@ them for non-Slack interfaces.
 """
 
 SLACK_EMOJI_MAP = {
+    ':arrows_counterclockwise:': '🔄',
     ':hourglass_flowing_sand:': '⏳',
+    ':hourglass:': '⌛',
     ':inbox_tray:': '📥',
     ':white_check_mark:': '✅',
+    ':warning:': '⚠️',
     ':no_entry:': '🚫',
     ':x:': '❌',
 }
