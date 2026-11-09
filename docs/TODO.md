@@ -87,6 +87,10 @@ accepted/expired are not visible in the web UI or API. Options:
      permission rules (`permission_rules`) naming the three commands.
    - Optionally drop the `"machineState"`, `"jobQueue"`, `"Votes"`, `"Answers"` and `"Receipts"` tables and
      `public.submissions`; they stay out of the Alembic baseline.
+10. **Permission groups**: many commands need near-identical rules (one rule per function, e.g. the `onboard`
+    commands, `permissions reload`/`show`, `webapp.routers.permissions:manage`). Group functions so that one rule
+    covers a set, for example a named group of function names or a prefix match in `permission_rules`, and use it for
+    the web UI's Administration section too (the dashboard currently checks `manage` and `permissions reload` separately).
 
 ## Per-instance configuration and data
 
