@@ -148,9 +148,11 @@ def logout(request: Request):
 def dashboard(request: Request):
     if redirect := _require_login(request):
         return redirect
+    user = _current_user(request)
     return templates.TemplateResponse(request, 'dashboard.html', {
-        'user': _current_user(request), 'forms': FORMS,
-        'can_manage_permissions': permissions_router.can_manage(_current_user(request))})
+        'user': user, 'forms': FORMS,
+        'can_manage_permissions': permissions_router.can_manage(user),
+        'can_reload_permissions': permissions_router.can_reload(user)})
 
 
 @router.post('/admin/reload-permissions', include_in_schema=False)

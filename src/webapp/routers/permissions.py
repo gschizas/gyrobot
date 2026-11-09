@@ -22,6 +22,7 @@ from webapp import config
 logger = logging.getLogger('webapp.routers.permissions')
 
 MANAGE_FUNCTION = 'webapp.routers.permissions:manage'
+RELOAD_FUNCTION = 'commands.permissions:reload_permissions'
 FUNCTION_NAME_RE = re.compile(r'[\w.]+:\w+')
 ROLE_RE = re.compile(r'\w+')
 
@@ -45,10 +46,19 @@ def _rule_allows(rule: Optional[dict], user: str) -> bool:
 
 def can_manage(user: Optional[str]) -> bool:
     """For the dashboard: whether to show the link. Never raises."""
+    return _can(MANAGE_FUNCTION, user)
+
+
+def can_reload(user: Optional[str]) -> bool:
+    """For the dashboard: whether the user may run ``permissions reload``. Never raises."""
+    return _can(RELOAD_FUNCTION, user)
+
+
+def _can(function_name: str, user: Optional[str]) -> bool:
     try:
-        return bool(user) and _may_manage(user)
+        return bool(user) and _rule_allows(permissions.get_rule(function_name), user)
     except Exception as ex:
-        logger.warning(f"Could not evaluate {MANAGE_FUNCTION}: {ex!r}")
+        logger.warning(f"Could not evaluate {function_name}: {ex!r}")
         return False
 
 

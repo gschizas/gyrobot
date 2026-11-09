@@ -12,13 +12,17 @@ approval, exactly like the chat bot's <code>onboard</code>/<code>offboard</code>
     <li><a href="{{ request.url_for('move_bulk_form') }}">Bulk move: change the team of multiple colleagues</a></li>
     <li><a href="{{ request.url_for('missing_emails_form') }}">Fill in missing emails of GitHub members</a></li>
 </ul>
+{% if can_manage_permissions or can_reload_permissions %}
 <h2>Administration</h2>
 {% if can_manage_permissions %}
 <p><a href="{{ request.url_for('list_rules') }}">Manage permission rules</a></p>
 {% endif %}
+{% if can_reload_permissions %}
 <p>After editing permission rules in the database, reload them here (this affects the web UI/API process only;
 use <code>permissions reload</code> in chat for the bot).</p>
 <form method="post" action="{{ request.url_for('reload_permissions') }}">
     <button type="submit">Reload permissions</button>
 </form>
+{% endif %}
+{% endif %}
 {% endblock %}
