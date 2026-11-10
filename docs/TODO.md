@@ -216,7 +216,9 @@ Ubuntu install guide (`INSTALL-ubuntu.md`), a systemd unit and an Apache snippet
 
 Open questions:
 
-1. **Company name** to use in the path.
+1. **Company name** to use in the path: decided. `deploy/company.sh` takes `--company`/`$COMPANY`, an existing
+   `/opt/<company>`, or the first label of the host's DNS suffix, and accepts only names listed in the untracked
+   `deploy/site.env` (`deploy/site.env.example`). `deploy/install_services.sh` uses it.
 2. **Several instances**: a systemd template unit (`gyrobot@<instance>`, which `INSTALLATION.md` already mentions)
    with `/etc/<app>/<instance>.env`, and separate units for the bot, the web UI and the REST API?
 3. **Writable locations**: with `ProtectSystem=strict`, `config/`, `data/`, `logs/` and `.refreshtoken/` need

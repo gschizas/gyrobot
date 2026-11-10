@@ -198,3 +198,4 @@ setup_fiddler.sh
 src/requirements.txt # temporary requirements file
 usernotes-*.yml
 !/scripts/
+deploy/site.env
