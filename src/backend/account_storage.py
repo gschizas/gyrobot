@@ -207,16 +207,19 @@ def get_pending_provisions(resource: str, status: str) -> List[Provision]:
 
 
 def find_provisions_by_username(resource: str, usernames: List[str],
-                                statuses: tuple[str, ...] = LIVE_STATUSES) -> List[Provision]:
+                                statuses: tuple[str, ...] | None = LIVE_STATUSES) -> List[Provision]:
     """Provisions of a resource whose stored ``username`` matches any of the given names (case-insensitive).
 
     By default only provisions that still hold, or are about to hold, the resource are returned
-    (not ``expired``, ``failed`` or ``deprovisioned`` ones).
+    (not ``expired``, ``failed`` or ``deprovisioned`` ones); ``statuses=None`` returns every status.
     """
     if not usernames:
         return []
-    return _provisions(ProvisionRow.resource == resource, ProvisionRow.status.in_(statuses),
-                       func.lower(ProvisionRow.data['username'].astext).in_([u.lower() for u in usernames]))
+    conditions = [ProvisionRow.resource == resource,
+                  func.lower(ProvisionRow.data['username'].astext).in_([u.lower() for u in usernames])]
+    if statuses is not None:
+        conditions.append(ProvisionRow.status.in_(statuses))
+    return _provisions(*conditions)
 
 
 def find_provisions_by_any_username(usernames: List[str]) -> List[Provision]:

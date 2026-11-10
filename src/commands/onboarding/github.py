@@ -6,7 +6,7 @@ import requests
 from treelib import Tree
 
 from backend import bot_identity
-from backend.account_storage import (find_provisions_by_any_username, find_provisions_by_github_id, get_account_by_email,
+from backend.account_storage import (find_provisions_by_any_username, find_provisions_by_github_id, get_account, get_account_by_email,
                                      get_provision, LIVE_STATUSES,
                                      find_provisions_by_username, get_last_status_times, get_or_create_account, get_pending_provisions,
                                      get_provisions, rename_github_team, set_provision_status)
@@ -105,7 +105,7 @@ def github_group():
 
     Without a subcommand this is "add": bot onboard github <username> <email> <team>
 
-    Read-only lookups (not gated by approval): teams, members, pending-invitations, expired.
+    Read-only lookups (not gated by approval): teams, members, pending-invitations, expired, whois.
     """
 
 
@@ -516,6 +516,36 @@ def github_check(ctx: ExtendedContext):
     message = '\n'.join(summary_lines)
     ctx.chat.send_text(message)
     return message
+
+
+@github_group.command('whois')
+@click.argument('username')
+@click.pass_context
+def github_whois(ctx: ExtendedContext, username: str):
+    """Find who a GitHub username belongs to, from the bot's database.
+
+    Searches only the GitHub provisions (any status, including expired or deprovisioned ones), then shows
+    the account each belongs to. The reverse of "bot onboard whois <email>". Read-only, not gated by approval.
+
+    USAGE: bot onboard github whois <username>
+    """
+    username = username.strip().lstrip('@')
+    provisions = find_provisions_by_username('github', [username], statuses=None)
+    if not provisions:
+        ctx.chat.send_text(f"No GitHub provision found for {username}", is_error=True)
+        return
+
+    table = []
+    for provision in provisions:
+        account = get_account(provision.account_id)
+        table.append({'Username': provision.data.get('username', ''), 'Status': provision.status,
+                      'Provision team': provision.data.get('team', ''),
+                      'Provision email': provision.data.get('email', ''),
+                      'Account': account.name or '' if account else '',
+                      'Account email': account.primary_email if account else '',
+                      'Canonical team': account.team or '' if account else '',
+                      'Updated': f"{provision.updated_at:%Y-%m-%d %H:%M}"})
+    ctx.chat.send_table(title=f'GitHub user {username}', table=table)
 
 
 @github_group.command('expired')
