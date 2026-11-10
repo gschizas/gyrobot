@@ -168,8 +168,15 @@ def onboard_whois(ctx: ExtendedContext, email: str):
         ctx.chat.send_table(title='Provisions', table=[
             {'Resource': RESOURCE_LABELS.get(p.resource, p.resource), 'Status': p.status,
              'Created': f"{p.created_at:%Y-%m-%d %H:%M}", 'Updated': f"{p.updated_at:%Y-%m-%d %H:%M}",
-             'Data': json.dumps(p.data, ensure_ascii=False, default=str), 'Provision id': str(p.id)}
+             'Provision id': str(p.id)}
             for p in provisions])
+        # A table cannot hold a table, so each provision's data gets its own Field/Value table
+        for p in provisions:
+            if p.data:
+                ctx.chat.send_table(title=f"{RESOURCE_LABELS.get(p.resource, p.resource)} data", table=[
+                    {'Field': key, 'Value': value if isinstance(value, str)
+                     else json.dumps(value, ensure_ascii=False, default=str)}
+                    for key, value in p.data.items()])
     else:
         ctx.chat.send_text("No provisions.")
 
