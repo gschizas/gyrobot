@@ -1,11 +1,13 @@
+#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.10"
 # dependencies = ["requests", "ruamel.yaml"]
 # ///
-"""Check whether an Entra ID service principal can look up users through Microsoft Graph.
+"""Check whether an Entra ID service principal can look up a user by email through Microsoft Graph.
 
 Run it on the server that holds the real credentials. It never prints a secret or a token; it prints the
-application id, the tenant, the permissions ("roles") in the token Graph accepted, and whether user lookups work.
+application id, the tenant, the permissions ("roles") in the token Graph accepted, and, with --email, the result
+of looking that single address up.
 
 Credentials sources (give one or more):
   --azdo [FILE]                 config/azdo.credentials.yml (keys tenant_id, client_id, client_secret)
@@ -18,9 +20,9 @@ Examples:
   uv run scripts/check_entra_credentials.py --azdo
   uv run scripts/check_entra_credentials.py --kubernetes config/openshift.credentials.yml --email jdoe@example.com
 
-With --email, it also looks that address up the way the bot would (mail, userPrincipalName, otherMails and
-proxyAddresses). Graph needs the application permission "User.Read.All" (with admin consent) for that; without it
-you get HTTP 403 "Insufficient privileges".
+With --email, it looks that address up the way the bot would (mail, userPrincipalName, otherMails and
+proxyAddresses). Graph needs the application permission "User.Read.All" (with admin consent) for that, even for a
+single user; without it you get HTTP 403 "Insufficient privileges". Without --email it only reports the permissions.
 """
 import argparse
 import base64
@@ -34,6 +36,7 @@ from ruamel.yaml import YAML
 
 GRAPH_SCOPE = 'https://graph.microsoft.com/.default'
 GRAPH_USERS = 'https://graph.microsoft.com/v1.0/users'
+USER_READ_ROLES = {'User.Read.All', 'User.ReadWrite.All', 'Directory.Read.All', 'Directory.ReadWrite.All'}
 
 
 def _load(path: pathlib.Path) -> dict:
@@ -93,32 +96,26 @@ def check(label: str, creds: dict, email: str | None) -> bool:
     print(f"   token OK, valid until {expires:%Y-%m-%d %H:%M} UTC")
     roles = claims.get('roles', [])
     print(f"   Graph permissions in the token: {', '.join(sorted(roles)) or '(none)'}")
-    if not roles:
-        print("   -> no Graph application permission has been granted to this application")
+    if not email:
+        can_read = bool(set(roles) & USER_READ_ROLES)
+        print("   can read users: " + ("probably (pass --email to prove it)" if can_read else
+              "NO: needs the Graph application permission User.Read.All (admin consent)"))
+        return can_read
 
     headers = {'Authorization': f"Bearer {body['access_token']}", 'ConsistencyLevel': 'eventual'}
-    probe = requests.get(GRAPH_USERS, headers=headers, params={'$top': 1, '$select': 'id'}, timeout=30)
-    if probe.ok:
-        print("   list users: OK")
-    else:
-        error = probe.json().get('error', {})
-        print(f"   list users: HTTP {probe.status_code} {error.get('code')}: {error.get('message')}")
+    found = requests.get(GRAPH_USERS, headers=headers, timeout=30, params={
+        '$filter': _lookup_filter(email), '$count': 'true',
+        '$select': 'displayName,userPrincipalName,mail,accountEnabled'})
+    if not found.ok:
+        error = found.json().get('error', {})
+        print(f"   look up {email}: HTTP {found.status_code} {error.get('code')}: {error.get('message')}")
         return False
-
-    if email:
-        found = requests.get(GRAPH_USERS, headers=headers, timeout=30, params={
-            '$filter': _lookup_filter(email), '$count': 'true',
-            '$select': 'displayName,userPrincipalName,mail,accountEnabled'})
-        if not found.ok:
-            error = found.json().get('error', {})
-            print(f"   look up {email}: HTTP {found.status_code} {error.get('code')}: {error.get('message')}")
-            return False
-        users = found.json().get('value', [])
-        if not users:
-            print(f"   look up {email}: not found")
-        for user in users:
-            print(f"   look up {email}: {user.get('displayName')} <{user.get('userPrincipalName')}> "
-                  f"enabled={user.get('accountEnabled')}")
+    users = found.json().get('value', [])
+    if not users:
+        print(f"   look up {email}: works, but the address was not found")
+    for user in users:
+        print(f"   look up {email}: {user.get('displayName')} <{user.get('userPrincipalName')}> "
+              f"enabled={user.get('accountEnabled')}")
     return True
 
 
