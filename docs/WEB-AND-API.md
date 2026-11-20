@@ -23,7 +23,7 @@ Requests from the web UI run as the LDAP user in the `$webui` pseudo-channel, an
 
 ## Web UI
 
-Log in with your LDAP credentials at `/login`.
+Log in with your LDAP credentials at `/login`. End users: see the [user manual](WEB-UI-MANUAL.md).
 
 | Page | Description |
 |---|---|
