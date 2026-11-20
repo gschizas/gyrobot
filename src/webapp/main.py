@@ -15,11 +15,13 @@ Required environment variables:
 * ``APPROVAL_DATABASE_URL`` / ``PERMISSIONS_DATABASE_URL`` -- required by the
   underlying ``onboard``/``offboard`` commands (see ``commands/onboarding``).
 """
+import pathlib
 import subprocess
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import FileResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 from webapp.bootstrap import ensure_commands_imported
@@ -57,6 +59,18 @@ app = FastAPI(
 if allowed_hosts:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=[hostname, "localhost"] + allowed_hosts)
 app.add_middleware(SessionMiddleware, secret_key=session_secret())
+
+STATIC_DIR = pathlib.Path(__file__).parent / 'static'
+
+
+# A plain route instead of a StaticFiles mount: the mount does not find its files when root_path is set
+@app.get('/static/{path}', name='static', include_in_schema=False)
+def static_file(path: str):
+    file = (STATIC_DIR / path).resolve()
+    if file.parent != STATIC_DIR.resolve() or not file.is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(file)
+
 
 app.include_router(web.router)
 app.include_router(permissions.router)
