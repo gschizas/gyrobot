@@ -91,6 +91,51 @@ accepted/expired are not visible in the web UI or API. Options:
     commands, `permissions reload`/`show`, `webapp.routers.permissions:manage`). Group functions so that one rule
     covers a set, for example a named group of function names or a prefix match in `permission_rules`, and use it for
     the web UI's Administration section too (the dashboard currently checks `manage` and `permissions reload` separately).
+11. **Team roles and a team members page** (items 11 to 14 belong together; decide 14 first, since it shapes 11 and 13):
+    - `Role` (`backend/providers/base.py`) and `ProvisionRequest.role` exist but nothing sets or stores a role yet.
+    - Add an optional role to the onboarding commands/forms and store it. Options: a nullable `accounts.role`
+      (one role per person; simplest), or a `role` on the team membership (one role per person per team, needed if
+      someone can be in several teams). Prefer a separate membership table (`account_id`, `team`, `role`,
+      `is_admin`) over a column on `accounts`, because `accounts.team` is a single value today.
+    - Web UI page (no chat command) that lists a team's members with their roles and lets authorised users edit
+      them. Reuse the team tree of `onboard github` for picking the team. Every edit goes through
+      `requires_approval` and writes to `account_history`, like the other changes.
+12. **Team display names**: teams are identified by their GitHub slug (canonical team name) only.
+    - Option A: a `teams` table (`slug` primary key, `display_name`, optional `parent`, `description`), filled by
+      a sync from GitHub plus manual edits on a web page. It could also take over the hierarchy now derived from the
+      dash-separated slugs and `config/team_mapping.yml`.
+    - Option B: a `display_names:` section in `config/team_mapping.yml`. Cheap, but edited by hand and by file, not
+      from the UI.
+    - Prefer A. It also gives item 13 a place to hang team admins on. Show the display name everywhere (tree,
+      tables, `whois`) and keep the slug as the key in commands and storage.
+13. **Team administrators** (people who may edit the members of their own team). Options, from simplest:
+    1. A `team_admin` flag on the membership (item 11). Authorisation is "caller is a team admin of the team, or of
+       an ancestor team", and is checked by the page and the API, not through `permission_rules`. Needs the
+       caller's identity mapped to an account (by email from the LDAP login).
+    2. A role attribute: `Role` gets an `is_admin` property (e.g. facilitator, scrum master, product owner), so
+       whoever holds such a role in a team administers it. No extra flag, but it ties authority to job titles. If
+       roles move into the database (item 14), it becomes an `is_team_admin` column on the role.
+    3. Per-team rules in `permission_rules`, one row per team. Reuses the existing UI, but a team change means an
+       admin has to edit permissions; it doesn't scale.
+    - What an admin may do: add a person to their team (**pull**), remove one, change roles. Moving someone *out*
+      to another team should need the other team's admin or a global approver.
+    - **Push vs pull**: pushing only (a team admin can remove people and a global approver must place them) is the
+      safest, but gives team admins no way to staff their own team and makes the global approvers a bottleneck.
+      Pulling is valid if it's constrained: a team admin may add someone who has **no team yet** (new joiners and
+      the NULL-team imports) or whose current team admin agrees; taking someone from another team is a request
+      that the current team's admin (or a global approver) approves. Everything stays in the approval queue and the
+      history, so a pull is traceable. Whichever is chosen, a team admin never gets rights outside their subtree,
+      and may not promote themselves or others to team admin (only a global approver does).
+14. **Roles in the database instead of an enum**: needed if different team hierarchies use different roles.
+    - Option A: keep the enum; simplest and type-checked, but a new role is a code change and one list serves every
+      team.
+    - Option B: a `roles` table (`key`, `display_name`, `is_team_admin`) plus an optional `team_prefix` (or a join
+      table `team_roles`) restricting a role to a hierarchy. Editable from the web UI; validation changes from the
+      enum to a lookup. Memberships store the role key, with a foreign key.
+    - Option C: roles in `config/` YAML per hierarchy. Versioned, but changes need a restart (like all config) and
+      can't be edited from the UI.
+    - Prefer B, seeded from the current enum by a migration. Open: should a missing role be allowed (the role is
+      optional), and what happens to memberships when a role is retired (deactivate rather than delete).
 
 ## Per-instance configuration and data
 
