@@ -13,6 +13,7 @@ class Role(Enum):
     IOS_DEVELOPER = 'ios_developer'
     ANDROID_DEVELOPER = 'android_developer'
     PRODUCT_OWNER = 'product_owner'
+    BUSINESS_ANALYST = 'business_analyst'
 
 
 @dataclass
