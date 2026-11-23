@@ -61,8 +61,16 @@ class ODataRouterTest(unittest.TestCase):
         body = response.json()
         self.assertEqual(body['value'], [{'Login': 'a'}])
         self.assertEqual(body['@odata.count'], 5)
-        self.assertIn('%24skip=1', body['@odata.nextLink'])
+        self.assertIn('skip=1', body['@odata.nextLink'])
+        self.assertIn('$top=1', body['@odata.nextLink'].replace('%24', '$'))
         self.assertEqual(lst.call_args.args[2], 2)
+
+    def test_links_keep_the_proxy_prefix(self):
+        prefixed = TestClient(self.client.app, base_url='https://testserver', root_path='/eurobot')
+        with mock.patch.object(router.github_directory, 'list_github_users', return_value=[dict(ROW), dict(ROW)]):
+            body = prefixed.get('/api/odata/GithubUsers?$top=1', headers=auth()).json()
+        self.assertTrue(body['@odata.nextLink'].startswith('https://testserver/eurobot/api/odata/GithubUsers?'))
+        self.assertTrue(body['@odata.context'].startswith('https://testserver/eurobot/api/odata/'))
 
     def test_bad_filter_is_400(self):
         response = self.client.get('/api/odata/GithubUsers?$filter=Nope eq 1', headers=auth())

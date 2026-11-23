@@ -136,7 +136,7 @@ def _prefix_condition(prefixes: list[str]):
     return or_(*[team.startswith(prefix, autoescape=True) for prefix in prefixes])
 
 
-@router.get('/GithubUsers')
+@router.get('/GithubUsers', name='github_users')
 def github_users(request: Request):
     client_id = authenticate(request)
     allowed_prefixes = _team_prefixes(client_id)
@@ -177,5 +177,6 @@ def github_users(request: Request):
         body['@odata.count'] = github_directory.count_github_users(where)
     body['value'] = rows
     if has_more:
-        body['@odata.nextLink'] = str(request.url.include_query_params(**{'$skip': skip + top}))
+        next_params = {**request.query_params, '$skip': str(skip + top)}
+        body['@odata.nextLink'] = str(request.url_for('github_users').replace_query_params(**next_params))
     return _json(body)
