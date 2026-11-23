@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Add the numeric GitHub user id (``github_id``) to existing GitHub provisions.
+"""Add the numeric GitHub user id (``github_id``) and the global node id (``global_id``) to GitHub provisions.
 
-Usernames can change on GitHub; the id cannot. Usage (from the repository root; reads the database and
+Usernames can change on GitHub; the ids cannot. Usage (from the repository root; reads the database and
 GitHub settings from .env.d/<env-name>.env):
 
     uv run python scripts/backfill_github_ids.py <env-name>           # preview only
     uv run python scripts/backfill_github_ids.py <env-name> --apply   # write to the database
 
-Provisions that already have a ``github_id`` are skipped. A provision whose username no longer exists on
+Provisions that already have both ids are skipped. A provision whose username no longer exists on
 GitHub (renamed or deleted) is reported and left untouched. Costs one GitHub API request per provision.
-If the stored username was reassigned to a different person, the id will be wrong, so review the preview.
+If the stored username was reassigned to a different person, the id will be wrong, so review the preview:
+a provision that already has a ``github_id`` different from the one GitHub returns is reported as a
+``mismatch`` and left untouched.
 """
 import argparse
 import pathlib
@@ -19,6 +21,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'src'))
 
 import requests
 from dotenv import load_dotenv
+from tqdm import tqdm
 
 
 def main() -> None:
@@ -32,34 +35,42 @@ def main() -> None:
     from backend.github_api import GitHubApi
 
     github = GitHubApi()
-    counts = {'updated': 0, 'already': 0, 'no_username': 0, 'not_found': 0, 'error': 0}
-    for provision in storage.get_provisions('github'):
+    counts = {'updated': 0, 'already': 0, 'no_username': 0, 'not_found': 0, 'mismatch': 0, 'error': 0}
+    provisions = storage.get_provisions('github')
+    for provision in tqdm(provisions, desc='GitHub users', unit='user'):
         username = provision.data.get('username')
-        if provision.data.get('github_id'):
+        stored_id = provision.data.get('github_id')
+        if stored_id and provision.data.get('global_id'):
             counts['already'] += 1
             continue
         if not username:
-            print(f"{'no username':12} account {provision.account_id}")
+            tqdm.write(f"{'no username':12} account {provision.account_id}")
             counts['no_username'] += 1
             continue
         try:
-            user = github.get_user_details(username)
+            ids = github.get_user_ids(username)
         except requests.HTTPError as e:
             if e.response is not None and e.response.status_code == 404:
-                print(f"{'not found':12} {username} ({provision.status})")
+                tqdm.write(f"{'not found':12} {username} ({provision.status})")
                 counts['not_found'] += 1
             else:
-                print(f"{'error':12} {username}: {e}")
+                tqdm.write(f"{'error':12} {username}: {e}")
                 counts['error'] += 1
             continue
-        print(f"{'set' if args.apply else 'would set':12} {username:30} -> {user['id']} ({provision.status})")
+        if stored_id and int(stored_id) != ids['github_id']:
+            tqdm.write(f"{'mismatch':12} {username}: stored {stored_id}, GitHub says {ids['github_id']} "
+                       f"({provision.status})")
+            counts['mismatch'] += 1
+            continue
+        tqdm.write(f"{'set' if args.apply else 'would set':12} {username:30} -> {ids['github_id']} "
+                   f"{ids['global_id']} ({provision.status})")
         if args.apply:
-            storage.merge_provision_data(provision.account_id, 'github', {'github_id': user['id']})
+            storage.merge_provision_data(provision.account_id, 'github', ids)
         counts['updated'] += 1
 
-    print(f"\n{counts['updated']} {'updated' if args.apply else 'to update'}, {counts['already']} already had an id, "
-          f"{counts['not_found']} not found, {counts['no_username']} without username, {counts['error']} errors"
-          + ('' if args.apply else "  -- preview only, rerun with --apply to write"))
+    print(f"\n{counts['updated']} {'updated' if args.apply else 'to update'}, {counts['already']} already complete, "
+          f"{counts['not_found']} not found, {counts['mismatch']} mismatches, {counts['no_username']} without "
+          f"username, {counts['error']} errors" + ('' if args.apply else "  -- preview only, rerun with --apply to write"))
 
 
 if __name__ == '__main__':
