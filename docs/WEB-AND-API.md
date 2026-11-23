@@ -69,7 +69,22 @@ clients:
     revoked separately.
   - Use lowercase letters, digits and hyphens. No `:` (it breaks Basic auth) and no spaces.
   - Do not put secrets or private organisation names in it; it appears in logs.
-- **Secret**: a long random value, for example `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+- **Secret**: a long random value (at least 32 bytes). Any of these works:
+
+  ```sh
+  python -c "import secrets; print(secrets.token_urlsafe(32))"
+  openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n'
+  openssl rand -hex 32
+  ```
+
+  PowerShell, without Python or OpenSSL:
+
+  ```powershell
+  [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).TrimEnd('=').Replace('+','-').Replace('/','_')
+  ```
+
+  Prefer the URL-safe forms (`token_urlsafe`, `-hex`, the translated base64 above): the secret is used in Basic auth
+  and in form bodies, where `+`, `/` and `=` can be mangled. Never reuse a secret between clients.
 - **Scopes**: `onboarding` allows the write endpoints below, `directory:read` allows `GET /api/odata/*`. A client with
   no `scopes` gets `onboarding` only. Give read-only consumers `directory:read` alone.
 
