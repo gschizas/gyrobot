@@ -45,9 +45,11 @@ FORMS = {
     'github': {
         'title': 'Onboard: GitHub Copilot',
         'fields': [
-            {'name': 'username', 'label': 'GitHub username', 'required': True},
+            {'name': 'username', 'label': 'GitHub username', 'required': True,
+             'placeholder': 'GitHub Login, no @, no emails'},
             {'name': 'email', 'label': 'Email address', 'required': True},
-            {'name': 'team', 'label': 'Enterprise team', 'required': True, 'type': 'team_tree'},
+            {'name': 'team', 'label': 'Team', 'required': True, 'type': 'team_tree',
+             'placeholder': 'team-slug'},
             {'name': 'role', 'label': 'Role (optional)', 'required': False, 'type': 'role'},
         ],
     },
@@ -177,6 +179,8 @@ def onboarding_form(request: Request, action: str):
         raise HTTPException(status.HTTP_404_NOT_FOUND)
     context = {'user': _current_user(request), 'action': action, **form}
     if action == 'github':
+        context['fields'] = [{**f, 'placeholder': _github_email_placeholder()} if f['name'] == 'email' else f
+                             for f in form['fields']]
         context['team_tree'], context['team_tree_error'] = _github_team_tree()
         context['roles'] = [(r.key, r.display_name) for r in list_roles()]
     return templates.TemplateResponse(request, 'form.html', context)

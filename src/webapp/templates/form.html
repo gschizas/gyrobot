@@ -13,7 +13,7 @@
             <input type="hidden" id="{{ f.name }}" name="{{ f.name }}" {% if f.required %}required{% endif %}>
             {% else %}
             {% if team_tree_error %}<div class="error">{{ team_tree_error }}</div>{% endif %}
-            <input type="text" id="{{ f.name }}" name="{{ f.name }}" {% if f.required %}required{% endif %}>
+            <input type="text" id="{{ f.name }}" name="{{ f.name }}" placeholder="{{ f.placeholder or '' }}" {% if f.required %}required{% endif %}>
             {% endif %}
         {% elif f.type == 'role' %}
             <label for="{{ f.name }}">{{ f.label }}</label>
@@ -22,7 +22,8 @@
                 {% for key, display_name in roles %}<option value="{{ key }}">{{ display_name }}</option>{% endfor %}
             </select>
         {% else %}
-            <input type="text" id="{{ f.name }}" name="{{ f.name }}" {% if f.required %}required{% endif %}>
+            <label for="{{ f.name }}">{{ f.label }}</label>
+            <input type="text" id="{{ f.name }}" name="{{ f.name }}" placeholder="{{ f.placeholder or '' }}" {% if f.required %}required{% endif %}>
         {% endif %}
     {% endfor %}
     <button type="submit">Submit</button>
