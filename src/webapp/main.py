@@ -48,14 +48,14 @@ def _register_notification_sender():
 
 _register_notification_sender()
 
+root_path = os.environ.get('WEBAPP_ROOT_PATH', '/eurobot/')
 allowed_hosts = os.environ.get('WEBAPP_ALLOWED_HOSTS', '').split(',')
 
-# The URL prefix (WEBAPP_ROOT_PATH) is a server setting: run_webapp.py passes it to uvicorn; with a bare
-# ``uvicorn webapp.main:app`` use ``--root-path``.
 app = FastAPI(
     title='GyroBot Onboarding Interface',
     description='Web UI (LDAP-authenticated) and REST API (OAuth2 client-credentials) '
-               'for the onboard/offboard chat bot commands.'
+               'for the onboard/offboard chat bot commands.',
+    root_path=root_path
 )
 if allowed_hosts:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=[hostname, "localhost"] + allowed_hosts)
