@@ -173,3 +173,23 @@ Without the scope you get 403, and without the rule you get 403.
 Notes: Excel remembers credentials per URL (change them in *Data > Get Data > Data Source Settings*); it reads
 `$metadata` first, so a 403 there means the scope or the rule is missing. **Power BI** is the same: *Get data > OData
 feed*, then Basic.
+
+**Excel troubleshooting**:
+
+- **"Access to the resource is forbidden"**: read the real reason with `curl -u <id>:<secret> <url>`. Over plain HTTP
+  it is `Basic authentication requires HTTPS` (development: set `WEBAPP_ALLOW_BASIC_HTTP=1`); otherwise the scope
+  (`Missing scope`) or the rule (`Not permitted`) is missing.
+- **Stale connection after a server fix**: Power Query caches responses, including `@odata.nextLink`, and credentials
+  per URL. Clearing credentials (*Data Source Settings > Clear Permissions*) is not enough. Also clear the cache
+  (*Data > Get Data > Query Options > Global > Data Load > Clear Cache*, and the same under *Current Workbook >
+  Data Load*), then delete the old query and create it again. A symptom is Excel (or a proxy such as Fiddler) asking
+  only for URLs without the `/eurobot` prefix.
+- **Pinning the OData version**: a blank query with
+  `OData.Feed("<base>/api/odata/GithubUsers", null, [Implementation = "2.0"])` makes Excel use the OData v4 reader,
+  which follows `@odata.nextLink` as the server returns it.
+- **Checking what the server returns**: `@odata.context` and `@odata.nextLink` must start with the public URL, for
+  example `https://<host>/eurobot/api/odata/`:
+
+  ```sh
+  curl -s -u <id>:<secret> "https://<host>/eurobot/api/odata/GithubUsers?\$top=1" | grep -o '"@odata[^,]*'
+  ```
