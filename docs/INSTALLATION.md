@@ -74,7 +74,26 @@ journalctl -u gyrobot@myinstance -f
 sudo systemctl restart gyrobot@myinstance        # after changing config/ or .env.d/
 ```
 
-After `git pull`: `uv sync && sudo systemctl restart gyrobot@myinstance gyrobot-web@myinstance`.
+After `git pull`: `uv sync`, then run the database migrations (see below), then
+`sudo systemctl restart gyrobot@myinstance gyrobot-web@myinstance`.
+
+### Database migrations
+
+The schema is managed by Alembic. Run it after every pull that adds a file under
+`migrations/versions/`, **before** restarting (the new code expects the new tables):
+
+```sh
+export MIGRATIONS_DATABASE_URL='postgresql://<owner>:<password>@<host>/<database>'
+uv run alembic -x env=myinstance upgrade head
+uv run alembic -x env=myinstance check        # optional: model vs. database drift
+unset MIGRATIONS_DATABASE_URL
+```
+
+`MIGRATIONS_DATABASE_URL` takes precedence over the `*_DATABASE_URL` variables in the env file. Use
+it with the connection string of a role that **owns** the tables, because the bot's normal database
+user usually does not (`CREATE INDEX IF NOT EXISTS` and `ALTER TABLE` need ownership even when
+nothing changes). Set it only for this command; do not put it in `.env.d/`. If the normal user
+owns the tables, you can skip the variable.
 
 The units are rendered with the user, repository directory and `uv` path filled in; rerun
 `install_services.sh` if you move the checkout or change the user. The web app binds to
