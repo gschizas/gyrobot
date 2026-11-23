@@ -1,0 +1,7 @@
+ldap: 1.0.0
+info:
+  title: Development LDAP server
+  description: Mokapi mock of the directory the web UI logs in against (see docs/DEVELOPMENT.md)
+host: 127.0.0.1:1389
+files:
+  - ./users.ldif

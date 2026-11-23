@@ -1,0 +1,12 @@
+dn:
+namingContexts: dc=example,dc=com
+
+dn: uid=alice,dc=example,dc=com
+cn: Alice Example
+uid: alice
+userPassword: alice-dev-password
+
+dn: uid=bob,dc=example,dc=com
+cn: Bob Example
+uid: bob
+userPassword: bob-dev-password
