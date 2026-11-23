@@ -89,7 +89,7 @@ deploy/migrate.sh
 `deploy/migrate.sh` (needs `whiptail`) lists the instances in `.env.d/`, then asks for the database
 user (default `postgres`) and its password. It reuses the host, port and database from the
 instance's env file, runs `alembic upgrade head` and `alembic check`, and forgets the password when
-it exits.
+it exits. On Windows use `deploy\windows\migrate.ps1`, which does the same with text prompts (no `whiptail`).
 
 To do it by hand: the password does not have to be in the URL (and so needs no escaping), because
 libpq reads `PGPASSWORD`:
