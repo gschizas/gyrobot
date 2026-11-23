@@ -27,4 +27,5 @@ if __name__ == '__main__':
         host=os.environ.get('WEBAPP_HOST', '127.0.0.1'),
         port=int(os.environ.get('WEBAPP_PORT', '5709')),
         reload=True,
+        root_path=os.environ.get('WEBAPP_ROOT_PATH', '/eurobot/'),
     )
