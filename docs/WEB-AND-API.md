@@ -51,6 +51,30 @@ curl -X POST <base>/api/oauth/token \
 
 Send the token as `Authorization: Bearer <token>`.
 
+#### Creating a client
+
+Copy `config-examples/oauth2_clients.example.yml` to `config/oauth2_clients.yml` and add one entry per consumer:
+
+```yaml
+clients:
+  powerbi-directory:
+    secret: "<random>"
+    description: "Power BI GitHub users report"
+    scopes: [directory:read]
+```
+
+- **Client id**: the key under `clients:`. Any short, unique, stable string. It is also the username for HTTP Basic
+  auth and the user name that permission rules match, so renaming it breaks both.
+  - Use one client per consumer (`powerbi-hr-report`, `export-script`) so each has its own scopes and limits and can be
+    revoked separately.
+  - Use lowercase letters, digits and hyphens. No `:` (it breaks Basic auth) and no spaces.
+  - Do not put secrets or private organisation names in it; it appears in logs.
+- **Secret**: a long random value, for example `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+- **Scopes**: `onboarding` allows the write endpoints below, `directory:read` allows `GET /api/odata/*`. A client with
+  no `scopes` gets `onboarding` only. Give read-only consumers `directory:read` alone.
+
+The registry is cached for the life of the web process; restart it after editing.
+
 ### Endpoints
 
 All are `POST` with a JSON body (except where none is listed). Each returns `success`, `exit_code`, `output`,
