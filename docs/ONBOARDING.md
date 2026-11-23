@@ -22,7 +22,7 @@ Core concepts:
 
 | Command | Description |
 |---|---|
-| `onboard github [add] <username> <email> <team>` | Invites the GitHub user to the enterprise and records the invitation. `add` is optional. Validation checks that the GitHub user exists, is not already onboarded (also under an earlier username), that the team exists and that the email domain is allowed. The invitee also gets an email with the direct acceptance link. Once the invitation is accepted, the user is added to the team automatically (see `check`). |
+| `onboard github [add] <username> <email> <team> [--role <role>]` | Invites the GitHub user to the enterprise and records the invitation. `add` is optional. `--role` is optional: a role key or display name from the `roles` table (seeded by migration `0006`), recorded with the team in `team_memberships`. Validation checks that the GitHub user exists, is not already onboarded (also under an earlier username), that the team and role exist and that the email domain is allowed. The invitee also gets an email with the direct acceptance link. Once the invitation is accepted, the user is added to the team automatically (see `check`). |
 | `onboard github check` | Checks the pending GitHub invitations: users who accepted are assigned to their team, expired invitations are marked. Not gated by approval. It also runs on a schedule. Old name: `onboard github_check`. |
 | `onboard github cancel <login\|email\|invitation_id>` | Withdraws a pending invitation and marks the provision `cancelled`. Old name: `onboard github_cancel`. |
 | `onboard github expired [team_prefix] [-x]` | Invitations that expired unaccepted, with invitation and expiry times (from the database, since GitHub no longer has them). Not gated by approval. |

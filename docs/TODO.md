@@ -91,7 +91,13 @@ accepted/expired are not visible in the web UI or API. Options:
     commands, `permissions reload`/`show`, `webapp.routers.permissions:manage`). Group functions so that one rule
     covers a set, for example a named group of function names or a prefix match in `permission_rules`, and use it for
     the web UI's Administration section too (the dashboard currently checks `manage` and `permissions reload` separately).
-11. **Team roles and a team members page** (items 11 to 14 belong together; decide 14 first, since it shapes 11 and 13):
+11. **Team roles and a team members page** (items 11 to 14 belong together; decide 14 first, since it shapes 11 and 13).
+    **Decided:** roles live in the database (item 14, option B); a `team_memberships` table holds one role per person
+    per team; role edits go through the approval queue.
+    **DONE (slice 1, pending `alembic upgrade head` on the real database):** `roles` (seeded from the former enum) and
+    `team_memberships` (migration `0006`), optional `--role` on `onboard github` (chat, web form, API; the bulk web
+    page has no role column yet). **Remaining:** the members page (list/edit a team's roles), role on the other
+    onboard commands and `onboard move`, retire the unused `Role` enum, a roles admin page.
     - `Role` (`backend/providers/base.py`) and `ProvisionRequest.role` exist but nothing sets or stores a role yet.
     - Add an optional role to the onboarding commands/forms and store it. Options: a nullable `accounts.role`
       (one role per person; simplest), or a `role` on the team membership (one role per person per team, needed if

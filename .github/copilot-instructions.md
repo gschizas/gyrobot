@@ -379,7 +379,7 @@ def onboard_crowd(ctx, username, team):
 
 | Command / Group | Description |
 |---|---|
-| `onboard github [add] <username> <email> <team>` | Queue a GitHub Copilot licence invite + team assignment; `add` is the default subcommand of the `onboard github` group; `validate` checks the GitHub user/team exist and the email domain |
+| `onboard github [add] <username> <email> <team> [--role <role>]` | Queue a GitHub Copilot licence invite + team assignment; optional `--role` (a key from the `roles` table) is stored in `team_memberships`; `add` is the default subcommand of the `onboard github` group; `validate` checks the GitHub user/team exist, the role and the email domain |
 | `onboard github check` | Manually reconcile pending GitHub invitations: auto-assigns accepted users to their team (also the target of a scheduled/manual re-check, not gated by approval); hidden alias `onboard github_check` |
 | `onboard github cancel <login\|email\|invitation_id>` | Queue withdrawal of a pending GitHub invitation (approval-gated); hidden alias `onboard github_cancel` |
 | `onboard github expired [team_prefix] [-x]` | List invitations that expired unaccepted (read from the database, since GitHub no longer has them); not gated by approval |
