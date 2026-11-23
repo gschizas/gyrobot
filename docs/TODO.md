@@ -153,11 +153,10 @@ accepted/expired are not visible in the web UI or API. Options:
       `PreviousLogins` field, or a `GithubUsers/History` entity from the history table)? A person who was
       reinvited under a different email gets a second account, hence a second row; merging them would need a
       manual decision (compare `github_id` or `onboard whois`).
-16. **Modern GitHub node ids**: the listing derives the legacy global id (`base64("04:User<github_id>")`). GitHub's
-    newer ids (`U_kgDO...`) cannot be computed from the numeric id, so fetch `node_id` from the GitHub API when
-    onboarding (`GitHubApi.get_user_details` returns it), store it in the provision data, and backfill existing
-    provisions with a script like `scripts/backfill_github_ids.py`. Then switch the API's `NodeId` to the stored
-    value and drop the derivation. Not urgent.
+16. **Modern GitHub node ids** (done, to be run): onboarding now stores `global_id` (`U_kgDO...`, fetched with
+    `X-Github-Next-Global-ID: 1`) next to `github_id`, and `scripts/backfill_github_ids.py <env> --apply` fills in
+    both for existing provisions. The API exposes `GlobalId` (stored) next to `NodeId` (the legacy id, derived from
+    the numeric one). Once everything is backfilled, decide whether to drop the derived `NodeId`.
 
 ## Per-instance configuration and data
 

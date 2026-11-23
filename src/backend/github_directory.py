@@ -23,6 +23,7 @@ _team = func.coalesce(MembershipRow.team, AccountRow.team)
 FIELDS: dict[str, ColumnElement] = {
     'Login': _login,
     'GithubId': _github_id,
+    'GlobalId': ProvisionRow.data['global_id'].astext,
     'Email': AccountRow.primary_email,
     'Team': _team,
     'Role': MembershipRow.role_key,
@@ -33,8 +34,8 @@ FIELDS: dict[str, ColumnElement] = {
 }
 
 
-FIELD_TYPES = {'Login': 'string', 'GithubId': 'int', 'Email': 'string', 'Team': 'string', 'Role': 'string',
-               'RoleName': 'string', 'Status': 'string', 'LastChanged': 'datetime'}
+FIELD_TYPES = {'Login': 'string', 'GithubId': 'int', 'GlobalId': 'string', 'Email': 'string', 'Team': 'string',
+               'Role': 'string', 'RoleName': 'string', 'Status': 'string', 'LastChanged': 'datetime'}
 
 
 def node_id(github_id: Optional[int]) -> Optional[str]:

@@ -116,7 +116,7 @@ appear once, with their main team and an empty role). Read-only; every status is
 | Property | Meaning |
 |---|---|
 | `Id` | `<login>\|<team>`, the entity key |
-| `Login`, `GithubId`, `NodeId` | GitHub login, numeric id, and the legacy global node id derived from it |
+| `Login`, `GithubId`, `NodeId`, `GlobalId` | GitHub login, numeric id, the legacy node id derived from it (`MDQ6...`), and the stored next-generation global node id (`U_kgDO...`, empty until backfilled) |
 | `Email` | primary email |
 | `Team`, `Role`, `RoleName` | canonical team, role key and display name |
 | `Status` | provision status (`invited`, `assigned`, `active`, `removed`, ...) |
