@@ -27,7 +27,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from webapp.bootstrap import ensure_commands_imported
 from webapp.config import session_secret
-from webapp.routers import api, permissions, web
+from webapp.routers import api, odata, permissions, web
 
 hostname = subprocess.check_output(["hostname"]).decode().strip()
 print(f"Starting FastAPI application on host: {hostname}...")
@@ -76,3 +76,4 @@ def static_file(path: str):
 app.include_router(web.router)
 app.include_router(permissions.router)
 app.include_router(api.router)
+app.include_router(odata.router)
