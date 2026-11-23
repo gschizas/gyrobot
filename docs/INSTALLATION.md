@@ -83,17 +83,30 @@ The schema is managed by Alembic. Run it after every pull that adds a file under
 `migrations/versions/`, **before** restarting (the new code expects the new tables):
 
 ```sh
-export MIGRATIONS_DATABASE_URL='postgresql://<owner>:<password>@<host>/<database>'
+deploy/migrate.sh
+```
+
+`deploy/migrate.sh` (needs `whiptail`) lists the instances in `.env.d/`, then asks for the database
+user (default `postgres`) and its password. It reuses the host, port and database from the
+instance's env file, runs `alembic upgrade head` and `alembic check`, and forgets the password when
+it exits.
+
+To do it by hand: the password does not have to be in the URL (and so needs no escaping), because
+libpq reads `PGPASSWORD`:
+
+```sh
+export PGPASSWORD='<password>'
+export MIGRATIONS_DATABASE_URL='postgresql://<owner>@<host>/<database>'
 uv run alembic -x env=myinstance upgrade head
 uv run alembic -x env=myinstance check        # optional: model vs. database drift
-unset MIGRATIONS_DATABASE_URL
+unset PGPASSWORD MIGRATIONS_DATABASE_URL
 ```
 
 `MIGRATIONS_DATABASE_URL` takes precedence over the `*_DATABASE_URL` variables in the env file. Use
-it with the connection string of a role that **owns** the tables, because the bot's normal database
+it with a role that **owns** the tables, because the bot's normal database
 user usually does not (`CREATE INDEX IF NOT EXISTS` and `ALTER TABLE` need ownership even when
 nothing changes). Set it only for this command; do not put it in `.env.d/`. If the normal user
-owns the tables, you can skip the variable.
+owns the tables, you can skip the variables.
 
 The units are rendered with the user, repository directory and `uv` path filled in; rerun
 `install_services.sh` if you move the checkout or change the user. The web app binds to
@@ -129,7 +142,10 @@ use, generates `.winsw\<service>.exe` and `.xml` (git-ignored), installs them an
   `PYTHONUTF8=1` is set so emoji don't break the console encoding.
 - Manage them with the normal tools: `Get-Service gyrobot-*`, `Restart-Service gyrobot-myinstance`,
   or `.winsw\gyrobot-myinstance.exe status|restart|stop`.
-- After `git pull`: run `uv sync`, then `Restart-Service gyrobot-myinstance` (and the web one).
+- After `git pull`: run `uv sync`, then the database migrations (set `$env:PGPASSWORD` and
+  `$env:MIGRATIONS_DATABASE_URL` for the owner, run `uv run alembic -x env=myinstance upgrade head`, then
+  remove both variables; see "Database migrations" above), then
+  `Restart-Service gyrobot-myinstance` (and the web one).
 - `-RenderOnly` only generates the files, for review; `-Uninstall` removes the services.
 - To make the services depend on something (e.g. a local database), add `<depend>` entries to
   `deploy\windows\service.xml` and rerun the installer.
