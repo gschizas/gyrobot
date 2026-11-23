@@ -95,8 +95,8 @@ accepted/expired are not visible in the web UI or API. Options:
     **Decided:** roles live in the database (item 14, option B); a `team_memberships` table holds one role per person
     per team; role edits go through the approval queue.
     **DONE (slice 1, pending `alembic upgrade head` on the real database):** `roles` (seeded from the former enum) and
-    `team_memberships` (migration `0006`), optional `--role` on `onboard github` (chat, web form, API; the bulk web
-    page has no role column yet). **Remaining:** the members page (list/edit a team's roles), role on the other
+    `team_memberships` (migration `0006`), optional `--role` on `onboard github` (chat, web form, bulk web page, API).
+    **Remaining:** the members page (list/edit a team's roles), role on the other
     onboard commands and `onboard move`, retire the unused `Role` enum, a roles admin page.
     - `Role` (`backend/providers/base.py`) and `ProvisionRequest.role` exist but nothing sets or stores a role yet.
     - Add an optional role to the onboarding commands/forms and store it. Options: a nullable `accounts.role`
