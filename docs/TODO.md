@@ -142,6 +142,22 @@ accepted/expired are not visible in the web UI or API. Options:
       can't be edited from the UI.
     - Prefer B, seeded from the current enum by a migration. Open: should a missing role be allowed (the role is
       optional), and what happens to memberships when a role is retired (deactivate rather than delete).
+15. **GitHub users listing API (OData)**: `GET /api/odata/GithubUsers` (in progress, see `WEB-AND-API.md`). One
+    row per person and team membership, with login, node id, email, team, role, status and last change; paged
+    (100 by default, 1000 at most). Decided: HTTP Basic (`client_id:secret`) is accepted next to bearer tokens (for
+    Excel and Power BI), scopes per client plus a permission rule limiting the readable team prefixes.
+    - **Reinvited users**: there is only one GitHub provision per account (`account_id` + `resource` is unique), so
+      someone who lost their GitHub account and was removed and invited again keeps the same row: the new login,
+      `github_id` and status replace the old ones, and the old values only exist in `account_provision_history`.
+      The listing therefore shows the current login only. Open: should the API also expose the previous logins (a
+      `PreviousLogins` field, or a `GithubUsers/History` entity from the history table)? A person who was
+      reinvited under a different email gets a second account, hence a second row; merging them would need a
+      manual decision (compare `github_id` or `onboard whois`).
+16. **Modern GitHub node ids**: the listing derives the legacy global id (`base64("04:User<github_id>")`). GitHub's
+    newer ids (`U_kgDO...`) cannot be computed from the numeric id, so fetch `node_id` from the GitHub API when
+    onboarding (`GitHubApi.get_user_details` returns it), store it in the provision data, and backfill existing
+    provisions with a script like `scripts/backfill_github_ids.py`. Then switch the API's `NodeId` to the stored
+    value and drop the derivation. Not urgent.
 
 ## Per-instance configuration and data
 
