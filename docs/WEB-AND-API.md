@@ -92,3 +92,46 @@ All are `POST` with a JSON body (except where none is listed). Each returns `suc
 | `/api/admin/permissions/reload` | none | `permissions reload` |
 
 A successful call to an onboarding endpoint means the request was **queued**, not executed.
+
+### GitHub users listing (OData)
+
+`GET /api/odata/GithubUsers` lists GitHub users, one row per person and team membership (people without a membership
+appear once, with their main team and an empty role). Read-only; every status is listed (`Status` column).
+
+| Property | Meaning |
+|---|---|
+| `Id` | `<login>\|<team>`, the entity key |
+| `Login`, `GithubId`, `NodeId` | GitHub login, numeric id, and the legacy global node id derived from it |
+| `Email` | primary email |
+| `Team`, `Role`, `RoleName` | canonical team, role key and display name |
+| `Status` | provision status (`invited`, `assigned`, `active`, `removed`, ...) |
+| `LastChanged` | latest change of the account, the GitHub provision or the membership |
+
+Only the **current** login is shown. Someone who lost their GitHub account and was reinvited keeps one row with the
+new login (see `docs/TODO.md`, item 15).
+
+Supported query options: `$filter` (`eq ne gt ge lt le`, `and or not`, parentheses, `startswith endswith contains`),
+`$orderby`, `$select`, `$top` (default 100, at most 1000), `$skip`, `$count=true`. Anything else returns an OData
+error (HTTP 400). Page through the results by following `@odata.nextLink`. `$metadata` is served for Excel and
+Power BI. The team prefix is just a filter, or the shortcut `?team_prefix=<prefix>`:
+
+```sh
+curl -u <client-id>:<secret> "<base>/api/odata/GithubUsers?\$filter=startswith(Team,'<prefix>')&\$top=100"
+```
+
+**Authentication**: a bearer token (as above) or HTTP Basic with the client id and secret (Excel and Power BI cannot
+do the client-credentials flow). Basic is refused over plain HTTP unless `WEBAPP_ALLOW_BASIC_HTTP=1` (development
+only); behind a proxy, make it send `X-Forwarded-Proto`. The client needs the `directory:read` scope.
+
+**Authorization**: the client also needs a permission rule for function `webapp.routers.odata:list_github_users`,
+channel `$api`, with the client id in `users`. Without a rule, access is denied. Optional `extra` limits the teams:
+
+```json
+{"team_prefixes": ["platform", "data"]}
+```
+
+Rows outside these prefixes are never returned, whatever the `$filter`. Add the rule in `/admin/permissions` and run
+`permissions reload` for the bot (the web process picks it up on its own reload/restart).
+
+**Excel / Power BI**: use *Get data > From OData feed* with `<base>/api/odata`, choose *Basic* authentication and
+enter the client id and secret.

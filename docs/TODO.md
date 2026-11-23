@@ -142,7 +142,7 @@ accepted/expired are not visible in the web UI or API. Options:
       can't be edited from the UI.
     - Prefer B, seeded from the current enum by a migration. Open: should a missing role be allowed (the role is
       optional), and what happens to memberships when a role is retired (deactivate rather than delete).
-15. **GitHub users listing API (OData)**: `GET /api/odata/GithubUsers` (in progress, see `WEB-AND-API.md`). One
+15. **GitHub users listing API (OData)**: `GET /api/odata/GithubUsers` (implemented, untested against the real database; see `WEB-AND-API.md`). One
     row per person and team membership, with login, node id, email, team, role, status and last change; paged
     (100 by default, 1000 at most). Decided: HTTP Basic (`client_id:secret`) is accepted next to bearer tokens (for
     Excel and Power BI), scopes per client plus a permission rule limiting the readable team prefixes.
