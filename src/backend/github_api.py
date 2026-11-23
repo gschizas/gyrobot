@@ -295,6 +295,18 @@ class GitHubApi():
         resp.raise_for_status()
         return resp.json()
 
+    def get_user_ids(self, username) -> dict:
+        """The numeric id (``github_id``) and the next-generation global node id (``global_id``, ``U_kgDO...``).
+
+        The header makes GitHub return the new format for every account, including old ones that would
+        otherwise get the legacy ``MDQ6...`` id (which can be derived from the numeric id).
+        """
+        resp = self.ses_ent.get(f"{GITHUB_API_URL}/users/{username}", headers={'X-Github-Next-Global-ID': '1'},
+                                timeout=15)
+        resp.raise_for_status()
+        user = resp.json()
+        return {'github_id': user['id'], 'global_id': user['node_id']}
+
     def get_sso_identity(self, username):
         url = f"{GITHUB_API_URL}/orgs/{self.organization}/memberships/{username}"
         response = self.ses_org.get(url)

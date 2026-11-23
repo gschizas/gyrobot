@@ -250,9 +250,9 @@ def onboard_github(ctx: ExtendedContext, username: str, email: str, team: str, r
     """
     provision_data = {'username': username, 'email': email, 'team': team}
     try:
-        provision_data['github_id'] = GitHubApi().get_user_details(username)['id']
+        provision_data.update(GitHubApi().get_user_ids(username))
     except Exception as e:
-        # Not fatal: scripts/backfill_github_ids.py can fill it in later
+        # Not fatal: scripts/backfill_github_ids.py can fill the ids in later
         ctx.logger.warning(f"Could not look up GitHub id of {username}: {e}")
 
     # For now, provision via the stub (using email for ProviderAccount)
@@ -406,7 +406,7 @@ def github_set_email(ctx: ExtendedContext, username: str, email: str):
     data = {'username': username, 'email': email, 'recorded_by': ctx.chat.user_id,
             'recorded_at': datetime.datetime.now(tz=datetime.timezone.utc).isoformat()}
     try:
-        data['github_id'] = api.get_user_details(username)['id']
+        data.update(api.get_user_ids(username))
     except Exception as e:
         ctx.logger.warning(f"Could not look up GitHub id of {username}: {e}")
 
