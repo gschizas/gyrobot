@@ -145,8 +145,31 @@ channel `$api`, with the client id in `users`. Without a rule, access is denied.
 {"team_prefixes": ["platform", "data"]}
 ```
 
-Rows outside these prefixes are never returned, whatever the `$filter`. Add the rule in `/admin/permissions` and run
-`permissions reload` for the bot (the web process picks it up on its own reload/restart).
+Rows outside these prefixes are never returned, whatever the `$filter`.
 
-**Excel / Power BI**: use *Get data > From OData feed* with `<base>/api/odata`, choose *Basic* authentication and
-enter the client id and secret.
+To set it up for a new consumer:
+
+1. Add the client to `config/oauth2_clients.yml` with `scopes: [directory:read]` and restart the web process.
+2. In `/admin/permissions`, create a rule:
+   - **Function**: `webapp.routers.odata:list_github_users`
+   - **Environment**: the global one (blank), **Role**: `default`
+   - **Users**: the client id (one per line; `*` allows any client with the scope)
+   - **Channels**: `$api`
+   - **Extra**: `{"team_prefixes": ["<prefix>"]}`, or empty for all teams
+3. Saving refreshes the web process's cache, and the API runs in that process, so it applies at once. Run
+   `permissions reload` only if the chat bot should see the rule too.
+
+Without the scope you get 403, and without the rule you get 403.
+
+**Excel**:
+
+1. *Data > Get Data > From Other Sources > From OData Feed*.
+2. URL: `https://<host>/eurobot/api/odata/GithubUsers` (development: `http://localhost:<port>/api/odata/GithubUsers`,
+   with `WEBAPP_ALLOW_BASIC_HTTP=1`). A filter can go in the URL, for example `?$filter=startswith(Team,'<prefix>')`.
+3. Choose **Basic** authentication; the user name is the client id and the password is the client secret.
+4. In the navigator, select **GithubUsers**, then **Load** (or **Transform Data**). Power Query follows
+   `@odata.nextLink`, so you get all rows, not just the first 100.
+
+Notes: Excel remembers credentials per URL (change them in *Data > Get Data > Data Source Settings*); it reads
+`$metadata` first, so a 403 there means the scope or the rule is missing. **Power BI** is the same: *Get data > OData
+feed*, then Basic.
