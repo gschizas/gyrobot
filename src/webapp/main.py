@@ -48,15 +48,33 @@ def _register_notification_sender():
 
 _register_notification_sender()
 
-root_path = os.environ.get('WEBAPP_ROOT_PATH', '/eurobot/')
 allowed_hosts = os.environ.get('WEBAPP_ALLOWED_HOSTS', '').split(',')
 
 app = FastAPI(
     title='GyroBot Onboarding Interface',
     description='Web UI (LDAP-authenticated) and REST API (OAuth2 client-credentials) '
-               'for the onboard/offboard chat bot commands.',
-    root_path=root_path
+               'for the onboard/offboard chat bot commands.'
 )
+
+
+class RootPathMiddleware:
+    """Sets the URL prefix of the proxy (``WEBAPP_ROOT_PATH``) on every request, however the server was started.
+
+    Replaces ``FastAPI(root_path=...)``, which is deprecated; the prefix is stripped by the proxy, so only the
+    generated links need it.
+    """
+
+    def __init__(self, asgi_app, root_path: str):
+        self.asgi_app = asgi_app
+        self.root_path = root_path.rstrip('/')
+
+    async def __call__(self, scope, receive, send):
+        if scope['type'] in ('http', 'websocket') and self.root_path:
+            scope = {**scope, 'root_path': self.root_path}
+        await self.asgi_app(scope, receive, send)
+
+
+app.add_middleware(RootPathMiddleware, root_path=os.environ.get('WEBAPP_ROOT_PATH', '/eurobot/'))
 if allowed_hosts:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=[hostname, "localhost"] + allowed_hosts)
 app.add_middleware(SessionMiddleware, secret_key=session_secret())
