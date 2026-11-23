@@ -12,7 +12,7 @@ Run with `python src/run_webapp.py <env-name>` (reads `.env.d/<env-name>.env`) o
 |---|---|
 | `WEBAPP_SESSION_SECRET` | Signs the web session cookie. |
 | `WEBAPP_JWT_SECRET` | Signs REST API access tokens. |
-| `LDAP_SERVER_URL`, `LDAP_BIND_DN_TEMPLATE` | LDAP authentication of the web UI. |
+| `LDAP_SERVER`, `LDAP_USERNAME_PATTERN`, `LDAP_AUTHENTICATION_TYPE` | LDAP authentication of the web UI: the server, the bind name with `{}` for the username (`DOMAIN\{}`, `{}@domain.corp` or a DN), and `NTLM` (default) or `SIMPLE`. |
 | `OAUTH2_CLIENTS_CONFIGURATION` | API client registry (default `config/oauth2_clients.yml`). |
 | `WEBAPP_ROOT_PATH`, `WEBAPP_ALLOWED_HOSTS` | URL prefix (default `/eurobot/`) and accepted host names. |
 | `APPROVAL_DATABASE_URL`, `PERMISSIONS_DATABASE_URL` | Needed by the underlying commands. |

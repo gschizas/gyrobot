@@ -9,7 +9,8 @@ Required environment variables:
 
 * ``WEBAPP_SESSION_SECRET`` -- signs the Web UI session cookie.
 * ``WEBAPP_JWT_SECRET`` -- signs REST API OAuth2 access tokens.
-* ``LDAP_SERVER_URL`` / ``LDAP_BIND_DN_TEMPLATE`` -- Web UI LDAP authentication.
+* ``LDAP_SERVER`` / ``LDAP_USERNAME_PATTERN`` (and optionally ``LDAP_AUTHENTICATION_TYPE``) -- Web UI LDAP
+  authentication.
 * ``OAUTH2_CLIENTS_CONFIGURATION`` (optional, default ``config/oauth2_clients.yml``)
   -- REST API client_id/client_secret registry.
 * ``APPROVAL_DATABASE_URL`` / ``PERMISSIONS_DATABASE_URL`` -- required by the
