@@ -15,8 +15,13 @@
             {% if team_tree_error %}<div class="error">{{ team_tree_error }}</div>{% endif %}
             <input type="text" id="{{ f.name }}" name="{{ f.name }}" {% if f.required %}required{% endif %}>
             {% endif %}
-        {% else %}
+        {% elif f.type == 'role' %}
             <label for="{{ f.name }}">{{ f.label }}</label>
+            <select id="{{ f.name }}" name="{{ f.name }}">
+                <option value="">(none)</option>
+                {% for key, display_name in roles %}<option value="{{ key }}">{{ display_name }}</option>{% endfor %}
+            </select>
+        {% else %}
             <input type="text" id="{{ f.name }}" name="{{ f.name }}" {% if f.required %}required{% endif %}>
         {% endif %}
     {% endfor %}

@@ -9,7 +9,8 @@ from backend import bot_identity
 from backend.account_storage import (find_provisions_by_any_username, find_provisions_by_github_id, get_account, get_account_by_email,
                                      get_provision, LIVE_STATUSES,
                                      find_provisions_by_username, get_last_status_times, get_or_create_account, get_pending_provisions,
-                                     get_provisions, rename_github_team, set_provision_status)
+                                     get_provisions, list_roles, rename_github_team, resolve_role, set_membership,
+                                     set_provision_status)
 from backend.accounts import Provision
 from backend.approval import requires_approval
 from backend.arguments import extract_email
@@ -25,7 +26,8 @@ from commands.team_columns import team_level_columns
 
 
 def _github_summary(params: dict) -> str:
-    return f"onboard {params['username']} to GitHub team {params['team']}"
+    role = f" as {params['role']}" if params.get('role') else ''
+    return f"onboard {params['username']} to GitHub team {params['team']}{role}"
 
 
 github_client: GitHubApi | None = None
@@ -59,6 +61,12 @@ def _github_validate(params: dict, ctx: ExtendedContext) -> str | None:
         github_client = GitHubApi()
 
     username = params['username']
+    if params.get('role'):
+        role_key = resolve_role(params['role'])
+        if role_key is None:
+            valid = ', '.join(r.key for r in list_roles())
+            return f"Unknown role '{params['role']}'. Valid roles: {valid}."
+        params['role'] = role_key
     params['team'] = params['team'].strip().lower().removeprefix('ent:')
     team = 'ent:' + params['team']
 
@@ -232,12 +240,13 @@ def github_pending_invitations(ctx: ExtendedContext, team_prefix: str | None, as
 @click.argument('username')
 @click.argument('email')
 @click.argument('team')
+@click.option('-r', '--role', default=None, help='Optional role in the team (e.g. scrum_master)')
 @click.pass_context
 @requires_approval(summarize=_github_summary, validate=_github_validate)
-def onboard_github(ctx: ExtendedContext, username: str, email: str, team: str):
+def onboard_github(ctx: ExtendedContext, username: str, email: str, team: str, role: str | None):
     """Onboard a colleague for GitHub Copilot.
 
-    USAGE: bot onboard github [add] <username> <email> <team>
+    USAGE: bot onboard github [add] <username> <email> <team> [--role <role>]
     """
     provision_data = {'username': username, 'email': email, 'team': team}
     try:
@@ -248,7 +257,7 @@ def onboard_github(ctx: ExtendedContext, username: str, email: str, team: str):
 
     # For now, provision via the stub (using email for ProviderAccount)
     # In real integration, the provider will populate node_id, login, enterprise_user_id
-    account_obj = ProvisionRequest(name=email.split('@')[0], userid=username, email=email, team=team)
+    account_obj = ProvisionRequest(name=email.split('@')[0], userid=username, email=email, team=team, role=role)
     message = PROVIDERS['github'].provision(ctx, account_obj)
 
     provision_data.update(account_obj.provision_data)
@@ -256,6 +265,7 @@ def onboard_github(ctx: ExtendedContext, username: str, email: str, team: str):
     # Store account and provision status
     account = get_or_create_account(primary_email=email, name=username, team=team)
     set_provision_status(account.id, 'github', 'invited', provision_data)
+    set_membership(account.id, team, role)
 
     message += _send_invitation_email(ctx, username, email, team)
 

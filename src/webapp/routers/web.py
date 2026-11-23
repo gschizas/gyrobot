@@ -21,7 +21,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from backend.account_storage import find_provisions_by_username
+from backend.account_storage import find_provisions_by_username, list_roles
 from backend.github_api import GitHubApi
 from webapp import config
 from webapp.auth_ldap import ldap_authenticate
@@ -48,6 +48,7 @@ FORMS = {
             {'name': 'username', 'label': 'GitHub username', 'required': True},
             {'name': 'email', 'label': 'Email address', 'required': True},
             {'name': 'team', 'label': 'Enterprise team', 'required': True, 'type': 'team_tree'},
+            {'name': 'role', 'label': 'Role (optional)', 'required': False, 'type': 'role'},
         ],
     },
     'crowd': {
@@ -177,6 +178,7 @@ def onboarding_form(request: Request, action: str):
     context = {'user': _current_user(request), 'action': action, **form}
     if action == 'github':
         context['team_tree'], context['team_tree_error'] = _github_team_tree()
+        context['roles'] = [(r.key, r.display_name) for r in list_roles()]
     return templates.TemplateResponse(request, 'form.html', context)
 
 
@@ -418,7 +420,10 @@ async def move_bulk_submit(request: Request):
 
 def _build_args(action: str, form_data) -> list[str] | None:
     if action == 'github':
-        return ['onboard', 'github', form_data['username'], form_data['email'], form_data['team']]
+        args = ['onboard', 'github', form_data['username'], form_data['email'], form_data['team']]
+        if role := str(form_data.get('role') or '').strip():
+            args += ['--role', role]
+        return args
     if action == 'crowd':
         return ['onboard', 'crowd', form_data['username'], form_data['team']]
     if action == 'jetbrains':

@@ -22,6 +22,6 @@ class ProvisionRequest:
     email: str
     userid: str
     team: str
-    role: Optional[Role] = None
+    role: Optional[str] = None
     # Extra values a provider wants persisted with the provision (e.g. an invitation id)
     provision_data: dict = field(default_factory=dict)

@@ -8,12 +8,14 @@ class GithubOnboardRequest(BaseModel):
     username: str = Field(..., description="GitHub username to invite")
     email: str = Field(..., description="Colleague's email address")
     team: str = Field(..., description="Enterprise team slug to assign once accepted")
+    role: Optional[str] = Field(None, description="Optional role in the team (a role key, e.g. scrum_master)")
 
 
 class GithubBulkOnboardItem(BaseModel):
     username: str = Field(..., description="GitHub username to invite")
     email: str = Field(..., description="Colleague's email address")
     team: str = Field(..., description="Enterprise team slug to assign once accepted")
+    role: Optional[str] = Field(None, description="Optional role in the team (a role key, e.g. scrum_master)")
 
 
 class GithubBulkOnboardRequest(BaseModel):

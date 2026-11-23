@@ -60,9 +60,16 @@ def _run(args: list[str], client_id: str) -> CommandResult:
         messages=result.messages, error=result.error)
 
 
+def _github_args(item) -> list[str]:
+    args = ['onboard', 'github', item.username, item.email, item.team]
+    if item.role:
+        args += ['--role', item.role]
+    return args
+
+
 @router.post('/onboarding/github', response_model=CommandResult)
 def onboard_github(payload: GithubOnboardRequest, client_id: str = Depends(get_current_client)):
-    return _run(['onboard', 'github', payload.username, payload.email, payload.team], client_id)
+    return _run(_github_args(payload), client_id)
 
 
 @router.post('/onboarding/github/bulk', response_model=list[CommandResult])
@@ -73,8 +80,7 @@ def onboard_github_bulk(payload: GithubBulkOnboardRequest, client_id: str = Depe
     :func:`onboard_github` (including the approval queue), independently -
     one item failing doesn't stop the rest from being processed.
     """
-    return [_run(['onboard', 'github', item.username, item.email, item.team], client_id)
-            for item in payload.items]
+    return [_run(_github_args(item), client_id) for item in payload.items]
 
 
 @router.post('/onboarding/crowd', response_model=CommandResult)
