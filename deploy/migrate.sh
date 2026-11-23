@@ -30,26 +30,7 @@ PGPASSWORD="$(whiptail --title 'PostgreSQL' --passwordbox "Password of $db_user"
 export PGPASSWORD
 
 # Same connection as the instance, but as db_user and without a password.
-MIGRATIONS_DATABASE_URL="$(PYTHONPATH=src uv run python - "$env_name" "$db_user" <<'EOF'
-import os
-import sys
-
-from sqlalchemy.engine import URL, make_url
-
-from backend.secret_store import load_environment
-
-env_name, db_user = sys.argv[1:3]
-load_environment(env_name)
-for name in ('MIGRATIONS_DATABASE_URL', 'APPROVAL_DATABASE_URL', 'PERMISSIONS_DATABASE_URL', 'KUDOS_DATABASE_URL'):
-    if dsn := os.environ.get(name):
-        break
-else:
-    raise SystemExit(f'No database URL in .env.d/{env_name}.env')
-url = make_url(dsn)
-url = URL.create('postgresql', username=db_user, host=url.host, port=url.port, database=url.database, query=url.query)
-print(url.render_as_string(hide_password=False))
-EOF
-)"
+MIGRATIONS_DATABASE_URL="$(uv run python deploy/migration_url.py "$env_name" "$db_user")"
 export MIGRATIONS_DATABASE_URL
 
 echo "Migrating $MIGRATIONS_DATABASE_URL"
