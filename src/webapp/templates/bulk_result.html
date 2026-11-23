@@ -8,7 +8,7 @@
 {% for row in rows %}
 <div class="bulk-row">
     <h2>{{ row.username }}</h2>
-    <p>Email: {{ row.email }} &middot; Team: {{ row.team }}</p>
+    <p>Email: {{ row.email }} &middot; Team: {{ row.team }}{% if row.role %} &middot; Role: {{ row.role }}{% endif %}</p>
     {% if row.error %}
     <div class="error">{{ row.error }}</div>
     {% else %}

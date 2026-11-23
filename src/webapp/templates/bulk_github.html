@@ -5,14 +5,14 @@
 <p>Add one row per colleague. GitHub username, email address, and enterprise team are
 all required per row; entirely blank rows are ignored. Type/paste a team slug directly,
 or use the browse (🌳) button to pick one from the team tree.</p>
-<p class="hint">Tip: you can copy a range of cells (username / email / team columns, in that
+<p class="hint">Tip: you can copy a range of cells (username / email / team / role columns, in that
 order) from Excel and paste it directly into any cell below &mdash; it will fill that cell and
 the following rows/columns automatically, adding rows as needed.</p>
 {% if team_tree_error %}<div class="error">{{ team_tree_error }}</div>{% endif %}
 <form method="post" action="{{ request.url_for('github_bulk_submit') }}" id="bulk-form">
 <table id="bulk-table">
     <thead>
-        <tr><th>GitHub username</th><th></th><th>Email address</th><th>Team</th><th></th></tr>
+        <tr><th>GitHub username</th><th></th><th>Email address</th><th>Team</th><th>Role</th><th></th></tr>
     </thead>
     <tbody id="bulk-table-body"></tbody>
 </table>
@@ -43,6 +43,12 @@ the following rows/columns automatically, adding rows as needed.</p>
                 {% endif %}
             </div>
         </td>
+        <td>
+            <select name="role">
+                <option value="">(none)</option>
+                {% for key, display_name in roles %}<option value="{{ key }}">{{ display_name }}</option>{% endfor %}
+            </select>
+        </td>
         <td><button type="button" class="remove-row">&times;</button></td>
     </tr>
 </template>
@@ -69,7 +75,7 @@ attachGithubUserValidation(document.getElementById('bulk-form'),
     document.getElementById('add-row').addEventListener('click', function () { addRow(); });
     for (let i = 0; i < 3; i++) addRow();
 
-    attachGridPaste(tbody, ['username', 'email', 'team'], addRow);
+    attachGridPaste(tbody, ['username', 'email', 'team', 'role'], addRow);
     attachTeamPicker(tbody);
 })();
 </script>

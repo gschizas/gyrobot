@@ -274,6 +274,7 @@ def github_bulk_form(request: Request):
     return templates.TemplateResponse(request, 'bulk_github.html', {
         'user': _current_user(request), 'team_tree': team_tree, 'team_tree_error': team_tree_error,
         'team_options': team_options, 'email_placeholder': _github_email_placeholder(),
+        'roles': [(r.key, r.display_name) for r in list_roles()],
     })
 
 
@@ -286,23 +287,28 @@ async def github_bulk_submit(request: Request):
     usernames = form_data.getlist('username')
     emails = form_data.getlist('email')
     teams = form_data.getlist('team')
+    roles = form_data.getlist('role')
 
     user = _current_user(request)
     rows = []
-    for username, email, team in zip(usernames, emails, teams):
-        username, email, team = username.strip(), email.strip(), team.strip()
+    for username, email, team, role in zip(usernames, emails, teams, roles):
+        username, email, team, role = username.strip(), email.strip(), team.strip(), role.strip()
         if not (username or email or team):
             continue  # fully blank row - silently skipped
 
         if not (username and email and team):
-            rows.append({'username': username, 'email': email, 'team': team, 'result': None,
+            rows.append({'username': username, 'email': email, 'team': team, 'role': role, 'result': None,
                         'error': 'Missing GitHub username, email, or team.'})
             continue
 
+        args = ['onboard', 'github', username, email, team]
+        if role:
+            args += ['--role', role]
         result = run_bot_command(
-            ['onboard', 'github', username, email, team], user_id=user,
+            args, user_id=user,
             channel_name=config.web_channel_name(), team_name=config.web_team_name())
-        rows.append({'username': username, 'email': email, 'team': team, 'result': result, 'error': None})
+        rows.append({'username': username, 'email': email, 'team': team, 'role': role, 'result': result,
+                     'error': None})
 
     return templates.TemplateResponse(request, 'bulk_result.html', {'user': user, 'rows': rows})
 
