@@ -33,6 +33,10 @@ FIELDS: dict[str, ColumnElement] = {
 }
 
 
+FIELD_TYPES = {'Login': 'string', 'GithubId': 'int', 'Email': 'string', 'Team': 'string', 'Role': 'string',
+               'RoleName': 'string', 'Status': 'string', 'LastChanged': 'datetime'}
+
+
 def node_id(github_id: Optional[int]) -> Optional[str]:
     """The legacy global node id of a user (``base64("04:User<id>")``); the newer ``U_kg...`` ids are not derivable."""
     if github_id is None:
