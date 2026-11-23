@@ -14,7 +14,8 @@ from sqlalchemy.orm import Session
 
 from backend.accounts import Account, Provision
 from backend.database import get_engine
-from backend.models.accounts import AccountHistoryRow, AccountRow, ProvisionHistoryRow, ProvisionRow
+from backend.models.accounts import AccountHistoryRow, AccountRow, MembershipRow, ProvisionHistoryRow, ProvisionRow, \
+    RoleRow
 
 if 'APPROVAL_DATABASE_URL' not in os.environ:
     raise ImportError('APPROVAL_DATABASE_URL not found in environment')
@@ -270,6 +271,46 @@ def rename_github_team(old_team: str, new_team: str) -> tuple[int, int]:
             session.add(ProvisionHistoryRow(account_id=row.account_id, resource=row.resource,
                                             previous_status=row.status, status=row.status, data=row.data))
     return len(accounts), len(provisions)
+
+
+def list_roles(active_only: bool = True) -> List[RoleRow]:
+    """Roles ordered by display name; retired ones only when ``active_only`` is False."""
+    with _session() as session:
+        query = select(RoleRow).order_by(RoleRow.display_name)
+        if active_only:
+            query = query.where(RoleRow.active)
+        rows = session.scalars(query).all()
+        session.expunge_all()
+        return list(rows)
+
+
+def resolve_role(value: str) -> Optional[str]:
+    """The key of the active role that ``value`` names (its key or display name, ignoring case), else None."""
+    wanted = value.strip().lower().replace(' ', '_')
+    for role in list_roles():
+        if wanted in (role.key.lower(), role.display_name.lower().replace(' ', '_')):
+            return role.key
+    return None
+
+
+def set_membership(account_id: UUID, team: str, role_key: Optional[str] = None) -> None:
+    """Record that the account is in ``team``. A given ``role_key`` replaces the stored one; None leaves it as it is."""
+    with _session() as session, session.begin():
+        statement = insert(MembershipRow).values(account_id=account_id, team=team, role_key=role_key)
+        update_values = {'updated_at': func.now()}
+        if role_key is not None:
+            update_values['role_key'] = role_key
+        session.execute(statement.on_conflict_do_update(
+            index_elements=[MembershipRow.account_id, MembershipRow.team], set_=update_values))
+
+
+def get_account_memberships(account_id: UUID) -> List[MembershipRow]:
+    """The teams the account is in, with their roles."""
+    with _session() as session:
+        rows = session.scalars(select(MembershipRow).where(MembershipRow.account_id == account_id)
+                               .order_by(MembershipRow.team)).all()
+        session.expunge_all()
+        return list(rows)
 
 
 def get_account_provisions(account_id: UUID) -> List[Provision]:

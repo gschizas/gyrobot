@@ -2,8 +2,8 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Integer, PrimaryKeyConstraint, Text, UniqueConstraint, \
-    func, text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, PrimaryKeyConstraint, Text, \
+    UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -67,6 +67,36 @@ class ProvisionHistoryRow(Base):
     status: Mapped[str] = mapped_column(Text)
     data: Mapped[Any] = mapped_column(JSONB, server_default=_EMPTY_OBJECT)
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class RoleRow(Base):
+    """A role a person can hold in a team (e.g. scrum master). Retired roles are deactivated, never deleted."""
+    __tablename__ = 'roles'
+    __table_args__ = (PrimaryKeyConstraint('key', name='roles_pkey'),)
+
+    key: Mapped[str] = mapped_column(Text)
+    display_name: Mapped[str] = mapped_column(Text)
+    is_team_admin: Mapped[bool] = mapped_column(Boolean, server_default=text('false'))
+    active: Mapped[bool] = mapped_column(Boolean, server_default=text('true'))
+    # When set, the role is only offered for this canonical team and the teams below it
+    team_prefix: Mapped[str | None] = mapped_column(Text)
+
+
+class MembershipRow(Base):
+    """A person in a team, with an optional role. One role per person per team."""
+    __tablename__ = 'team_memberships'
+    __table_args__ = (
+        PrimaryKeyConstraint('account_id', 'team', name='team_memberships_pkey'),
+        Index('idx_team_memberships_team', 'team'),
+    )
+
+    account_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey('accounts.id', name='team_memberships_account_id_fkey', ondelete='CASCADE'))
+    team: Mapped[str] = mapped_column(Text)
+    role_key: Mapped[str | None] = mapped_column(Text, ForeignKey('roles.key', name='team_memberships_role_key_fkey'))
+    is_team_admin: Mapped[bool] = mapped_column(Boolean, server_default=text('false'))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class AccountHistoryRow(Base):
