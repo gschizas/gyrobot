@@ -7,3 +7,5 @@ clients:
   example-client-id:
     secret: "change-me-to-a-long-random-secret"
     description: "Example integration - replace or remove"
+    # Optional; default is [onboarding]. directory:read allows GET /api/odata/*
+    scopes: [onboarding, directory:read]

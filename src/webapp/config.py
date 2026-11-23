@@ -15,6 +15,8 @@ from bot_framework.yaml_wrapper import yaml
 _clients_lock = threading.Lock()
 _clients_cache: Optional[dict] = None
 
+DEFAULT_SCOPE = 'onboarding'
+
 
 def oauth2_clients_config_path() -> pathlib.Path:
     env_value = os.environ.get('OAUTH2_CLIENTS_CONFIGURATION', 'config/oauth2_clients.yml')
@@ -40,6 +42,19 @@ def load_oauth2_clients(force_reload: bool = False) -> dict:
             data = yaml.load(f) or {}
         _clients_cache = dict(data.get('clients') or {})
     return _clients_cache
+
+
+def client_scopes(client_id: str) -> list[str]:
+    """The scopes granted to a client in the registry (``scopes:``, a list or a space-separated string).
+
+    A client without ``scopes`` keeps the original behaviour: ``onboarding`` only.
+    """
+    scopes = (load_oauth2_clients().get(client_id) or {}).get('scopes')
+    if scopes is None:
+        return [DEFAULT_SCOPE]
+    if isinstance(scopes, str):
+        scopes = scopes.split()
+    return [str(scope) for scope in scopes]
 
 
 def jwt_secret() -> str:

@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
 from webapp import config
+from webapp.config import client_scopes
 from webapp.auth_oauth2 import create_access_token, decode_access_token, validate_client_credentials
 from webapp.command_runner import run_bot_command
 from webapp.models import (CommandResult, CrowdOnboardRequest, GithubBulkOnboardRequest,
@@ -40,16 +41,29 @@ def issue_token(grant_type: str = Form(...), client_id: str = Form(...), client_
     return TokenResponse(access_token=access_token, expires_in=ttl)
 
 
-def get_current_client(token: str = Depends(oauth2_scheme)) -> str:
+def _authenticate(token: str) -> dict:
     if not token:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail='Not authenticated',
                             headers={'WWW-Authenticate': 'Bearer'})
     try:
-        payload = decode_access_token(token)
+        return decode_access_token(token)
     except jwt.PyJWTError:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail='Invalid or expired token',
                             headers={'WWW-Authenticate': 'Bearer'})
-    return payload['sub']
+
+
+def require_scope(scope: str):
+    """A dependency returning the client id when the token grants ``scope`` (and the registry still does)."""
+    def dependency(token: str = Depends(oauth2_scheme)) -> str:
+        payload = _authenticate(token)
+        granted = set(str(payload.get('scope', '')).split()) & set(client_scopes(payload['sub']))
+        if scope not in granted:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail=f'Missing scope: {scope}')
+        return payload['sub']
+    return dependency
+
+
+get_current_client = require_scope(config.DEFAULT_SCOPE)
 
 
 def _run(args: list[str], client_id: str) -> CommandResult:

@@ -12,7 +12,7 @@ import time
 
 import jwt
 
-from webapp.config import jwt_secret, load_oauth2_clients, token_ttl_seconds
+from webapp.config import client_scopes, jwt_secret, load_oauth2_clients, token_ttl_seconds
 
 ALGORITHM = 'HS256'
 
@@ -31,7 +31,7 @@ def validate_client_credentials(client_id: str, client_secret: str) -> bool:
 def create_access_token(client_id: str) -> tuple[str, int]:
     ttl = token_ttl_seconds()
     now = int(time.time())
-    payload = {'sub': client_id, 'iat': now, 'exp': now + ttl, 'scope': 'onboarding'}
+    payload = {'sub': client_id, 'iat': now, 'exp': now + ttl, 'scope': ' '.join(client_scopes(client_id))}
     token = jwt.encode(payload, jwt_secret(), algorithm=ALGORITHM)
     return token, ttl
 
