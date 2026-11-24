@@ -472,6 +472,42 @@ class GitHubApi():
             cursor = orgs["pageInfo"]["endCursor"]
         return logins
 
+    def list_enterprise_members_with_orgs(self, ses: requests.Session | None = None) -> list[dict]:
+        """Enterprise members as ``[{"login", "name", "orgs"}]``, ``orgs`` being their enterprise organizations.
+
+        Reads no email fields, so it works with the SSO-authorized user session.
+        """
+        ses = ses or self.ses_usr
+        enterprise_orgs = {o.lower() for o in self.get_org_logins(ses)}
+        query = """
+        query($slug: String!, $cursor: String) {
+          enterprise(slug: $slug) {
+            members(first: 100, after: $cursor) {
+              nodes {
+                ... on EnterpriseUserAccount {
+                  login
+                  name
+                  user { organizations(first: 100) { nodes { login } } }
+                }
+              }
+              pageInfo { hasNextPage endCursor }
+            }
+          }
+        }
+        """
+        members, cursor = [], None
+        while True:
+            page = self._graphql(ses, query, {"slug": self.enterprise, "cursor": cursor})["enterprise"]["members"]
+            for node in page["nodes"]:
+                if not node or not node.get("login"):
+                    continue
+                orgs = [o["login"] for o in ((node.get("user") or {}).get("organizations") or {}).get("nodes", [])
+                        if o and o["login"].lower() in enterprise_orgs]
+                members.append({"login": node["login"], "name": node.get("name") or "", "orgs": orgs})
+            if not page["pageInfo"]["hasNextPage"]:
+                return members
+            cursor = page["pageInfo"]["endCursor"]
+
     def extract_verified_emails(self, node: dict, num_orgs: int) -> list[str]:
         """Collect and deduplicate verified domain emails across all org aliases."""
         all_emails = []
