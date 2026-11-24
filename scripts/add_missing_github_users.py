@@ -7,8 +7,10 @@ Usage (from the repository root; reads the database and GitHub settings from .en
     uv run python scripts/add_missing_github_users.py <env-name> --apply             # write to the database
     uv run python scripts/add_missing_github_users.py <env-name> --emails fill.csv   # supply emails by hand
     uv run python scripts/add_missing_github_users.py <env-name> --user LOGIN --verbose   # troubleshoot one user
+    uv run python scripts/add_missing_github_users.py <env-name> --user LOGIN --email a@b.com --apply   # add one user
 
-``--user`` checks (and, with ``--apply``, adds) just that user. ``--verbose`` prints GitHub's answer per
+``--user`` checks (and, with ``--apply``, adds) just that user; ``--email`` gives the address to record, so no CSV
+is needed. ``--verbose`` prints GitHub's answer per
 organization: the verified emails, the user's organizations and any errors (for example SAML/SSO ones).
 
 Only members of at least one enterprise team are checked. A member counts as known when a GitHub provision (any status) has their username. For each unknown member the
@@ -19,7 +21,6 @@ A member whose email belongs to an account that already has a GitHub provision u
 Added provisions are ``active``, like ``onboard github set-email``: both ids are stored, and the team is
 recorded only when the member is in exactly one enterprise team.
 """
-import argparse
 import csv
 import datetime
 import pathlib
@@ -27,6 +28,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'src'))
 
+import click
 from dotenv import load_dotenv
 from tqdm import tqdm
 
@@ -89,50 +91,57 @@ def load_team_rows(github, ses, env_name: str, refresh: bool, max_age_minutes: i
     return rows
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('env_name')
-    parser.add_argument('--emails', type=pathlib.Path, help='CSV of login,email for members GitHub has no email for')
-    parser.add_argument('--apply', action='store_true', help='write to the database (default: preview only)')
-    parser.add_argument('--user', metavar='LOGIN', help='check only this GitHub user, even if in no team')
-    parser.add_argument('--verbose', action='store_true',
-                        help='with --user: show what GitHub returns (organizations, verified emails, errors)')
-    parser.add_argument('--refresh', action='store_true', help='ignore the cached team members and read them again')
-    parser.add_argument('--max-age', type=int, default=60, metavar='MINUTES',
-                        help='how long the cached team members stay valid (default: 60)')
-    args = parser.parse_args()
-    if args.verbose and not args.user:
-        parser.error('--verbose needs --user')
+@click.command(help=__doc__.split('\n\n', 1)[0])
+@click.argument('env_name')
+@click.option('--emails', 'emails_file', type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
+              help='CSV of login,email for members GitHub has no email for')
+@click.option('--apply', is_flag=True, help='write to the database (default: preview only)')
+@click.option('--user', 'user', metavar='LOGIN', help='check only this GitHub user, even if in no team')
+@click.option('--email', 'user_email', help='with --user: the email to record, instead of the one GitHub reports')
+@click.option('--verbose', is_flag=True,
+              help='with --user: show what GitHub returns (organizations, verified emails, errors)')
+@click.option('--refresh', is_flag=True, help='ignore the cached team members and read them again')
+@click.option('--max-age', type=int, default=60, metavar='MINUTES', show_default=True,
+              help='how long the cached team members stay valid')
+def main(env_name: str, emails_file: pathlib.Path | None, apply: bool, user: str | None, user_email: str | None,
+         verbose: bool, refresh: bool, max_age: int) -> None:
+    if (verbose or user_email) and not user:
+        raise click.UsageError('--verbose and --email need --user')
+    if user_email and '@' not in user_email:
+        raise click.UsageError('--email is not an email address')
 
-    load_dotenv(dotenv_path=f'.env.d/{args.env_name}.env', override=True)
+    load_dotenv(dotenv_path=f'.env.d/{env_name}.env', override=True)
     from backend import account_storage as storage
     from backend.github_api import GitHubApi
 
-    manual = read_email_map(args.emails) if args.emails else {}
+    manual = read_email_map(emails_file) if emails_file else {}
+    if user_email:
+        manual[user.lower()] = user_email.strip()
     github = GitHubApi()
     print('Reading the enterprise teams from GitHub...')
     # The user session (SSO-authorized) is needed to read the organizations' verified emails
     ses = github.ses_usr
     teams_by_login: dict[str, list[str]] = {}
     names: dict[str, str] = {}
-    for row in load_team_rows(github, ses, args.env_name, args.refresh, args.max_age):
+    for row in load_team_rows(github, ses, env_name, refresh, max_age):
         teams_by_login.setdefault(row['login'].lower(), []).append(row['team'])
         names[row['login'].lower()] = row['login']
     known = {p.data['username'].lower() for p in storage.get_provisions('github') if p.data.get('username')}
-    if args.user:
-        key = args.user.lower()
-        names.setdefault(key, args.user)
-        print(f"{args.user}: {'known' if key in known else 'NOT known'} in the database, "
+    if user:
+        key = user.lower()
+        names.setdefault(key, user)
+        print(f"{user}: {'known' if key in known else 'NOT known'} in the database, "
               f"teams: {', '.join(teams_by_login.get(key, [])) or 'none'}")
-        if args.verbose:
-            diagnose_user(github, ses, args.user)
+        if verbose:
+            diagnose_user(github, ses, user)
         if key in known:
             return
         unknown = [key]
     else:
         unknown = sorted((key for key in teams_by_login if key not in known))
     print(f"{len(teams_by_login)} team members, {len(known)} known provisions, {len(unknown)} without a provision\n")
-    emails_by_login = github.get_verified_emails([names[key] for key in unknown], ses) if unknown else {}
+    to_look_up = [names[key] for key in unknown if key not in manual]
+    emails_by_login = github.get_verified_emails(to_look_up, ses) if to_look_up else {}
     missing = [{'login': names[key], 'verified_emails': emails_by_login.get(key, [])} for key in unknown]
 
     counts = {'added': 0, 'no_email': 0, 'ambiguous': 0, 'conflict': 0, 'error': 0}
@@ -156,9 +165,9 @@ def main() -> None:
 
         teams = teams_by_login.get(login.lower(), [])
         team = teams[0] if len(teams) == 1 else None
-        tqdm.write(f"{'add' if args.apply else 'would add':12} {login:30} {email} "
+        tqdm.write(f"{'add' if apply else 'would add':12} {login:30} {email} "
                    f"({team or f'{len(teams)} teams, none recorded'})")
-        if args.apply:
+        if apply:
             data = {'username': login, 'email': email, 'recorded_by': 'add_missing_github_users',
                     'recorded_at': datetime.datetime.now(tz=datetime.timezone.utc).isoformat()}
             try:
@@ -176,9 +185,9 @@ def main() -> None:
                 continue
         counts['added'] += 1
 
-    print(f"\n{counts['added']} {'added' if args.apply else 'to add'}, {counts['no_email']} without an email, "
+    print(f"\n{counts['added']} {'added' if apply else 'to add'}, {counts['no_email']} without an email, "
           f"{counts['ambiguous']} with several emails, {counts['conflict']} conflicts, {counts['error']} errors"
-          + ('' if args.apply else "  -- preview only, rerun with --apply to write"))
+          + ('' if apply else "  -- preview only, rerun with --apply to write"))
     if counts['no_email'] or counts['ambiguous']:
         print("Put login,email rows in a CSV and pass it with --emails to add those members.")
 
