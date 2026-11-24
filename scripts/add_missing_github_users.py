@@ -7,7 +7,7 @@ Usage (from the repository root; reads the database and GitHub settings from .en
     uv run python scripts/add_missing_github_users.py <env-name> --apply             # write to the database
     uv run python scripts/add_missing_github_users.py <env-name> --emails fill.csv   # supply emails by hand
 
-A member counts as known when a GitHub provision (any status) has their username. For each unknown member the
+Only members of at least one enterprise team are checked. A member counts as known when a GitHub provision (any status) has their username. For each unknown member the
 email is taken from the verified-domain emails GitHub reports. Members with no email, or with several, are
 listed and skipped unless ``--emails`` gives one: a CSV of ``login,email`` rows (a header row is fine).
 A member whose email belongs to an account that already has a GitHub provision under another username
@@ -47,11 +47,18 @@ def main() -> None:
     manual = read_email_map(args.emails) if args.emails else {}
     github = GitHubApi()
     print('Reading the enterprise members and teams from GitHub...')
-    members = github.list_enterprise_members()
-    teams_by_login = github.get_ent_team_logins()
+    # The user session (SSO-authorized) is needed to read the organizations' verified emails
+    ses = github.ses_usr
+    teams_by_login: dict[str, list[str]] = {}
+    names: dict[str, str] = {}
+    for row in github._ent_team_member_rows('', ses):
+        teams_by_login.setdefault(row['login'].lower(), []).append(row['team'])
+        names[row['login'].lower()] = row['login']
     known = {p.data['username'].lower() for p in storage.get_provisions('github') if p.data.get('username')}
-    missing = sorted((m for m in members if m['login'].lower() not in known), key=lambda m: m['login'].lower())
-    print(f"{len(members)} members, {len(known)} known provisions, {len(missing)} members without a provision\n")
+    unknown = sorted((key for key in teams_by_login if key not in known))
+    print(f"{len(teams_by_login)} team members, {len(known)} known provisions, {len(unknown)} without a provision\n")
+    emails_by_login = github.get_verified_emails([names[key] for key in unknown], ses) if unknown else {}
+    missing = [{'login': names[key], 'verified_emails': emails_by_login.get(key, [])} for key in unknown]
 
     counts = {'added': 0, 'no_email': 0, 'ambiguous': 0, 'conflict': 0, 'error': 0}
     for member in tqdm(missing, desc='Missing members', unit='user'):
