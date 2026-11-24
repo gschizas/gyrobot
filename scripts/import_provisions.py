@@ -10,7 +10,7 @@ Columns (header row required, case-insensitive; CSV may be comma- or semicolon-s
 
     email       required  account primary email
     resource    required  github | jetbrains | crowd | slack
-    status      optional  default: assigned
+    status      optional  default: active
     username    optional  stored in the provision data (GitHub login, Crowd user, ...)
     team        optional  stored in the provision data
     created_at  optional  original date (ISO, e.g. 2024-03-01); keeps invitation-expiry logic correct
@@ -30,7 +30,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'src'))
 from dotenv import load_dotenv
 
 RESOURCES = {'github', 'jetbrains', 'crowd', 'slack'}
-STATUSES = {'pending', 'invited', 'assigned', 'active', 'expired', 'deprovisioned'}
+STATUSES = {'pending', 'invited', 'active', 'expired', 'deprovisioned'}
 
 
 def read_rows(path: pathlib.Path) -> list[dict]:
@@ -85,7 +85,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('env_name')
     parser.add_argument('file', type=pathlib.Path)
-    parser.add_argument('--default-status', default='assigned')
+    parser.add_argument('--default-status', default='active')
     parser.add_argument('--overwrite', action='store_true', help='replace provisions that already exist')
     parser.add_argument('--apply', action='store_true', help='write to the database (default: preview only)')
     args = parser.parse_args()

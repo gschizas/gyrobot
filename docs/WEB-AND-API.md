@@ -119,7 +119,7 @@ appear once, with their main team and an empty role). Read-only; every status is
 | `Login`, `GithubId`, `NodeId`, `GlobalId` | GitHub login, numeric id, the legacy node id derived from it (`MDQ6...`), and the stored next-generation global node id (`U_kgDO...`, empty until backfilled) |
 | `Email` | primary email |
 | `Team`, `Role`, `RoleName` | canonical team, role key and display name |
-| `Status` | provision status (`invited`, `assigned`, `active`, `removed`, ...) |
+| `Status` | provision status (`invited`, `active`, `removed`, ...) |
 | `LastChanged` | latest change of the account, the GitHub provision or the membership |
 
 Only the **current** login is shown. Someone who lost their GitHub account and was reinvited keeps one row with the

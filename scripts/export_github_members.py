@@ -8,7 +8,7 @@ Usage (from the repository root; reads GITHUB_* settings from .env.d/<env-name>.
 
 The file is ``;``-separated and its columns are compatible with ``scripts/import_provisions.py``:
 
-    email, resource (always "github"), status (always "assigned"), username, team, name, other_emails
+    email, resource (always "github"), status (always "active"), username, team, name, other_emails
 
 * ``email`` is the first organization-verified-domain email across all organizations of the enterprise
   (``user.organizationVerifiedDomainEmails``); any further ones go in ``other_emails`` (``,``-separated).
@@ -55,7 +55,7 @@ def main() -> int:
             if not emails:
                 no_email.append(member['login'])
             writer.writerow([
-                emails[0] if emails else '', 'github', 'assigned', member['login'],
+                emails[0] if emails else '', 'github', 'active', member['login'],
                 ','.join(sorted(teams_by_login.get(member['login'].lower(), []))),
                 member['name'], ','.join(emails[1:]),
             ])

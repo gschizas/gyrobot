@@ -60,7 +60,7 @@ class Provision:
         id: Unique provision identifier (UUID)
         account_id: Associated account UUID
         resource: Resource type ('github', 'jetbrains', 'crowd', 'slack')
-        status: Provisioning status ('pending', 'invited', 'accepted', 'assigned', 'active', 'failed')
+        status: Provisioning status ('pending', 'invited', 'accepted', 'active', 'failed')
         data: Resource-specific data (e.g., {username, node_id, license_id, member_ids})
         created_at: Provision creation timestamp
         updated_at: Last update timestamp

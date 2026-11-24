@@ -920,7 +920,7 @@ class GitHubApi():
                         now = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
                         provision.data['accepted_at'] = now
                         provision.data['assigned_at'] = now
-                        set_provision_status(provision.account_id, 'github', 'assigned', provision.data)
+                        set_provision_status(provision.account_id, 'github', 'active', provision.data)
                         results['accepted_and_assigned'].append(username)
                         logger.info(f"Auto-assigned {username} to GitHub team {team}")
                         notify(f":white_check_mark: *{username}* accepted the GitHub invitation "

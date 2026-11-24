@@ -21,7 +21,7 @@ if 'APPROVAL_DATABASE_URL' not in os.environ:
     raise ImportError('APPROVAL_DATABASE_URL not found in environment')
 
 # Provision statuses meaning the resource is held or an invitation is outstanding
-LIVE_STATUSES = ('pending', 'invited', 'accepted', 'assigned', 'active')
+LIVE_STATUSES = ('pending', 'invited', 'accepted', 'active')
 
 
 def _session() -> Session:

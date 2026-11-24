@@ -12,7 +12,7 @@ Core concepts:
 - **Account**: one person, identified by their primary email, with a canonical team (the GitHub enterprise team slug,
   without `ent:`). An account may carry extra addresses (`additional_emails`).
 - **Provision**: one resource held by an account (`github`, `jetbrains`, `crowd`, `slack`) with a status such as
-  `invited`, `active`, `assigned`, `expired`, `cancelled` or `deprovisioned`.
+  `invited`, `active`, `expired`, `cancelled` or `deprovisioned`.
 - **Team mapping** (`config/team_mapping.yml`): maps a canonical team to each resource's own team. A mapping also covers the
   sub-teams under it, and several canonical teams may point at one JetBrains team.
 - **Allowed email domains** (`allowed_email_domains` in `config/github.yml`): the domains accepted for onboarding.
