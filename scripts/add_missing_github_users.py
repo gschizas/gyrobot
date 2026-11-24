@@ -63,6 +63,32 @@ def diagnose_user(github, ses, login: str) -> None:
     print('\n--- end of GitHub responses\n')
 
 
+def load_team_rows(github, ses, env_name: str, refresh: bool, max_age_minutes: int) -> list[dict]:
+    """The enterprise team members (``[{"login", "team"}]``), cached in data/ so reruns are quick."""
+    import json
+    import time
+
+    cache = pathlib.Path('data') / f'github_team_members-{env_name}.json'
+    if not refresh and cache.exists() and time.time() - cache.stat().st_mtime < max_age_minutes * 60:
+        print(f"Using the team members cached in {cache} ({int((time.time() - cache.stat().st_mtime) / 60)} min old; "
+              f"--refresh to read them again)")
+        return json.loads(cache.read_text(encoding='utf-8'))
+
+    bar = tqdm(desc='Reading from GitHub', unit='item')
+
+    def progress(message, done, total):
+        bar.set_description(message)
+        bar.total = total or None
+        bar.n = done
+        bar.refresh()
+
+    rows = github._ent_team_member_rows('', ses, progress)
+    bar.close()
+    cache.parent.mkdir(exist_ok=True)
+    cache.write_text(json.dumps(rows), encoding='utf-8')
+    return rows
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('env_name')
@@ -71,6 +97,9 @@ def main() -> None:
     parser.add_argument('--user', metavar='LOGIN', help='check only this GitHub user, even if in no team')
     parser.add_argument('--verbose', action='store_true',
                         help='with --user: show what GitHub returns (organizations, verified emails, errors)')
+    parser.add_argument('--refresh', action='store_true', help='ignore the cached team members and read them again')
+    parser.add_argument('--max-age', type=int, default=60, metavar='MINUTES',
+                        help='how long the cached team members stay valid (default: 60)')
     args = parser.parse_args()
     if args.verbose and not args.user:
         parser.error('--verbose needs --user')
@@ -81,12 +110,12 @@ def main() -> None:
 
     manual = read_email_map(args.emails) if args.emails else {}
     github = GitHubApi()
-    print('Reading the enterprise members and teams from GitHub...')
+    print('Reading the enterprise teams from GitHub...')
     # The user session (SSO-authorized) is needed to read the organizations' verified emails
     ses = github.ses_usr
     teams_by_login: dict[str, list[str]] = {}
     names: dict[str, str] = {}
-    for row in github._ent_team_member_rows('', ses):
+    for row in load_team_rows(github, ses, args.env_name, args.refresh, args.max_age):
         teams_by_login.setdefault(row['login'].lower(), []).append(row['team'])
         names[row['login'].lower()] = row['login']
     known = {p.data['username'].lower() for p in storage.get_provisions('github') if p.data.get('username')}
