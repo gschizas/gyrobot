@@ -1504,7 +1504,7 @@ wheels = [
 
 [[package]]
 name = "reddit-slack-bot"
-version = "3.1.1"
+version = "3.1.2"
 source = { virtual = "." }
 dependencies = [
     { name = "aiohttp" },
