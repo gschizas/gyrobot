@@ -35,6 +35,12 @@ Log in with your LDAP credentials at `/login`. End users: see the [user manual](
 | `/admin/permissions` | Permission rule management: list and filter, create, edit, delete, and a change history. Gated by the rule `webapp.routers.permissions:manage`. A save that would remove your own access is refused, and the page's own rule cannot be deleted or renamed. |
 | Reload permissions | Dashboard action that invalidates the web process's cache. Run `permissions reload` in chat for the bot. |
 
+Every route of the web routers requires a login by default: `webapp/auth.py` provides the `current_user` dependency
+(anonymous users are redirected to `/login`; JSON endpoints answer 401), applied to whole routers, so only
+`web.public_router` (`/`, `/login`, `/logout`) is open. `tests/test_web_auth.py` checks that no web route answers an
+anonymous request. The dashboard greys out the actions you have no permission rule for, and hides the administration
+links (`webapp/capabilities.py` reuses the real rules); this is only a hint, the commands and pages still enforce.
+
 ## REST API
 
 Interactive documentation is at `/docs`.
