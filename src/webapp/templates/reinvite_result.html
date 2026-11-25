@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block title %}Reinvite GitHub users - Result{% endblock %}
+{% block content %}
+<h1>Reinvite GitHub users</h1>
+<p>{{ rows|length }} request(s) submitted.</p>
+
+{% for row in rows %}
+<div class="bulk-row">
+    <h2>{{ row.email }}</h2>
+    {{ macros.render_command_result(row.result) }}
+</div>
+{% endfor %}
+
+<p>
+    <a href="{{ request.url_for('reinvite_form') }}">&larr; Back to the list</a> |
+    <a href="{{ request.url_for('dashboard') }}">Back to onboarding</a>
+</p>
+{% endblock %}

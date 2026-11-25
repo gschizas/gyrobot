@@ -21,7 +21,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from backend.account_storage import find_provisions_by_username, list_roles
+from backend.account_storage import find_provisions_by_username, list_reinvitable_github, list_roles
 from backend.github_api import GitHubApi
 from webapp import config
 from webapp.auth_ldap import ldap_authenticate
@@ -389,6 +389,32 @@ async def missing_emails_submit(request: Request):
             _missing_job['members'] = [m for m in _missing_job['members'] if m['login'].lower() not in submitted]
 
     return templates.TemplateResponse(request, 'missing_emails_result.html', {'user': user, 'rows': rows})
+
+
+@router.get('/onboarding/github/reinvite', include_in_schema=False)
+def reinvite_form(request: Request):
+    if redirect := _require_login(request):
+        return redirect
+    people = list_reinvitable_github()
+    return templates.TemplateResponse(request, 'reinvite.html', {'user': _current_user(request), 'people': people})
+
+
+@router.post('/onboarding/github/reinvite', include_in_schema=False)
+async def reinvite_submit(request: Request):
+    if redirect := _require_login(request):
+        return redirect
+
+    form_data = await request.form()
+    user = _current_user(request)
+    rows = []
+    for email in dict.fromkeys(e.strip() for e in form_data.getlist('email')):
+        if not email:
+            continue
+        result = run_bot_command(
+            ['onboard', 'github', 'reinvite', email], user_id=user,
+            channel_name=config.web_channel_name(), team_name=config.web_team_name())
+        rows.append({'email': email, 'result': result})
+    return templates.TemplateResponse(request, 'reinvite_result.html', {'user': user, 'rows': rows})
 
 
 @router.get('/onboarding/move/bulk', include_in_schema=False)
