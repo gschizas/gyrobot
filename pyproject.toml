@@ -1,6 +1,6 @@
 [project]
 name = "reddit-slack-bot"
-version = "3.1.2"
+version = "3.1.3"
 description = "Add your description here"
 requires-python = ">=3.14"
 dependencies = [
