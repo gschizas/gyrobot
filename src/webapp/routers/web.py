@@ -7,37 +7,37 @@ same ``onboard``/``offboard`` Click commands used by chat, via
 requesting identity (see ``backend.approval``/``backend.configuration``
 permission checks, matched against the ``$webui`` pseudo-channel).
 """
-import functools
-import inspect
 import json
 import logging
-import pathlib
 import re
 import threading
 import time
 from typing import Optional
 
 import requests
-from fastapi import APIRouter, Form, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 
 from backend.account_storage import find_provisions_by_username, list_reinvitable_github, list_roles
 from backend.github_api import GitHubApi
 from webapp import config
+from webapp.auth import current_user, current_user_json, session_user
 from webapp.auth_ldap import ldap_authenticate
 from webapp.command_runner import run_bot_command
-from webapp.routers import permissions as permissions_router
+from webapp.templating import templates
+
 logger = logging.getLogger('webapp.routers.web')
 
 MAX_VALIDATE_USERNAMES = 100
 # Alphanumerics or single hyphens, not starting/ending with a hyphen, max 39 chars
 GITHUB_LOGIN_RE = re.compile(r'(?=.{1,39}$)[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*')
 
-router = APIRouter(tags=['web'])
-templates = Jinja2Templates(directory=str(pathlib.Path(__file__).parent.parent / 'templates'))
-templates.env.filters['tojson'] = json.dumps
+# Every route on ``router`` requires a login (redirect to the login page); ``json_router`` answers 401 instead;
+# only ``public_router`` is open.
+router = APIRouter(tags=['web'], dependencies=[Depends(current_user)])
+json_router = APIRouter(tags=['web'], dependencies=[Depends(current_user_json)])
+public_router = APIRouter(tags=['web'])
 
 # Simple declarative form definitions for each onboarding action. Keeping this
 # data-driven avoids one template per action. The github 'team' field uses
@@ -85,30 +85,7 @@ FORMS = {
 }
 
 
-def _current_user(request: Request) -> str | None:
-    return request.session.get('user')
-
-
-def _require_login(request: Request) -> Optional[RedirectResponse]:
-    if not _current_user(request):
-        return RedirectResponse(url=request.url_for('login_form'), status_code=status.HTTP_302_FOUND)
-    return None
-
-
-def login_required(handler):
-    """Redirect to the login page unless the session has a user. Goes below ``@router.<method>``; the handler needs a ``request`` parameter."""
-    def check(kwargs):
-        return _require_login(kwargs['request'])
-
-    if inspect.iscoroutinefunction(handler):
-        @functools.wraps(handler)
-        async def wrapper(*args, **kwargs):
-            return check(kwargs) or await handler(*args, **kwargs)
-    else:
-        @functools.wraps(handler)
-        def wrapper(*args, **kwargs):
-            return check(kwargs) or handler(*args, **kwargs)
-    return wrapper
+_current_user = session_user
 
 
 def _github_team_tree() -> tuple[Optional[dict], Optional[str]]:
@@ -137,19 +114,19 @@ def _github_email_placeholder() -> str:
     return f'your-email-here@{domain}'
 
 
-@router.get('/', include_in_schema=False)
+@public_router.get('/', include_in_schema=False)
 def index(request: Request):
     return RedirectResponse(url=request.url_for('dashboard') if _current_user(request) else request.url_for('login_form'))
 
 
-@router.get('/login', include_in_schema=False)
+@public_router.get('/login', include_in_schema=False)
 def login_form(request: Request):
     if _current_user(request):
         return RedirectResponse(url=request.url_for('dashboard'), status_code=status.HTTP_302_FOUND)
     return templates.TemplateResponse(request, 'login.html', {'error': None})
 
 
-@router.post('/login', include_in_schema=False)
+@public_router.post('/login', include_in_schema=False)
 def login_submit(request: Request, username: str = Form(...), password: str = Form(...)):
     if user := ldap_authenticate(username, password):
         request.session['user'] = user
@@ -159,24 +136,18 @@ def login_submit(request: Request, username: str = Form(...), password: str = Fo
         status_code=status.HTTP_401_UNAUTHORIZED)
 
 
-@router.get('/logout', include_in_schema=False)
+@public_router.get('/logout', include_in_schema=False)
 def logout(request: Request):
     request.session.clear()
     return RedirectResponse(url=request.url_for('login_form'), status_code=status.HTTP_302_FOUND)
 
 
 @router.get('/onboarding', include_in_schema=False)
-@login_required
 def dashboard(request: Request):
-    user = _current_user(request)
-    return templates.TemplateResponse(request, 'dashboard.html', {
-        'user': user, 'forms': FORMS,
-        'can_manage_permissions': permissions_router.can_manage(user),
-        'can_reload_permissions': permissions_router.can_reload(user)})
+    return templates.TemplateResponse(request, 'dashboard.html', {'user': _current_user(request), 'forms': FORMS})
 
 
 @router.post('/admin/reload-permissions', include_in_schema=False)
-@login_required
 def reload_permissions(request: Request):
     """Invalidate this web process's permission cache (the chat bot has its own, in another process)."""
     user = _current_user(request)
@@ -187,7 +158,6 @@ def reload_permissions(request: Request):
 
 
 @router.get('/onboarding/{action}', include_in_schema=False)
-@login_required
 def onboarding_form(request: Request, action: str):
     form = FORMS.get(action)
     if not form:
@@ -202,7 +172,6 @@ def onboarding_form(request: Request, action: str):
 
 
 @router.post('/onboarding/{action}', include_in_schema=False)
-@login_required
 async def onboarding_submit(request: Request, action: str):
     form_def = FORMS.get(action)
     if not form_def:
@@ -220,7 +189,7 @@ async def onboarding_submit(request: Request, action: str):
         request, 'result.html', {'user': user, 'title': form_def['title'], 'result': result})
 
 
-@router.post('/onboarding/github/validate-users', include_in_schema=False)
+@json_router.post('/onboarding/github/validate-users', include_in_schema=False)
 async def github_validate_users(request: Request):
     """Server-side check that GitHub usernames exist, for the onboarding forms' JS validation.
 
@@ -228,8 +197,6 @@ async def github_validate_users(request: Request):
     "login": <canonical login>, "message": ...}}}``. ``error`` means the lookup itself failed (e.g. rate limit),
     so the form shouldn't treat the username as wrong.
     """
-    if not _current_user(request):
-        return JSONResponse({'error': 'Not logged in'}, status_code=status.HTTP_401_UNAUTHORIZED)
     try:
         usernames = (await request.json())['usernames']
         if not isinstance(usernames, list) or not all(isinstance(u, str) for u in usernames):
@@ -280,7 +247,6 @@ def _check_github_usernames(usernames: list[str]) -> dict[str, dict]:
 
 
 @router.get('/onboarding/github/bulk', include_in_schema=False)
-@login_required
 def github_bulk_form(request: Request):
     team_tree, team_tree_error = _github_team_tree()
     team_options = GitHubApi.flatten_team_tree(team_tree) if team_tree else None
@@ -292,7 +258,6 @@ def github_bulk_form(request: Request):
 
 
 @router.post('/onboarding/github/bulk', include_in_schema=False)
-@login_required
 async def github_bulk_submit(request: Request):
 
     form_data = await request.form()
@@ -357,16 +322,13 @@ def _missing_job_get(restart: bool = False) -> dict:
         return job
 
 
-@router.get('/onboarding/github/missing-emails/status', include_in_schema=False)
-def missing_emails_status(request: Request):
-    if not _current_user(request):
-        return JSONResponse({'status': 'unauthorized'}, status_code=status.HTTP_401_UNAUTHORIZED)
+@json_router.get('/onboarding/github/missing-emails/status', include_in_schema=False)
+def missing_emails_status():
     job = _missing_job_get()
     return {k: job.get(k) for k in ('status', 'message', 'done', 'total', 'error')}
 
 
 @router.get('/onboarding/github/missing-emails', include_in_schema=False)
-@login_required
 def missing_emails_form(request: Request, refresh: bool = False):
     job = _missing_job_get(restart=refresh)
     context = {'user': _current_user(request), 'job': job, 'error': job.get('error'),
@@ -378,7 +340,6 @@ def missing_emails_form(request: Request, refresh: bool = False):
 
 
 @router.post('/onboarding/github/missing-emails', include_in_schema=False)
-@login_required
 async def missing_emails_submit(request: Request):
 
     form_data = await request.form()
@@ -402,14 +363,12 @@ async def missing_emails_submit(request: Request):
 
 
 @router.get('/onboarding/github/reinvite', include_in_schema=False)
-@login_required
 def reinvite_form(request: Request):
     people = list_reinvitable_github()
     return templates.TemplateResponse(request, 'reinvite.html', {'user': _current_user(request), 'people': people})
 
 
 @router.post('/onboarding/github/reinvite', include_in_schema=False)
-@login_required
 async def reinvite_submit(request: Request):
 
     form_data = await request.form()
@@ -426,7 +385,6 @@ async def reinvite_submit(request: Request):
 
 
 @router.get('/onboarding/move/bulk', include_in_schema=False)
-@login_required
 def move_bulk_form(request: Request):
     team_tree, team_tree_error = _github_team_tree()
     team_options = GitHubApi.flatten_team_tree(team_tree) if team_tree else None
@@ -437,7 +395,6 @@ def move_bulk_form(request: Request):
 
 
 @router.post('/onboarding/move/bulk', include_in_schema=False)
-@login_required
 async def move_bulk_submit(request: Request):
 
     form_data = await request.form()

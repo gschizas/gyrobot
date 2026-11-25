@@ -11,70 +11,33 @@ import pathlib
 import re
 from typing import Optional
 
-from fastapi import APIRouter, Form, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 
 from backend import permission_admin, permissions
-from backend.configuration import user_allowed
-from webapp import config
+from webapp.auth import current_user
+from webapp.capabilities import MANAGE_FUNCTION, can_user, rule_allows
+from webapp.templating import templates
 
 logger = logging.getLogger('webapp.routers.permissions')
 
-MANAGE_FUNCTION = 'webapp.routers.permissions:manage'
-RELOAD_FUNCTION = 'commands.permissions:reload_permissions'
 FUNCTION_NAME_RE = re.compile(r'[\w.]+:\w+')
 ROLE_RE = re.compile(r'\w+')
 
-router = APIRouter(prefix='/admin/permissions', tags=['web'])
-templates = Jinja2Templates(directory=str(pathlib.Path(__file__).parent.parent / 'templates'))
-templates.env.filters['tojson'] = json.dumps
 
-
-def _may_manage(user: str) -> bool:
-    return _rule_allows(permissions.get_rule(MANAGE_FUNCTION), user)
-
-
-def _rule_allows(rule: Optional[dict], user: str) -> bool:
-    if rule is None:
-        return False
-    channels = rule['channels']
-    if '*' not in channels and config.web_channel_name() not in channels:
-        return False
-    return user_allowed(config.web_team_name(), user, rule['users'])
-
-
-def can_manage(user: Optional[str]) -> bool:
-    """For the dashboard: whether to show the link. Never raises."""
-    return _can(MANAGE_FUNCTION, user)
-
-
-def can_reload(user: Optional[str]) -> bool:
-    """For the dashboard: whether the user may run ``permissions reload``. Never raises."""
-    return _can(RELOAD_FUNCTION, user)
-
-
-def _can(function_name: str, user: Optional[str]) -> bool:
+def manager(user: str = Depends(current_user)) -> str:
+    """The logged-in user, if allowed to manage rules (HTTP 403/503 otherwise)."""
     try:
-        return bool(user) and _rule_allows(permissions.get_rule(function_name), user)
-    except Exception as ex:
-        logger.warning(f"Could not evaluate {function_name}: {ex!r}")
-        return False
-
-
-def _authorize(request: Request) -> str:
-    """The logged-in user, if allowed to manage rules. Raises HTTPException/redirect otherwise."""
-    user = request.session.get('user')
-    if not user:
-        raise HTTPException(status.HTTP_303_SEE_OTHER, headers={'Location': str(request.url_for('login_form'))})
-    try:
-        allowed = _may_manage(user)
+        allowed = can_user(user, 'manage_permissions', strict=True)
     except RuntimeError as ex:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(ex))
     if not allowed:
         logger.warning(f"{user} tried to manage permission rules without being allowed")
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="You don't have permission to manage permission rules.")
     return user
+
+
+router = APIRouter(prefix='/admin/permissions', tags=['web'], dependencies=[Depends(manager)])
 
 
 def _flash(request: Request, text: str, is_error: bool = False) -> None:
@@ -112,28 +75,25 @@ def _is_manage_rule(rule: dict) -> bool:
 
 def _lockout(rule: dict, user: str) -> bool:
     """True if saving ``rule`` would remove the acting user's own access to this page."""
-    return _is_manage_rule(rule) and not _rule_allows(rule, user)
+    return _is_manage_rule(rule) and not rule_allows(rule, user)
 
 
 @router.get('', include_in_schema=False)
-def list_rules(request: Request):
-    user = _authorize(request)
+def list_rules(request: Request, user: str = Depends(manager)):
     flash = request.session.pop('flash', None)
     return templates.TemplateResponse(request, 'permissions.html', {
         'user': user, 'rules': permission_admin.list_rules(), 'flash': flash, 'manage_function': MANAGE_FUNCTION})
 
 
 @router.get('/history', include_in_schema=False)
-def history(request: Request, function_name: Optional[str] = None):
-    user = _authorize(request)
+def history(request: Request, function_name: Optional[str] = None, user: str = Depends(manager)):
     return templates.TemplateResponse(request, 'permissions_history.html', {
         'user': user, 'entries': permission_admin.list_history(function_name or None),
         'function_name': function_name})
 
 
 @router.get('/new', include_in_schema=False)
-def new_form(request: Request):
-    user = _authorize(request)
+def new_form(request: Request, user: str = Depends(manager)):
     return templates.TemplateResponse(request, 'permission_form.html', {
         'user': user, 'rule': {'function_name': '', 'environment': '', 'role': permissions.DEFAULT_ROLE,
                                'users': [], 'channels': [], 'extra': {}},
@@ -142,8 +102,7 @@ def new_form(request: Request):
 
 @router.post('/new', include_in_schema=False)
 def create(request: Request, function_name: str = Form(''), environment: str = Form(''), role: str = Form(''),
-           users: str = Form(''), channels: str = Form(''), extra: str = Form('')):
-    user = _authorize(request)
+           users: str = Form(''), channels: str = Form(''), extra: str = Form(''), user: str = Depends(manager)):
     rule, errors = _parse_form(function_name, environment, role, users, channels, extra)
     if not errors and _lockout(rule, user):
         errors.append("This would remove your own access to this page.")
@@ -161,8 +120,7 @@ def create(request: Request, function_name: str = Form(''), environment: str = F
 
 
 @router.get('/{rule_id}/edit', include_in_schema=False)
-def edit_form(request: Request, rule_id: int):
-    user = _authorize(request)
+def edit_form(request: Request, rule_id: int, user: str = Depends(manager)):
     rule = permission_admin.get_rule_by_id(rule_id)
     if rule is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND)
@@ -172,8 +130,8 @@ def edit_form(request: Request, rule_id: int):
 
 @router.post('/{rule_id}/edit', include_in_schema=False)
 def update(request: Request, rule_id: int, function_name: str = Form(''), environment: str = Form(''),
-           role: str = Form(''), users: str = Form(''), channels: str = Form(''), extra: str = Form('')):
-    user = _authorize(request)
+           role: str = Form(''), users: str = Form(''), channels: str = Form(''), extra: str = Form(''),
+           user: str = Depends(manager)):
     current = permission_admin.get_rule_by_id(rule_id)
     if current is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND)
@@ -198,8 +156,7 @@ def update(request: Request, rule_id: int, function_name: str = Form(''), enviro
 
 
 @router.post('/{rule_id}/delete', include_in_schema=False)
-def delete(request: Request, rule_id: int):
-    user = _authorize(request)
+def delete(request: Request, rule_id: int, user: str = Depends(manager)):
     rule = permission_admin.get_rule_by_id(rule_id)
     if rule is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND)

@@ -1,0 +1,7 @@
+{% macro action_link(key, url, label) %}
+{% if can(request, key) %}
+<a href="{{ url }}">{{ label }}</a>
+{% else %}
+<a class="link-disabled" aria-disabled="true" tabindex="-1" title="You don't have permission for this">{{ label }}</a>
+{% endif %}
+{% endmacro %}

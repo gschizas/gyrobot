@@ -25,6 +25,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse
 from starlette.middleware.sessions import SessionMiddleware
 
+from webapp.auth import LoginRequired, login_redirect
 from webapp.bootstrap import ensure_commands_imported
 from webapp.config import session_secret
 from webapp.routers import api, odata, permissions, web
@@ -91,7 +92,10 @@ def static_file(path: str):
     return FileResponse(file)
 
 
+app.add_exception_handler(LoginRequired, login_redirect)
+app.include_router(web.public_router)
 app.include_router(web.router)
+app.include_router(web.json_router)
 app.include_router(permissions.router)
 app.include_router(api.router)
 app.include_router(odata.router)

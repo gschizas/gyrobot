@@ -1,24 +1,28 @@
 {% extends "base.html" %}
+{% from "_links.html" import action_link with context %}
 {% block title %}Onboarding - GyroBot{% endblock %}
 {% block content %}
 <h1>Onboarding</h1>
 <p>Choose what to onboard/offboard a colleague for. Each request is queued for
-approval, exactly like the chat bot's <code>onboard</code>/<code>offboard</code> commands.</p>
+approval, exactly like the chat bot's <code>onboard</code>/<code>offboard</code> commands.
+Greyed-out entries are not available to you.</p>
 <ul class="actions">
     {% for action, form in forms.items() %}
-    <li><a href="{{request.url_for('onboarding_form', action=action) }}">{{ form.title }}</a></li>
+    <li>{{ action_link(action, request.url_for('onboarding_form', action=action), form.title) }}</li>
     {% endfor %}
-    <li><a href="{{ request.url_for('github_bulk_form') }}">Bulk onboard: GitHub Copilot (multiple users)</a></li>
-    <li><a href="{{ request.url_for('move_bulk_form') }}">Bulk move: change the team of multiple colleagues</a></li>
-    <li><a href="{{ request.url_for('missing_emails_form') }}">Fill in missing emails of GitHub members</a></li>
-    <li><a href="{{ request.url_for('reinvite_form') }}">Reinvite GitHub users whose invitation expired</a></li>
+    <li>{{ action_link('onboard_github', request.url_for('github_bulk_form'), 'Bulk onboard: GitHub Copilot (multiple users)') }}</li>
+    <li>{{ action_link('move', request.url_for('move_bulk_form'), 'Bulk move: change the team of multiple colleagues') }}</li>
+    <li>{{ action_link('set_email', request.url_for('missing_emails_form'), 'Fill in missing emails of GitHub members') }}</li>
+    <li>{{ action_link('reinvite', request.url_for('reinvite_form'), 'Reinvite GitHub users whose invitation expired') }}</li>
 </ul>
-{% if can_manage_permissions or can_reload_permissions %}
+{% set manage = can(request, 'manage_permissions') %}
+{% set reload = can(request, 'reload_permissions') %}
+{% if manage or reload %}
 <h2>Administration</h2>
-{% if can_manage_permissions %}
+{% if manage %}
 <p><a href="{{ request.url_for('list_rules') }}">Manage permission rules</a></p>
 {% endif %}
-{% if can_reload_permissions %}
+{% if reload %}
 <p>After editing permission rules in the database, reload them here (this affects the web UI/API process only;
 use <code>permissions reload</code> in chat for the bot).</p>
 <form method="post" action="{{ request.url_for('reload_permissions') }}">
