@@ -7,6 +7,8 @@ same ``onboard``/``offboard`` Click commands used by chat, via
 requesting identity (see ``backend.approval``/``backend.configuration``
 permission checks, matched against the ``$webui`` pseudo-channel).
 """
+import functools
+import inspect
 import json
 import logging
 import pathlib
@@ -93,6 +95,22 @@ def _require_login(request: Request) -> Optional[RedirectResponse]:
     return None
 
 
+def login_required(handler):
+    """Redirect to the login page unless the session has a user. Goes below ``@router.<method>``; the handler needs a ``request`` parameter."""
+    def check(kwargs):
+        return _require_login(kwargs['request'])
+
+    if inspect.iscoroutinefunction(handler):
+        @functools.wraps(handler)
+        async def wrapper(*args, **kwargs):
+            return check(kwargs) or await handler(*args, **kwargs)
+    else:
+        @functools.wraps(handler)
+        def wrapper(*args, **kwargs):
+            return check(kwargs) or handler(*args, **kwargs)
+    return wrapper
+
+
 def _github_team_tree() -> tuple[Optional[dict], Optional[str]]:
     """Fetch the GitHub Enterprise team hierarchy for the tree widget.
 
@@ -148,9 +166,8 @@ def logout(request: Request):
 
 
 @router.get('/onboarding', include_in_schema=False)
+@login_required
 def dashboard(request: Request):
-    if redirect := _require_login(request):
-        return redirect
     user = _current_user(request)
     return templates.TemplateResponse(request, 'dashboard.html', {
         'user': user, 'forms': FORMS,
@@ -159,10 +176,9 @@ def dashboard(request: Request):
 
 
 @router.post('/admin/reload-permissions', include_in_schema=False)
+@login_required
 def reload_permissions(request: Request):
     """Invalidate this web process's permission cache (the chat bot has its own, in another process)."""
-    if redirect := _require_login(request):
-        return redirect
     user = _current_user(request)
     result = run_bot_command(['permissions', 'reload'], user_id=user, channel_name=config.web_channel_name(),
                              team_name=config.web_team_name())
@@ -171,9 +187,8 @@ def reload_permissions(request: Request):
 
 
 @router.get('/onboarding/{action}', include_in_schema=False)
+@login_required
 def onboarding_form(request: Request, action: str):
-    if redirect := _require_login(request):
-        return redirect
     form = FORMS.get(action)
     if not form:
         raise HTTPException(status.HTTP_404_NOT_FOUND)
@@ -187,9 +202,8 @@ def onboarding_form(request: Request, action: str):
 
 
 @router.post('/onboarding/{action}', include_in_schema=False)
+@login_required
 async def onboarding_submit(request: Request, action: str):
-    if redirect := _require_login(request):
-        return redirect
     form_def = FORMS.get(action)
     if not form_def:
         raise HTTPException(status.HTTP_404_NOT_FOUND)
@@ -266,9 +280,8 @@ def _check_github_usernames(usernames: list[str]) -> dict[str, dict]:
 
 
 @router.get('/onboarding/github/bulk', include_in_schema=False)
+@login_required
 def github_bulk_form(request: Request):
-    if redirect := _require_login(request):
-        return redirect
     team_tree, team_tree_error = _github_team_tree()
     team_options = GitHubApi.flatten_team_tree(team_tree) if team_tree else None
     return templates.TemplateResponse(request, 'bulk_github.html', {
@@ -279,9 +292,8 @@ def github_bulk_form(request: Request):
 
 
 @router.post('/onboarding/github/bulk', include_in_schema=False)
+@login_required
 async def github_bulk_submit(request: Request):
-    if redirect := _require_login(request):
-        return redirect
 
     form_data = await request.form()
     usernames = form_data.getlist('username')
@@ -354,9 +366,8 @@ def missing_emails_status(request: Request):
 
 
 @router.get('/onboarding/github/missing-emails', include_in_schema=False)
+@login_required
 def missing_emails_form(request: Request, refresh: bool = False):
-    if redirect := _require_login(request):
-        return redirect
     job = _missing_job_get(restart=refresh)
     context = {'user': _current_user(request), 'job': job, 'error': job.get('error'),
                'email_placeholder': _github_email_placeholder(), 'members': [], 'total_members': 0}
@@ -367,9 +378,8 @@ def missing_emails_form(request: Request, refresh: bool = False):
 
 
 @router.post('/onboarding/github/missing-emails', include_in_schema=False)
+@login_required
 async def missing_emails_submit(request: Request):
-    if redirect := _require_login(request):
-        return redirect
 
     form_data = await request.form()
     user = _current_user(request)
@@ -392,17 +402,15 @@ async def missing_emails_submit(request: Request):
 
 
 @router.get('/onboarding/github/reinvite', include_in_schema=False)
+@login_required
 def reinvite_form(request: Request):
-    if redirect := _require_login(request):
-        return redirect
     people = list_reinvitable_github()
     return templates.TemplateResponse(request, 'reinvite.html', {'user': _current_user(request), 'people': people})
 
 
 @router.post('/onboarding/github/reinvite', include_in_schema=False)
+@login_required
 async def reinvite_submit(request: Request):
-    if redirect := _require_login(request):
-        return redirect
 
     form_data = await request.form()
     user = _current_user(request)
@@ -418,9 +426,8 @@ async def reinvite_submit(request: Request):
 
 
 @router.get('/onboarding/move/bulk', include_in_schema=False)
+@login_required
 def move_bulk_form(request: Request):
-    if redirect := _require_login(request):
-        return redirect
     team_tree, team_tree_error = _github_team_tree()
     team_options = GitHubApi.flatten_team_tree(team_tree) if team_tree else None
     return templates.TemplateResponse(request, 'bulk_move.html', {
@@ -430,9 +437,8 @@ def move_bulk_form(request: Request):
 
 
 @router.post('/onboarding/move/bulk', include_in_schema=False)
+@login_required
 async def move_bulk_submit(request: Request):
-    if redirect := _require_login(request):
-        return redirect
 
     form_data = await request.form()
     user = _current_user(request)
