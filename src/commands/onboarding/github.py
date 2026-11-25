@@ -7,7 +7,7 @@ from treelib import Tree
 
 from backend import bot_identity
 from backend.account_storage import (find_account_by_any_email, find_provisions_by_any_username, find_provisions_by_github_id, get_account, get_account_by_email,
-                                     get_provision, LIVE_STATUSES,
+                                     get_provision, LIVE_STATUSES, REINVITABLE_STATUSES,
                                      find_provisions_by_username, get_last_status_times, get_or_create_account, get_pending_provisions,
                                      get_provisions, list_roles, rename_github_team, resolve_role, set_membership,
                                      set_provision_status)
@@ -357,7 +357,6 @@ def github_cancel(ctx: ExtendedContext, identifier: str):
 
 ANY_STATUS = LIVE_STATUSES + ('expired', 'cancelled', 'deprovisioned', 'failed')
 
-REINVITABLE_STATUSES = ('expired', 'cancelled', 'failed')
 
 
 def _find_reinvite_provision(ctx: ExtendedContext, params: dict) -> tuple[Provision | None, str | None]:

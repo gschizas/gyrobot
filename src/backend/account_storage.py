@@ -22,6 +22,8 @@ if 'APPROVAL_DATABASE_URL' not in os.environ:
 
 # Provision statuses meaning the resource is held or an invitation is outstanding
 LIVE_STATUSES = ('pending', 'invited', 'accepted', 'active')
+# GitHub provisions that can be invited again (`onboard github reinvite`)
+REINVITABLE_STATUSES = ('expired', 'cancelled', 'failed')
 
 
 def _session() -> Session:
@@ -228,6 +230,30 @@ def find_provisions_by_any_username(usernames: List[str]) -> List[Provision]:
     if not usernames:
         return []
     return _provisions(ProvisionRow.data['username'].astext.in_(usernames))
+
+
+def list_reinvitable_github() -> List[dict]:
+    """GitHub provisions that can be invited again, newest change first, with the person's details for display."""
+    query = (select(ProvisionRow, AccountRow, MembershipRow.team, RoleRow.display_name)
+             .join(AccountRow, AccountRow.id == ProvisionRow.account_id)
+             .outerjoin(MembershipRow, MembershipRow.account_id == AccountRow.id)
+             .outerjoin(RoleRow, RoleRow.key == MembershipRow.role_key)
+             .where(ProvisionRow.resource == 'github', ProvisionRow.status.in_(REINVITABLE_STATUSES))
+             .order_by(ProvisionRow.updated_at.desc(), MembershipRow.team))
+    people: dict[UUID, dict] = {}
+    with _session() as session:
+        for provision, account, membership_team, role_name in session.execute(query):
+            data = provision.data or {}
+            person = people.setdefault(account.id, {
+                'email': account.primary_email, 'name': account.name, 'login': data.get('username'),
+                'github_id': data.get('github_id'), 'status': provision.status,
+                'team': data.get('team') or account.team, 'teams': [], 'roles': [],
+                'invited_at': data.get('invited_at'), 'changed': provision.updated_at})
+            if membership_team and membership_team not in person['teams']:
+                person['teams'].append(membership_team)
+            if role_name and role_name not in person['roles']:
+                person['roles'].append(role_name)
+    return list(people.values())
 
 
 def get_provisions(resource: str) -> List[Provision]:
