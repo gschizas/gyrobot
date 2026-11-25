@@ -6,7 +6,7 @@ import requests
 from treelib import Tree
 
 from backend import bot_identity
-from backend.account_storage import (find_provisions_by_any_username, find_provisions_by_github_id, get_account, get_account_by_email,
+from backend.account_storage import (find_account_by_any_email, find_provisions_by_any_username, find_provisions_by_github_id, get_account, get_account_by_email,
                                      get_provision, LIVE_STATUSES,
                                      find_provisions_by_username, get_last_status_times, get_or_create_account, get_pending_provisions,
                                      get_provisions, list_roles, rename_github_team, resolve_role, set_membership,
@@ -356,6 +356,78 @@ def github_cancel(ctx: ExtendedContext, identifier: str):
 
 
 ANY_STATUS = LIVE_STATUSES + ('expired', 'cancelled', 'deprovisioned', 'failed')
+
+REINVITABLE_STATUSES = ('expired', 'cancelled', 'failed')
+
+
+def _find_reinvite_provision(ctx: ExtendedContext, params: dict) -> tuple[Provision | None, str | None]:
+    """The GitHub provision of the account with ``params['email']`` (normalised in place), or an error."""
+    email = params['email']
+    if extracted := extract_email(ctx, email):
+        params['email'] = email = extracted
+    account = find_account_by_any_email(email)
+    provision = account and get_provision(account.id, 'github')
+    if not provision:
+        return None, f"No GitHub provision found for {email}. Use 'onboard github <username> {email} <team>' instead."
+    username = provision.data.get('username')
+    if not username:
+        return None, f"The GitHub provision of {email} has no username."
+    if provision.status == 'invited':
+        return None, f"{username} already has a pending invitation (see 'onboard github pending-invitations')."
+    if provision.status not in REINVITABLE_STATUSES:
+        return None, f"{username} cannot be reinvited: the provision is {provision.status}."
+    return provision, None
+
+
+def _reinvite_validate(params: dict, ctx: ExtendedContext) -> str | None:
+    provision, error = _find_reinvite_provision(ctx, params)
+    if error:
+        return error
+    username = provision.data['username']
+    try:
+        GitHubApi().get_user_details(username)
+    except requests.exceptions.HTTPError as r:
+        return f"GitHub user {username} not found (renamed or deleted?).\n" + r.args[0]
+    return None
+
+
+def _reinvite_summary(params: dict) -> str:
+    return f"send a new GitHub invitation to {params['email']}"
+
+
+@github_group.command('reinvite')
+@click.argument('email')
+@click.pass_context
+@requires_approval(summarize=_reinvite_summary, validate=_reinvite_validate)
+def github_reinvite(ctx: ExtendedContext, email: str):
+    """Send a new GitHub invitation to someone whose invitation expired, was cancelled or failed.
+
+    The username, team and role are taken from the existing provision; the previous values stay in the history.
+
+    USAGE: bot onboard github reinvite <email>
+    """
+    params = {'email': email}
+    provision, error = _find_reinvite_provision(ctx, params)
+    if error:
+        ctx.chat.send_text(error, is_error=True)
+        return f"Error: {error}"
+
+    data = provision.data
+    username, team = data['username'], data.get('team', '')
+    for stale in ('expired_at', 'cancelled_at', 'cancelled_by', 'accepted_at', 'assigned_at'):
+        data.pop(stale, None)
+
+    request = ProvisionRequest(name=params['email'].split('@')[0], userid=username, email=data.get('email', params['email']),
+                               team=team)
+    message = PROVIDERS['github'].provision(ctx, request)
+    data.update(request.provision_data)
+    data['reinvited_at'] = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+    data['reinvited_by'] = ctx.chat.user_id
+    set_provision_status(provision.account_id, 'github', 'invited', data)
+
+    message += _send_invitation_email(ctx, username, data.get('email', params['email']), team)
+    ctx.chat.send_table(title=f'Reinvited {username}', table=[{'Resource': RESOURCE_LABELS['github'], 'Result': message}])
+    return f"{RESOURCE_LABELS['github']}: {message}"
 
 
 def _set_email_summary(params: dict) -> str:
