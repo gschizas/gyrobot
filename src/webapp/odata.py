@@ -126,6 +126,10 @@ class _FilterParser:
             if operator[1] not in ('eq', 'ne'):
                 raise ODataError("null can only be compared with 'eq' or 'ne'")
             return column.is_(None) if operator[1] == 'eq' else column.is_not(None)
+        if self.types[value] == 'bool' and operator[1] not in ('eq', 'ne'):
+            raise ODataError("Boolean properties can only be compared with 'eq' or 'ne'")
+        if self.types[value] == 'bool':
+            return column == literal if operator[1] == 'eq' else column != literal
         return {'eq': column == literal, 'ne': column != literal, 'gt': column > literal,
                 'ge': column >= literal, 'lt': column < literal, 'le': column <= literal}[operator[1]]
 
@@ -153,6 +157,8 @@ class _FilterParser:
         kind, value = self._next()
         if kind == 'name' and value == 'null':
             return None
+        if kind == 'name' and value in ('true', 'false') and expected == 'bool':
+            return value == 'true'
         if kind == 'string' and expected == 'string':
             return value[1:-1].replace("''", "'")
         if kind == 'number' and expected == 'int':
@@ -163,7 +169,7 @@ class _FilterParser:
 
 
 def parse_filter(text: str, fields: dict[str, ColumnElement], types: dict[str, str]) -> ColumnElement:
-    """``types`` maps each property to ``string``, ``int`` or ``datetime``."""
+    """``types`` maps each property to ``string``, ``int``, ``bool`` or ``datetime``."""
     return _FilterParser(text, fields, types).parse()
 
 

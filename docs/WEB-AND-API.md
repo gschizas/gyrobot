@@ -168,7 +168,10 @@ Without the scope you get 403, and without the rule you get 403.
 `Provision`: login, ids and status of that change) and `account_history` (`Event` = `Account`: email and team of that
 change), and each row is completed with the other stream's state at that moment (the email/team snapshot in effect,
 or the GitHub provision in effect; empty when there was none yet). `Id` is `P<n>` or `A<n>`, `LastChanged` is the
-time the change was recorded, and rows are oldest first by default. Because earlier logins are kept in the history,
+time the change was recorded, and rows are oldest first by default. `IsLatest` (boolean) is `true` on the most recent
+row of each person (the latest change in either stream, so it matches the current state); filter with
+`$filter=IsLatest eq true` to get one current row per person. The flag is computed over all history, so it does not
+change when other filters or team limits hide rows. Because earlier logins are kept in the history,
 a reinvited person shows both logins here.
 
 Team memberships have no history, so `Role` and `RoleName` are the person's **current** role in that row's team

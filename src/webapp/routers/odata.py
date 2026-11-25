@@ -113,7 +113,7 @@ def service_document(request: Request):
 
 
 def _entity_type(name: str, field_types: dict[str, str]) -> str:
-    edm = {'string': 'Edm.String', 'int': 'Edm.Int64', 'datetime': 'Edm.DateTimeOffset'}
+    edm = {'string': 'Edm.String', 'int': 'Edm.Int64', 'datetime': 'Edm.DateTimeOffset', 'bool': 'Edm.Boolean'}
     properties = ['<Property Name="Id" Type="Edm.String" Nullable="false"/>',
                   '<Property Name="NodeId" Type="Edm.String"/>']
     properties += [f'<Property Name={quoteattr(prop)} Type="{edm[kind]}"/>' for prop, kind in field_types.items()]

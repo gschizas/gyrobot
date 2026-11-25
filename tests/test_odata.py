@@ -12,8 +12,9 @@ from sqlalchemy.dialects import postgresql
 from webapp import odata
 
 FIELDS = {'Team': column('team'), 'Login': column('login'), 'GithubId': column('github_id'),
-          'LastChanged': column('last_changed')}
-TYPES = {'Team': 'string', 'Login': 'string', 'GithubId': 'int', 'LastChanged': 'datetime'}
+          'LastChanged': column('last_changed'), 'IsLatest': column('is_latest')}
+TYPES = {'Team': 'string', 'Login': 'string', 'GithubId': 'int', 'LastChanged': 'datetime',
+         'IsLatest': 'bool'}
 
 
 def compiled(clause):
@@ -53,6 +54,10 @@ class FilterTests(unittest.TestCase):
     def test_numbers_and_dates(self):
         _, params = parse('GithubId gt 5 and LastChanged ge 2026-01-02T03:04:05Z')
         self.assertEqual(list(params.values()), [5, datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)])
+
+    def test_booleans(self):
+        self.assertEqual(parse('IsLatest eq true')[0], 'is_latest = true')
+        self.assertRaises(odata.ODataError, parse, 'IsLatest eq 1')
 
     def test_null(self):
         self.assertEqual(parse('Team eq null')[0], 'team IS NULL')

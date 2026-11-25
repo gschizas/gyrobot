@@ -21,7 +21,7 @@ from backend.models.accounts import AccountHistoryRow, AccountRow, MembershipRow
 
 FIELD_TYPES = {'Event': 'string', 'Login': 'string', 'GithubId': 'int', 'GlobalId': 'string', 'Email': 'string',
                'Team': 'string', 'Role': 'string', 'RoleName': 'string', 'Status': 'string',
-               'LastChanged': 'datetime'}
+               'LastChanged': 'datetime', 'IsLatest': 'bool'}
 
 
 def _latest(model, *conditions):
@@ -56,7 +56,11 @@ def _events():
             cast(provision.c.status, String).label('Status'), cast(ah.recorded_at, DateTime(timezone=True)).label('LastChanged'))
         .select_from(ah).join(AccountRow, AccountRow.id == ah.account_id).outerjoin(provision, true()))
 
-    return from_provisions.union_all(from_accounts).subquery('events')
+    union = from_provisions.union_all(from_accounts).subquery('all_events')
+    # Computed before any request filter is applied, so a filtered row keeps its flag
+    latest = (func.row_number().over(partition_by=union.c.AccountId,
+                                     order_by=(union.c.LastChanged.desc(), union.c.Id.desc())) == 1)
+    return select(union, latest.label('IsLatest')).subquery('events')
 
 
 _events_subquery = _events()
@@ -65,7 +69,7 @@ _c = _events_subquery.c
 FIELDS: dict[str, ColumnElement] = {
     'Event': _c.Event, 'Login': _c.Login, 'GithubId': _c.GithubId, 'GlobalId': _c.GlobalId, 'Email': _c.Email,
     'Team': _c.Team, 'Role': MembershipRow.role_key, 'RoleName': RoleRow.display_name, 'Status': _c.Status,
-    'LastChanged': _c.LastChanged,
+    'LastChanged': _c.LastChanged, 'IsLatest': _c.IsLatest,
 }
 
 
