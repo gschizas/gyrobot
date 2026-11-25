@@ -161,6 +161,22 @@ To set it up for a new consumer:
 
 Without the scope you get 403, and without the rule you get 403.
 
+#### History feed
+
+`GET /api/odata/GithubUserHistory` has the same columns (plus `Event`) and the same query options, but one row per
+**recorded change** instead of the current state. It is the union of `account_provision_history` (`Event` =
+`Provision`: login, ids and status of that change) and `account_history` (`Event` = `Account`: email and team of that
+change), and each row is completed with the other stream's state at that moment (the email/team snapshot in effect,
+or the GitHub provision in effect; empty when there was none yet). `Id` is `P<n>` or `A<n>`, `LastChanged` is the
+time the change was recorded, and rows are oldest first by default. Because earlier logins are kept in the history,
+a reinvited person shows both logins here.
+
+Team memberships have no history, so `Role` and `RoleName` are the person's **current** role in that row's team
+(empty if they no longer hold it).
+
+It is authorized separately, by the rule `webapp.routers.odata:list_github_user_history` (same setup and `extra` as
+above; the same `directory:read` scope).
+
 **Excel**:
 
 1. *Data > Get Data > From Other Sources > From OData Feed*.

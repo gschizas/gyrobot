@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import and_, or_
 
-from backend import github_directory, permissions
+from backend import github_directory, github_history, permissions
 from backend.configuration import user_allowed
 from webapp import config, odata
 from webapp.auth_oauth2 import decode_access_token, validate_client_credentials
@@ -25,6 +25,7 @@ from webapp.auth_oauth2 import decode_access_token, validate_client_credentials
 logger = logging.getLogger('webapp.routers.odata')
 
 RULE_FUNCTION = 'webapp.routers.odata:list_github_users'
+HISTORY_RULE_FUNCTION = 'webapp.routers.odata:list_github_user_history'
 SCOPE = 'directory:read'
 DEFAULT_PAGE_SIZE = 100
 MAX_PAGE_SIZE = 1000
@@ -79,9 +80,9 @@ def authenticate(request: Request) -> str:
     raise _unauthorized('Not authenticated')
 
 
-def _team_prefixes(client_id: str) -> Optional[list[str]]:
+def _team_prefixes(client_id: str, rule_function: str = RULE_FUNCTION) -> Optional[list[str]]:
     """The team prefixes the client may read (None = all). Raises 403 when the rule is missing or denies."""
-    rule = permissions.get_rule(RULE_FUNCTION)
+    rule = permissions.get_rule(rule_function)
     channels = rule['channels'] if rule else []
     if (rule is None or ('*' not in channels and config.api_channel_name() not in channels)
             or not user_allowed(config.api_team_name(), client_id, rule['users'])):
@@ -107,49 +108,50 @@ def service_document(request: Request):
     authenticate(request)
     base = _base_url(request)
     return _json({'@odata.context': f'{base}/$metadata',
-                  'value': [{'name': 'GithubUsers', 'kind': 'EntitySet', 'url': 'GithubUsers'}]})
+                  'value': [{'name': 'GithubUsers', 'kind': 'EntitySet', 'url': 'GithubUsers'},
+                            {'name': 'GithubUserHistory', 'kind': 'EntitySet', 'url': 'GithubUserHistory'}]})
+
+
+def _entity_type(name: str, field_types: dict[str, str]) -> str:
+    edm = {'string': 'Edm.String', 'int': 'Edm.Int64', 'datetime': 'Edm.DateTimeOffset'}
+    properties = ['<Property Name="Id" Type="Edm.String" Nullable="false"/>',
+                  '<Property Name="NodeId" Type="Edm.String"/>']
+    properties += [f'<Property Name={quoteattr(prop)} Type="{edm[kind]}"/>' for prop, kind in field_types.items()]
+    return f'<EntityType Name="{name}"><Key><PropertyRef Name="Id"/></Key>' + ''.join(properties) + '</EntityType>'
 
 
 @router.get('/$metadata')
 def metadata(request: Request):
     authenticate(request)
-    edm = {'string': 'Edm.String', 'int': 'Edm.Int64', 'datetime': 'Edm.DateTimeOffset'}
-    properties = ['<Property Name="Id" Type="Edm.String" Nullable="false"/>',
-                  '<Property Name="NodeId" Type="Edm.String"/>']
-    properties += [f'<Property Name={quoteattr(name)} Type="{edm[kind]}"/>'
-                   for name, kind in github_directory.FIELD_TYPES.items()]
     xml = ('<?xml version="1.0" encoding="utf-8"?>'
            '<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">'
            '<edmx:DataServices>'
            f'<Schema Namespace="{NAMESPACE}" xmlns="http://docs.oasis-open.org/odata/ns/edm">'
-           '<EntityType Name="GithubUser"><Key><PropertyRef Name="Id"/></Key>'
-           + ''.join(properties) +
-           '</EntityType>'
+           + _entity_type('GithubUser', github_directory.FIELD_TYPES)
+           + _entity_type('GithubUserHistory', github_history.FIELD_TYPES) +
            '<EntityContainer Name="Container">'
            f'<EntitySet Name="GithubUsers" EntityType="{NAMESPACE}.GithubUser"/>'
+           f'<EntitySet Name="GithubUserHistory" EntityType="{NAMESPACE}.GithubUserHistory"/>'
            '</EntityContainer></Schema></edmx:DataServices></edmx:Edmx>')
     return Response(xml, media_type='application/xml', headers={'OData-Version': '4.0'})
 
-
-def _prefix_condition(prefixes: list[str]):
-    team = github_directory.FIELDS['Team']
+def _prefix_condition(prefixes: list[str], team):
     return or_(*[team.startswith(prefix, autoescape=True) for prefix in prefixes])
 
 
-@router.get('/GithubUsers', name='github_users')
-def github_users(request: Request):
+def _serve(request: Request, entity_set: str, route: str, rule_function: str, fields: dict, types: dict,
+           list_rows, count_rows, row_id):
     client_id = authenticate(request)
-    allowed_prefixes = _team_prefixes(client_id)
+    allowed_prefixes = _team_prefixes(client_id, rule_function)
     params = request.query_params
-    fields, types = github_directory.FIELDS, github_directory.FIELD_TYPES
     try:
         conditions = []
         if params.get('$filter'):
             conditions.append(odata.parse_filter(params['$filter'], fields, types))
         if params.get('team_prefix'):
-            conditions.append(_prefix_condition([params['team_prefix']]))
+            conditions.append(_prefix_condition([params['team_prefix']], fields['Team']))
         if allowed_prefixes is not None:
-            conditions.append(_prefix_condition(allowed_prefixes))
+            conditions.append(_prefix_condition(allowed_prefixes, fields['Team']))
         where = and_(*conditions) if conditions else None
         order_by = odata.parse_orderby(params['$orderby'], fields) if params.get('$orderby') else None
         names = list(types) + ['NodeId']
@@ -160,23 +162,39 @@ def github_users(request: Request):
     except odata.ODataError as ex:
         return _error(400, str(ex))
 
-    rows = github_directory.list_github_users(where, order_by, top + 1, skip)
+    rows = list_rows(where, order_by, top + 1, skip)
     has_more = len(rows) > top
     rows = rows[:top]
     for row in rows:
-        row['Id'] = f"{row['Login']}|{row['Team']}"
+        row['Id'] = row_id(row)
         row['LastChanged'] = row['LastChanged'].isoformat() if row['LastChanged'] else None
         if selected:
             for name in [name for name in row if name not in selected]:
                 del row[name]
-    logger.info(f"{client_id} listed GitHub users: filter={params.get('$filter')!r} "
+    logger.info(f"{client_id} listed {entity_set}: filter={params.get('$filter')!r} "
                 f"team_prefix={params.get('team_prefix')!r} skip={skip} rows={len(rows)}")
 
-    body = {'@odata.context': f'{_base_url(request)}/$metadata#GithubUsers'}
+    body = {'@odata.context': f'{_base_url(request)}/$metadata#{entity_set}'}
     if count:
-        body['@odata.count'] = github_directory.count_github_users(where)
+        body['@odata.count'] = count_rows(where)
     body['value'] = rows
     if has_more:
         next_params = {**request.query_params, '$skip': str(skip + top)}
-        body['@odata.nextLink'] = str(request.url_for('github_users').replace_query_params(**next_params))
+        body['@odata.nextLink'] = str(request.url_for(route).replace_query_params(**next_params))
     return _json(body)
+
+
+@router.get('/GithubUsers', name='github_users')
+def github_users(request: Request):
+    return _serve(request, 'GithubUsers', 'github_users', RULE_FUNCTION,
+                  github_directory.FIELDS, github_directory.FIELD_TYPES,
+                  github_directory.list_github_users, github_directory.count_github_users,
+                  lambda row: f"{row['Login']}|{row['Team']}")
+
+
+@router.get('/GithubUserHistory', name='github_user_history')
+def github_user_history(request: Request):
+    return _serve(request, 'GithubUserHistory', 'github_user_history', HISTORY_RULE_FUNCTION,
+                  github_history.FIELDS, github_history.FIELD_TYPES,
+                  github_history.list_history, github_history.count_history,
+                  lambda row: row['Id'])
