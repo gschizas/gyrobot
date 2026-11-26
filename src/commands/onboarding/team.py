@@ -8,7 +8,7 @@ from backend.approval import requires_approval
 from backend.arguments import extract_email
 from backend.github_api import GitHubApi
 from backend.providers import PROVIDERS, RESOURCE_LABELS
-from backend.team_mapping import normalize, resolve_team
+from backend.team_mapping import normalize, resolve_team, resolve_teams
 from commands.extended_context import ExtendedContext
 
 if 'APPROVAL_DATABASE_URL' not in os.environ:
@@ -72,6 +72,8 @@ def onboard_move(ctx: ExtendedContext, email: str, team: str):
             failed = True
             results.append({'Resource': label, 'Result': f"FAILED: no team mapping for {team}"})
             continue
+        if getattr(provider, 'RECEIVES_ALL_TEAMS', False):
+            target = resolve_teams(provision.resource, team)
         try:
             message = change_team(ctx, provision, target)
             set_provision_status(provision.account_id, provision.resource, provision.status, provision.data)
