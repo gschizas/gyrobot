@@ -9,7 +9,11 @@ Secrets for the Crowd onboarding:
 | Secret name | Used for |
 |---|---|
 | `CROWD_PASSWORD` | The Crowd application/user password (Crowd itself does not talk to LDAP). |
-| `LDAP_BIND_PASSWORD` | The read-only AD service account that only looks up emails and display names. The account name is not secret; keep it in the instance env file (`LDAP_BIND_USER`). |
+| `LDAP_BIND_PASSWORD` | The read-only AD service account that only looks up emails and display names. |
+
+The matching user names are not secret: put `CROWD_USERNAME` and `LDAP_BIND_USERNAME` in the instance env file
+(`.env.d/<name>.env`) as plain values. (If you would rather keep them out of the file, `CROWD_USERNAME=secret:` works
+too, since any name can be looked up in the store.)
 
 Use a dedicated AD account that can only bind and search, with a long random password.
 
