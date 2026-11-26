@@ -11,6 +11,8 @@ Example::
       mail_domain: example.com                       # login -> login@mail_domain when matching by mail
       authentication: NTLM                           # or SIMPLE
       username_attribute: samaccountname             # Crowd user name taken from this attribute (or: name)
+      greek_name_attribute: extensionAttribute10     # holds the Greek name, GIVEN|SURNAME (empty: no Greek name)
+      greek_name_separator: "|"
     welcome:                                         # optional, used by the welcome email
       portal_url: https://crowd.example.com/crowd/   # where users change their password
       hosts_note: If crowd.example.com does not resolve, use 10.0.0.1
@@ -37,6 +39,8 @@ class LdapSettings:
     mail_domain: str
     authentication: str = 'NTLM'
     username_attribute: str = 'samaccountname'
+    greek_name_attribute: str = 'extensionAttribute10'
+    greek_name_separator: str = '|'
 
 
 @dataclass(frozen=True)
@@ -68,7 +72,9 @@ def load_settings(path: pathlib.Path = CONFIG_PATH) -> CrowdSettings:
         ldap = LdapSettings(
             server=ldap_raw['server'], search_base=ldap_raw['search_base'], mail_domain=ldap_raw['mail_domain'],
             authentication=str(ldap_raw.get('authentication', 'NTLM')).upper(),
-            username_attribute=str(ldap_raw.get('username_attribute', 'samaccountname')).lower())
+            username_attribute=str(ldap_raw.get('username_attribute', 'samaccountname')).lower(),
+            greek_name_attribute=str(ldap_raw.get('greek_name_attribute', 'extensionAttribute10') or ''),
+            greek_name_separator=str(ldap_raw.get('greek_name_separator', '|')))
         welcome_raw = dict(raw.get('welcome') or {})
         welcome = WelcomeSettings(
             portal_url=str(welcome_raw.get('portal_url', '')), hosts_note=str(welcome_raw.get('hosts_note', '')),

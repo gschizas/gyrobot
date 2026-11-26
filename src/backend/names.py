@@ -19,9 +19,9 @@ def title_case(text: str) -> str:
     return ''.join(part if _SEPARATORS.fullmatch(part) else part[:1].upper() + part[1:].lower() for part in parts)
 
 
-def split_greek_name(value: str) -> tuple[str, str]:
-    """``ΓΙΩΡΓΟΣ|ΣΧΙΖΑΣ`` -> (``Γιώργος``-style title case given name, surname). Missing parts are empty."""
-    given, _, surname = (value or '').partition('|')
+def split_greek_name(value: str, separator: str = '|') -> tuple[str, str]:
+    """``ΓΙΩΡΓΟΣ|ΣΧΙΖΑΣ`` -> (title case given name, surname). Missing parts are empty."""
+    given, _, surname = (value or '').partition(separator)
     return title_case(given), title_case(surname)
 
 

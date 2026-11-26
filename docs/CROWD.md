@@ -35,6 +35,8 @@ ldap:
   mail_domain: example.com
   authentication: NTLM
   username_attribute: samaccountname            # or: name (the CN)
+  greek_name_attribute: extensionAttribute10    # Greek name as GIVEN|SURNAME, upper case (empty: none)
+  greek_name_separator: "|"
 welcome:
   portal_url: https://crowd.example.com/crowd/
   hosts_note: ...

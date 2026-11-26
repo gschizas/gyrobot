@@ -166,15 +166,14 @@ accepted/expired are not visible in the web UI or API. Options:
     (`import_provisions`, `backfill_*`, `export_github_members`, ...) get migrated when next touched.
 19. **Display names from the directory** (decided: `accounts.name` becomes the person's display name, see item 3).
     Work, in order:
-    1. `backend/names.py`: proper Title Case (dashes and apostrophes: `ANNA-MARIA` -> `Anna-Maria`) and the Greek
-       name romanization with the `romanize` library (ISO 843); read the Greek name from `extensionAttribute10`
-       (`GIVEN|SURNAME`, all caps) in `LdapDirectory`. The AD names have mistakes, so compare the Latin name with
-       the romanized Greek one and flag differences.
+    1. Done: `backend/names.py` (Title Case with dashes and apostrophes, ISO 843 romanization with `romanize`) and the
+       Greek name read from `extensionAttribute10` (`GIVEN|SURNAME`, all caps) in `LdapDirectory`; `Person.name_mismatch`
+       compares the Latin name with the romanized Greek one, since the AD names have mistakes.
     2. `onboard crowd`: new options `--given-name`/`--surname` (or `--display-name`) to override the directory
        names; the validate step resolves them, the provider and the welcome email use them.
-    3. `onboard github`: verify the email in the directory (the `ad_check_email_domains` hook in `_github_validate`
-       is still a `pass`), take the display name from it, and stop writing the GitHub login into `accounts.name`
-       (`get_or_create_account(..., name=username)` in `commands/onboarding/github.py`; the same options as above).
+    3. Done for `onboard github` (and `set-email`): the email is verified in the directory for the
+       `ad_check_email_domains`, the display name goes to `accounts.name`, and `--given-name`/`--surname` override it.
+       Left: the import and backfill scripts still write logins into `accounts.name`.
     4. Crowd web page: verify the email (JSON route like the GitHub username validation), show the display name as a
        label that can be clicked to edit when it differs from the Title Case/romanized expectation; a bulk page
        (rows of email + team) like the GitHub one.

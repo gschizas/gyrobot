@@ -46,6 +46,16 @@ class LdapDirectoryTest(unittest.TestCase):
         ldap, _ = directory([ALICE])
         self.assertFalse(ldap.find_person('asmith').name_mismatch)
 
+    def test_greek_name_attribute_and_separator_are_configurable(self):
+        settings = CrowdSettings(crowd_url='u', ldap=LdapSettings(
+            'ldap://x', 'DC=x', 'x.test', greek_name_attribute='extensionAttribute3', greek_name_separator=';'))
+        item = entry(name='A B', sAMAccountName='ab', mail='ab@x.test', givenName='Anna', sn='Schizas',
+                     extensionAttribute3='ΑΝΝΑ;ΣΧΙΖΑΣ')
+        connection = mock.MagicMock(entries=[item])
+        person = LdapDirectory(settings, connection=connection).find_person('ab')
+        self.assertFalse(person.name_mismatch)
+        self.assertIn('extensionAttribute3', connection.search.call_args.kwargs['attributes'])
+
     def test_username_attribute_name_uses_cn(self):
         settings = CrowdSettings(crowd_url='u', ldap=LdapSettings('s', 'b', 'd', username_attribute='name'))
         connection = mock.MagicMock(entries=[ALICE])

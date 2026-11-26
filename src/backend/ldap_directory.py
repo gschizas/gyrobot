@@ -8,7 +8,7 @@ from backend.crowd_config import CrowdSettings, load_settings
 from backend.names import names_agree, split_greek_name, title_case
 from backend.secret_store import get_secret
 
-ATTRIBUTES = ['name', 'sAMAccountName', 'mail', 'givenName', 'sn', 'extensionAttribute10']
+ATTRIBUTES = ['name', 'sAMAccountName', 'mail', 'givenName', 'sn']
 
 
 @dataclass(frozen=True)
@@ -68,11 +68,14 @@ class LdapDirectory:
             self._connection = None
 
     def _search(self, ldap_filter: str) -> list[Person]:
-        self.connection.search(self.settings.ldap.search_base, ldap_filter, attributes=ATTRIBUTES)
+        ldap = self.settings.ldap
+        attributes = ATTRIBUTES + ([ldap.greek_name_attribute] if ldap.greek_name_attribute else [])
+        self.connection.search(ldap.search_base, ldap_filter, attributes=attributes)
         people = []
         for entry in self.connection.entries:
             attrs = entry.entry_attributes_as_dict
-            greek_first, greek_last = split_greek_name(_first(attrs.get('extensionAttribute10')))
+            greek = _first(attrs.get(ldap.greek_name_attribute)) if ldap.greek_name_attribute else ''
+            greek_first, greek_last = split_greek_name(greek, ldap.greek_name_separator)
             people.append(Person(
                 cn=_first(attrs.get('name')), login=_first(attrs.get('sAMAccountName')),
                 mail=_first(attrs.get('mail')).lower(),
