@@ -10,3 +10,129 @@ dn: uid=bob,dc=example,dc=com
 cn: Bob Example
 uid: bob
 userPassword: bob-dev-password
+
+# Active Directory-like people (search base dc=example,dc=com, mail domain example.com)
+
+# Regular user, Greek name in extensionAttribute10 (GIVEN|SURNAME, upper case)
+dn: cn=Nikos Papadopoulos,dc=example,dc=com
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: user
+cn: Nikos Papadopoulos
+name: Nikos Papadopoulos
+sAMAccountName: npapadopoulos
+userPrincipalName: npapadopoulos@example.com
+mail: npapadopoulos@example.com
+givenName: Nikos
+sn: Papadopoulos
+extensionAttribute10:: zp3Omc6azp/Oo3zOoM6RzqDOkc6Uzp/OoM6fzqXOm86fzqM=
+userAccountControl: 512
+
+# Dashed given name
+dn: cn=Maria-Eleni Georgiou,dc=example,dc=com
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: user
+cn: Maria-Eleni Georgiou
+name: Maria-Eleni Georgiou
+sAMAccountName: mgeorgiou
+userPrincipalName: mgeorgiou@example.com
+mail: mgeorgiou@example.com
+givenName: Maria-Eleni
+sn: Georgiou
+extensionAttribute10:: zpzOkc6hzpnOkS3Olc6bzpXOnc6XfM6TzpXOqc6hzpPOmc6fzqU=
+userAccountControl: 512
+
+# Wrong casing in AD (Title Case must fix it) and a non-ISO 843 Latin spelling (Gkiorgos)
+dn: cn=GKIORGOS SCHIZAS,dc=example,dc=com
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: user
+cn: GKIORGOS SCHIZAS
+name: GKIORGOS SCHIZAS
+sAMAccountName: gschizas
+userPrincipalName: gschizas@example.com
+mail: gschizas@example.com
+givenName: GKIORGOS
+sn: SCHIZAS
+extensionAttribute10:: zpPOmc6pzqHOk86fzqN8zqPOp86ZzpbOkc6j
+userAccountControl: 512
+
+# Latin name differs from the Greek one (Helen vs Eleni): flagged as a name mismatch
+dn: cn=Helen Christodoulou,dc=example,dc=com
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: user
+cn: Helen Christodoulou
+name: Helen Christodoulou
+sAMAccountName: hchristodoulou
+userPrincipalName: hchristodoulou@example.com
+mail: hchristodoulou@example.com
+givenName: Helen
+sn: Christodoulou
+extensionAttribute10:: zpXOm86Vzp3Ol3zOp86hzpnOo86kzp/OlM6fzqXOm86fzqU=
+userAccountControl: 512
+
+# Grandfathered: login differs from the email's username part
+dn: cn=Konstantinos Antoniou,dc=example,dc=com
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: user
+cn: Konstantinos Antoniou
+name: Konstantinos Antoniou
+sAMAccountName: kantoniou2
+userPrincipalName: kantoniou2@example.com
+mail: kostas.antoniou@example.com
+givenName: Konstantinos
+sn: Antoniou
+extensionAttribute10:: zprOqc6dzqPOpM6Rzp3OpM6Zzp3On86jfM6Rzp3OpM6pzp3Omc6fzqU=
+userAccountControl: 512
+
+# No Greek name recorded
+dn: cn=John Smith,dc=example,dc=com
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: user
+cn: John Smith
+name: John Smith
+sAMAccountName: jsmith
+userPrincipalName: jsmith@example.com
+mail: jsmith@example.com
+givenName: John
+sn: Smith
+userAccountControl: 512
+
+# Disabled account (ACCOUNTDISABLE flag)
+dn: cn=Old Timer,dc=example,dc=com
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: user
+cn: Old Timer
+name: Old Timer
+sAMAccountName: otimer
+userPrincipalName: otimer@example.com
+mail: otimer@example.com
+givenName: Old
+sn: Timer
+userAccountControl: 514
+
+# Email outside the mail domain
+dn: cn=Ext Contractor,dc=example,dc=com
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: user
+cn: Ext Contractor
+name: Ext Contractor
+sAMAccountName: econtractor
+mail: ext.contractor@contractor.example.org
+givenName: Ext
+sn: Contractor
+userAccountControl: 512
