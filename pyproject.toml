@@ -33,6 +33,7 @@ dependencies = [
     "uvicorn[standard]>=0.32.0",
     "python-multipart>=0.0.12",
     "ldap3>=2.9.1",
+    "romanize>=1.0.2",
     "itsdangerous>=2.2.0",
     "pycryptodome>=3.23.0",
     "sqlalchemy>=2.0",

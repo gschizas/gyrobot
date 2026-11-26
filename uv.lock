@@ -634,6 +634,7 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "python-multipart" },
     { name = "requests" },
+    { name = "romanize" },
     { name = "ruamel-yaml" },
     { name = "sqlalchemy" },
     { name = "tabulate" },
@@ -676,6 +677,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.1.0" },
     { name = "python-multipart", specifier = ">=0.0.12" },
     { name = "requests", specifier = ">=2.32.3" },
+    { name = "romanize", specifier = ">=1.0.2" },
     { name = "ruamel-yaml", specifier = ">=0.18.6" },
     { name = "sqlalchemy", specifier = ">=2.0" },
     { name = "tabulate", specifier = ">=0.1.dev612" },
@@ -1600,6 +1602,14 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ac/c3/e2a2b89f2d3e2179abd6d00ebd70bff6273f37fb3e0cc209f48b39d00cbf/requests-2.34.2.tar.gz", hash = "sha256:f288924cae4e29463698d6d60bc6a4da69c89185ad1e0bcc4104f584e960b9ed", size = 142856, upload-time = "2026-05-14T19:25:27.735Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl", hash = "sha256:2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0", size = 73075, upload-time = "2026-05-14T19:25:26.443Z" },
+]
+
+[[package]]
+name = "romanize"
+version = "1.0.2"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f5/d9/760f0a113909d655c0c546fbb62426a3470eb4baec09558e3877e7a46a4b/Romanize-1.0.2-py2.py3-none-any.whl", hash = "sha256:31fbe21ee9f97e65e5a6c3cde1eec4760b901672b47e1810a02c172084bad07c", size = 4710, upload-time = "2017-12-11T13:21:14.117Z" },
 ]
 
 [[package]]
