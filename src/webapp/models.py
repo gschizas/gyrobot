@@ -26,6 +26,8 @@ class CrowdOnboardRequest(BaseModel):
     username: str = Field(..., description="Directory login or email address of the person")
     team: str = Field(..., description="Canonical team (mapped to Crowd groups in config/team_mapping.yml)")
     groups: List[str] = Field(default_factory=list, description="Extra Crowd groups besides the team's ones")
+    given_name: Optional[str] = Field(None, description="Given name, overriding the directory's")
+    surname: Optional[str] = Field(None, description="Surname, overriding the directory's")
 
 
 class JetbrainsOnboardRequest(BaseModel):

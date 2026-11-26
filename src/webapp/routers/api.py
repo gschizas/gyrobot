@@ -100,7 +100,9 @@ def onboard_github_bulk(payload: GithubBulkOnboardRequest, client_id: str = Depe
 @router.post('/onboarding/crowd', response_model=CommandResult)
 def onboard_crowd(payload: CrowdOnboardRequest, client_id: str = Depends(get_current_client)):
     return _run(['onboard', 'crowd', payload.username, payload.team,
-                 *(arg for group in payload.groups for arg in ('--group', group))], client_id)
+                 *(arg for group in payload.groups for arg in ('--group', group)),
+                 *(arg for option, value in (('--given-name', payload.given_name), ('--surname', payload.surname))
+                   if value for arg in (option, value))], client_id)
 
 
 @router.post('/onboarding/jetbrains', response_model=CommandResult)
