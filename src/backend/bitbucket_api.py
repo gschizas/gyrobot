@@ -1,6 +1,7 @@
 """Read-only Bitbucket Server client: which repositories do a set of (Crowd) groups have access to.
 
-Authenticates with the secrets ``BITBUCKET_USERNAME`` / ``BITBUCKET_PASSWORD`` (a service account).
+Authenticates with the secret ``BITBUCKET_TOKEN`` (an HTTP access token, preferred) or else
+``BITBUCKET_USERNAME`` / ``BITBUCKET_PASSWORD``. Listing permissions needs project-admin rights.
 """
 import time
 from typing import Iterable, Optional
@@ -22,8 +23,12 @@ class BitbucketApi:
         self.base_url = base_url.rstrip('/')
         self.session = session or requests.Session()
         if session is None:
-            self.session.auth = (get_secret('BITBUCKET_USERNAME', required=True),
-                                 get_secret('BITBUCKET_PASSWORD', required=True))
+            token = get_secret('BITBUCKET_TOKEN')
+            if token:
+                self.session.headers['Authorization'] = f"Bearer {token}"
+            else:
+                self.session.auth = (get_secret('BITBUCKET_USERNAME', required=True),
+                                     get_secret('BITBUCKET_PASSWORD', required=True))
         self.session.headers['Accept'] = 'application/json'
         self._cache: dict[str, tuple[float, list]] = {}
 
