@@ -33,10 +33,8 @@ accepted/expired are not visible in the web UI or API. Options:
 
 ## Planned features and design notes
 
-1. **Crowd onboarding in gyrobot** (chat bot and web UI): incorporate the existing Crowd onboarding code.
-   **Do not write any Crowd onboarding code until the existing scripts have been pasted.** They mostly validate
-   that the account exists in AD/LDAP before adding it, and then assign the proper team. `onboard crowd` and
-   `backend/providers/crowd.py` are currently stubs.
+1. **Crowd onboarding in gyrobot**: done (see `CROWD.md`). Left: run `scripts/check_crowd_usernames.py` against real
+   data to decide `ldap.username_attribute`, and replace the personal Bitbucket token with a service account's.
 2. **Secrets storage**: a pluggable secret store now exists (`backend/secret_store`, see `SECRET-STORE.md`) with
    systemd, directory, `pass`, keyring and Azure Key Vault backends; remaining work is choosing a backend, moving the
    real secrets, and routing the `config/*.credentials.yml` files through it.

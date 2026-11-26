@@ -8,8 +8,9 @@ Secrets for the Crowd onboarding:
 
 | Secret name | Used for |
 |---|---|
-| `CROWD_PASSWORD` | The Crowd application/user password (Crowd itself does not talk to LDAP). |
+| `CROWD_PASSWORD` | The Crowd application password (Crowd itself does not talk to LDAP). |
 | `LDAP_BIND_PASSWORD` | The read-only AD service account that only looks up emails and display names. |
+| `BITBUCKET_TOKEN` | Optional Bitbucket access token (project and repository admin, read use only) for the repository list in the email. |
 
 The matching user names are not secret: put `CROWD_USERNAME` and `LDAP_BIND_USERNAME` in the instance env file
 (`.env.d/<name>.env`) as plain values. (If you would rather keep them out of the file, `CROWD_USERNAME=secret:` works

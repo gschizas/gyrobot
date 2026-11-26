@@ -34,7 +34,7 @@ Core concepts:
 | `onboard github members <team_slug> [-x]` | Members (login, email, team) of every enterprise team whose slug starts with `team_slug`. A missing GitHub email falls back to the one recorded when the bot onboarded the person. With `-x`, Excel with `team L2`/`team L3` columns. Read-only. |
 | `onboard github pending-invitations [team_prefix] [-x]` | Pending invitations, with email and team when the bot sent them. Read-only. |
 | `onboard jetbrains <email> <team_name>` | Assigns a free IntelliJ IDEA licence to the email. `team_name` is a canonical team (resolved through the team mapping) or a JetBrains team name, slug or id. Validation checks that the team has a free licence and that the person does not already hold one. |
-| `onboard crowd <username> <team>` | Queues a Crowd entry. The provider is still a stub. |
+| `onboard crowd [add] <login-or-email> <team> [-g group]...` | Creates the Crowd user from the AD entry, adds the groups of the canonical team (plus extra groups) and emails the welcome message. Also `onboard crowd lookup` and `onboard crowd groups`. See [CROWD.md](CROWD.md). |
 | `onboard slack <email> <member_id...>` | Records Slack workspace membership for the email and member ids. The provider is still a stub. |
 | `onboard move <email> <team>` | Moves a person to another canonical team on every resource they hold, using the team mapping for each resource. The account's team is updated only if every resource succeeded, so a failed move can simply be run again. |
 

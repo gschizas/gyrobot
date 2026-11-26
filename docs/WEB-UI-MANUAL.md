@@ -26,7 +26,7 @@ After logging in you land on the **Onboarding** page, which lists every action. 
 |---|---|---|
 | **GitHub Copilot** | GitHub username, email address, team, optionally a role | An invitation to the GitHub enterprise and, once accepted, assignment to the team. The role is stored with the team. |
 | **JetBrains IntelliJ IDEA** | Email address, team name | A licence of that team's pool is assigned. The team must have a free licence. |
-| **Crowd** | Username, team | A Crowd entry in the team. |
+| **Crowd** | Login or email, canonical team, optional extra groups | A Crowd user in the team's groups; the welcome email is sent. |
 | **Slack** | Email address, member IDs (comma-separated) | Slack workspace membership. |
 | **Offboard** | Email address | Removal of all the person's active provisions, and Slack deactivation. |
 

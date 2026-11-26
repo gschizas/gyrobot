@@ -106,7 +106,7 @@ All are `POST` with a JSON body (except where none is listed). Each returns `suc
 | `/api/onboarding/github` | `username`, `email`, `team`, optional `role` (a role key) | `onboard github` |
 | `/api/onboarding/github/bulk` | `items`: list of the above | `onboard github` once per item, independently. Returns a list of results. |
 | `/api/onboarding/jetbrains` | `email`, `team_name` | `onboard jetbrains` |
-| `/api/onboarding/crowd` | `username`, `team` | `onboard crowd` |
+| `/api/onboarding/crowd` | `username` (login or email), `team`, optional `groups` | `onboard crowd` |
 | `/api/onboarding/slack` | `email`, `member_ids` | `onboard slack` |
 | `/api/onboarding/offboard` | `email` | `offboard` |
 | `/api/onboarding/github_check` | none | `onboard github check` |
