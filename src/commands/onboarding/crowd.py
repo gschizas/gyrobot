@@ -19,7 +19,8 @@ if 'APPROVAL_DATABASE_URL' not in os.environ:
 
 def _crowd_summary(params: dict) -> str:
     extra = f" (+ groups {', '.join(params['group'])})" if params.get('group') else ''
-    return f"onboard {params['user']} to Crowd, canonical team {params['team']}{extra}"
+    name = f" ({params['given_name']} {params['surname']})" if params.get('given_name') and params.get('surname') else ''
+    return f"onboard {params['user']}{name} to Crowd, canonical team {params['team']}{extra}"
 
 
 def _crowd_validate(params: dict, ctx: ExtendedContext) -> str | None:
@@ -50,6 +51,8 @@ def _crowd_validate(params: dict, ctx: ExtendedContext) -> str | None:
         return f"{person.mail} already has a Crowd user ({existing.data.get('username', 'unknown')}); " \
                f"use 'onboard move' to change the team."
     params['user'] = person.mail  # the approver sees the resolved person
+    params['given_name'] = (params.get('given_name') or '').strip() or person.first_name
+    params['surname'] = (params.get('surname') or '').strip() or person.last_name
     return None
 
 
@@ -62,25 +65,32 @@ def crowd_group():
 @click.argument('user')
 @click.argument('team')
 @click.option('-g', '--group', multiple=True, help='Extra Crowd group (repeatable), besides the canonical team ones')
+@click.option('--given-name', default=None, help='Given name, if the directory has it wrong')
+@click.option('--surname', default=None, help='Surname, if the directory has it wrong')
 @click.pass_context
 @requires_approval(summarize=_crowd_summary, validate=_crowd_validate)
-def onboard_crowd(ctx: ExtendedContext, user: str, team: str, group: tuple):
+def onboard_crowd(ctx: ExtendedContext, user: str, team: str, group: tuple, given_name: str | None = None,
+                  surname: str | None = None):
     """Onboard a colleague for Crowd (Atlassian): creates the user, adds the groups and emails the password.
 
     USER is the login or email address in the directory; TEAM is a canonical team (config/team_mapping.yml).
 
-    USAGE: bot onboard crowd [add] <user> <team> [--group <crowd group>]...
+    USAGE: bot onboard crowd [add] <user> <team> [--group <crowd group>]... [--given-name <name>] [--surname <name>]
+
+    The name comes from the directory (Title Case); the options override it, and it becomes the account's name.
     """
-    account_obj = ProvisionRequest(name=user, email=user, userid=user, team=team,
-                                   provision_data={'extra_groups': list(group)})
+    display_name = f"{given_name} {surname}" if given_name and surname else user
+    account_obj = ProvisionRequest(name=display_name, email=user, userid=user, team=team,
+                                   provision_data={'extra_groups': list(group), 'given_name': given_name,
+                                                   'surname': surname})
     message = PROVIDERS['crowd'].provision(ctx, account_obj)
 
     data = account_obj.provision_data
-    account = get_or_create_account(primary_email=data['email'], name=user, team=team)
+    account = get_or_create_account(primary_email=data['email'], name=display_name, team=team)
     set_provision_status(account.id, 'crowd', 'active', data)
     set_membership(account.id, team, None)
 
-    ctx.chat.send_table(title=f'Onboarded {user}', table=[{'Resource': RESOURCE_LABELS['crowd'], 'Result': message}])
+    ctx.chat.send_table(title=f'Onboarded {display_name}', table=[{'Resource': RESOURCE_LABELS['crowd'], 'Result': message}])
     return f"{RESOURCE_LABELS['crowd']}: {message}"
 
 

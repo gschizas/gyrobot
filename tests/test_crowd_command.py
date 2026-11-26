@@ -38,6 +38,12 @@ class CrowdValidateTest(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual(params['user'], 'alice@x.test')
 
+    def test_names_come_from_the_directory_unless_given(self):
+        _, params = self.validate()
+        self.assertEqual((params['given_name'], params['surname']), ('Alice', 'Smith'))
+        _, params = self.validate(given_name=' Alicia ')
+        self.assertEqual((params['given_name'], params['surname']), ('Alicia', 'Smith'))
+
     def test_rejections(self):
         self.assertIn('No Crowd group mapping', self.validate(team='nope')[0])
         self.assertIn('Unknown Crowd group', self.validate(group=('missing',))[0])

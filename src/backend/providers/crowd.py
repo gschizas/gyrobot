@@ -5,6 +5,7 @@ The password is only ever held in memory: it is never logged, returned in a resu
 The groups are the ones the canonical team maps to (``config/team_mapping.yml``, ``crowd:`` section) plus
 ``account.provision_data['extra_groups']``.
 """
+import dataclasses
 import functools
 import secrets
 
@@ -84,6 +85,11 @@ def provision(ctx, account: ProvisionRequest, api: CrowdApi | None = None) -> st
     extra_groups = list(account.provision_data.get('extra_groups') or [])
     groups = list(dict.fromkeys(team_groups + extra_groups))
     person = _find_person(settings, account.email)
+    given_name = (account.provision_data.get('given_name') or '').strip()
+    surname = (account.provision_data.get('surname') or '').strip()
+    if given_name or surname:
+        person = dataclasses.replace(person, first_name=given_name or person.first_name,
+                                     last_name=surname or person.last_name)
     api = api or CrowdApi(settings)
 
     available = api.get_groups()

@@ -42,6 +42,13 @@ class CrowdProviderTest(unittest.TestCase):
         self.assertEqual(self.send_email.call_args.kwargs['password'], 'secret-words-42')
         self.assertNotIn('secret-words', message + str(req.provision_data))
 
+    def test_given_names_override_the_directory(self):
+        req = request()
+        req.provision_data.update({'given_name': 'Alicia', 'surname': ''})
+        crowd.provision(self.ctx, req, self.api)
+        self.api.create_user.assert_called_once_with('asmith', 'Alicia', 'Smith', 'alice@x.test', 'secret-words-42')
+        self.assertEqual(self.send_email.call_args.kwargs['first_name'], 'Alicia')
+
     def test_unmapped_team_and_unknown_group_create_nothing(self):
         for req in (request('nowhere'), request('', ['nope'])):
             with self.assertRaises(RuntimeError):
