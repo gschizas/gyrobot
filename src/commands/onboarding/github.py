@@ -10,7 +10,7 @@ from backend.account_storage import (find_account_by_any_email, find_provisions_
                                      get_provision, LIVE_STATUSES, REINVITABLE_STATUSES,
                                      find_provisions_by_username, get_last_status_times, get_or_create_account, get_pending_provisions,
                                      get_provisions, list_roles, rename_github_team, resolve_role, set_membership,
-                                     set_provision_status)
+                                     set_provision_status, update_account)
 from backend.accounts import Provision
 from backend.approval import requires_approval
 from backend.arguments import extract_email
@@ -18,6 +18,7 @@ from backend.constants import TableFormat
 from backend.email_domains import domain_in, is_allowed_email
 from backend.email_logging import send_email
 from backend.github_api import GitHubApi
+from backend.ldap_directory import verify_person
 from backend.providers import ProvisionRequest, PROVIDERS, RESOURCE_LABELS
 from backend.team_mapping import normalize
 from commands import DefaultCommandGroup
@@ -27,7 +28,32 @@ from commands.team_columns import team_level_columns
 
 def _github_summary(params: dict) -> str:
     role = f" as {params['role']}" if params.get('role') else ''
-    return f"onboard {params['username']} to GitHub team {params['team']}{role}"
+    name = f" ({params['given_name']} {params['surname']})" if params.get('given_name') and params.get('surname') else ''
+    return f"onboard {params['username']}{name} to GitHub team {params['team']}{role}"
+
+
+def _display_name(given_name: str | None, surname: str | None) -> str | None:
+    return f"{given_name} {surname}" if given_name and surname else None
+
+
+def _check_directory(params: dict, github: GitHubApi) -> str | None:
+    """Verify the email in the directory (for the domains in ``ad_check_email_domains``) and resolve the person's name.
+
+    On success ``params['email']`` is the directory's address and ``given_name``/``surname`` hold the names to use:
+    the ones given on the command line, else the directory's.
+    """
+    if not domain_in(params['email'], github.ad_check_email_domains):
+        return None
+    try:
+        person, error = verify_person(params['email'])
+    except Exception as e:
+        return f"Could not check {params['email']} in the directory: {e}"
+    if error:
+        return error
+    params['email'] = person.mail
+    params['given_name'] = (params.get('given_name') or '').strip() or person.first_name
+    params['surname'] = (params.get('surname') or '').strip() or person.last_name
+    return None
 
 
 github_client: GitHubApi | None = None
@@ -100,9 +126,7 @@ def _github_validate(params: dict, ctx: ExtendedContext) -> str | None:
         domain = email.split('@')[1]
         if not is_allowed_email(email, github_client.allowed_email_domains):
             raise RuntimeError(f"Invalid Email Domain {domain}.")
-        if domain_in(email, github_client.ad_check_email_domains):
-            # check email with active directory
-            pass
+        return _check_directory(params, github_client)
 
     return None
 
@@ -241,12 +265,18 @@ def github_pending_invitations(ctx: ExtendedContext, team_prefix: str | None, as
 @click.argument('email')
 @click.argument('team')
 @click.option('-r', '--role', default=None, help='Optional role in the team (e.g. scrum_master)')
+@click.option('--given-name', default=None, help='Given name, if the directory has it wrong')
+@click.option('--surname', default=None, help='Surname, if the directory has it wrong')
 @click.pass_context
 @requires_approval(summarize=_github_summary, validate=_github_validate)
-def onboard_github(ctx: ExtendedContext, username: str, email: str, team: str, role: str | None):
+def onboard_github(ctx: ExtendedContext, username: str, email: str, team: str, role: str | None,
+                   given_name: str | None, surname: str | None):
     """Onboard a colleague for GitHub Copilot.
 
-    USAGE: bot onboard github [add] <username> <email> <team> [--role <role>]
+    For the domains in ad_check_email_domains the email is verified in the directory, which also supplies the
+    person's name (the account name); --given-name/--surname override it.
+
+    USAGE: bot onboard github [add] <username> <email> <team> [--role <role>] [--given-name <name>] [--surname <name>]
     """
     provision_data = {'username': username, 'email': email, 'team': team}
     try:
@@ -263,7 +293,10 @@ def onboard_github(ctx: ExtendedContext, username: str, email: str, team: str, r
     provision_data.update(account_obj.provision_data)
 
     # Store account and provision status
-    account = get_or_create_account(primary_email=email, name=username, team=team)
+    display_name = _display_name(given_name, surname)
+    account = get_or_create_account(primary_email=email, name=display_name, team=team)
+    if display_name and account.name != display_name:
+        account = update_account(account.id, name=display_name) or account
     set_provision_status(account.id, 'github', 'invited', provision_data)
     set_membership(account.id, team, role)
 
@@ -489,7 +522,16 @@ def github_set_email(ctx: ExtendedContext, username: str, email: str):
     except Exception as e:
         ctx.logger.warning(f"Could not look up the teams of {username}: {e}")
 
-    account = get_or_create_account(primary_email=email, name=username, team=team)
+    name = None
+    try:
+        if domain_in(email, api.ad_check_email_domains):
+            person, _error = verify_person(email)
+            name = person.display_name if person else None
+    except Exception as e:
+        ctx.logger.warning(f"Could not look up the name of {email} in the directory: {e}")
+    account = get_or_create_account(primary_email=email, name=name, team=team)
+    if name and account.name != name:
+        account = update_account(account.id, name=name) or account
     set_provision_status(account.id, 'github', 'active', data)
 
     message = f"Recorded {email} for {username}" + (f" (team {team})" if team else " (no single team, left empty)")
