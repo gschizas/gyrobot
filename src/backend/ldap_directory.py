@@ -101,3 +101,22 @@ class LdapDirectory:
         if len(people) > 1:
             raise ValueError(f"{query!r} matches {len(people)} people in the directory")
         return people[0] if people else None
+
+
+def verify_person(query: str, settings: CrowdSettings | None = None) -> tuple[Person | None, str | None]:
+    """Look ``query`` (email or login) up in the directory: ``(person, None)``, or ``(None, reason)``.
+
+    Lookup problems (no config, server unreachable) raise, so callers can tell them from a wrong address.
+    """
+    directory = LdapDirectory(settings)
+    try:
+        person = directory.find_person(query)
+    except ValueError as e:
+        return None, f"{e}; use the email address."
+    finally:
+        directory.close()
+    if not person:
+        return None, f"{query} was not found in the directory."
+    if not (person.mail and person.first_name and person.last_name and person.username):
+        return None, f"The directory entry of {query} lacks a mail address or a name."
+    return person, None
