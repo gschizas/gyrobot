@@ -63,7 +63,7 @@ backends:
 |---|---|---|---|
 | `systemd` | files in `$CREDENTIALS_DIRECTORY` | none | file name = secret name (also tried lower-case) |
 | `directory` | files in `path` | none | same naming as `systemd` |
-| `pass` | `pass show <prefix>/<NAME>` | `pass`, `gnupg` (OS) | multi-line values kept unless `first_line_only` |
+| `pass` | `pass show <prefix>/<NAME>` | `pass`, `gnupg` (OS) | multi-line values kept unless `first_line_only`; setup: `PASS-SETUP.md` |
 | `keyring` | `keyring.get_password(service, NAME)` | `keyring` | needs a usable keyring backend on a headless server |
 | `azure_keyvault` | Key Vault secret `NAME` (`_` becomes `-`) | `azure-identity`, `azure-keyvault-secrets` | `auth: default` uses a managed identity, environment, `az login`, ... |
 
