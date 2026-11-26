@@ -8,7 +8,7 @@ provisioning runs. Provisioning itself is delegated to the provider stubs in
 Account metadata and provisioning state are persisted to PostgreSQL via account_storage
 for tracking and deprovisioning workflows.
 """
-PLUGIN = {'requires_files': ['config/github.yml'], 'dependencies': ['treelib>=1.8.0']}
+PLUGIN = {'requires_files': ['config/github.yml'], 'dependencies': ['treelib>=1.8.0', 'xkcdpass', 'jinja2', 'ldap3']}
 
 import copy
 import datetime
@@ -207,5 +207,5 @@ if pathlib.Path('config/azdo.yml').exists():
         onboard.add_command(_alias, _alias_name)
     onboard.add_command(azdo.ado)
 onboard.add_command(team.onboard_move)
-onboard.add_command(crowd.onboard_crowd)
+onboard.add_command(crowd.crowd_group)
 onboard.add_command(jetbrains.onboard_jetbrains)
