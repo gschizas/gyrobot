@@ -9,6 +9,7 @@ import secrets
 
 from backend import bot_identity
 from backend.accounts import Provision
+from backend.bitbucket_api import BitbucketApi
 from backend.crowd_api import CrowdApi
 from backend.crowd_config import CrowdSettings, load_settings
 from backend.email_logging import send_email
@@ -42,12 +43,25 @@ def _find_person(settings: CrowdSettings, email: str) -> Person:
     return person
 
 
-def _send_welcome(settings: CrowdSettings, person: Person, password: str | None, groups: list[str], is_new: bool):
+def _repositories(ctx, settings: CrowdSettings, api: CrowdApi, groups: list[str]) -> list[dict]:
+    """Repositories the groups give access to; empty if Bitbucket is not configured or cannot be reached."""
+    if not settings.bitbucket_url or not groups:
+        return []
+    try:
+        parents = {parent for group in groups for parent in api.get_parent_groups(group)}
+        return BitbucketApi(settings.bitbucket_url).repos_for_groups(groups, inherited_groups=parents)
+    except Exception as e:
+        ctx.logger.warning(f"Could not list the Bitbucket repositories of {', '.join(groups)}: {e!r}")
+        return []
+
+
+def _send_welcome(settings: CrowdSettings, person: Person, password: str | None, groups: list[str], is_new: bool,
+                  repos: list[dict] | None = None):
     welcome = settings.welcome
     send_email(
         'crowd_welcome', to=person.mail, subject=EMAIL_SUBJECT, bot_name=bot_identity.bot_name(),
         username=person.username, password=password, first_name=person.first_name, last_name=person.last_name,
-        email=person.mail, is_new=is_new, groups=groups, repos=[], portal_url=welcome.portal_url,
+        email=person.mail, is_new=is_new, groups=groups, repos=repos or [], portal_url=welcome.portal_url,
         help_links=list(welcome.help_links), hosts_note=welcome.hosts_note)
 
 
@@ -89,7 +103,8 @@ def provision(ctx, account: ProvisionRequest, api: CrowdApi | None = None) -> st
     verb = 'Created' if password else 'Updated existing'
     message = f"{verb} Crowd user {person.username}, groups: {', '.join(groups) or '(none)'}"
     try:
-        _send_welcome(settings, person, password, groups, is_new=bool(password))
+        _send_welcome(settings, person, password, groups, is_new=bool(password),
+                      repos=_repositories(ctx, settings, api, groups))
     except Exception as e:
         ctx.logger.warning(f"Could not send the Crowd welcome email to {person.mail}: {e!r}")
         if password:
