@@ -5,9 +5,10 @@ import ldap3
 from ldap3.utils.conv import escape_filter_chars
 
 from backend.crowd_config import CrowdSettings, load_settings
+from backend.names import names_agree, split_greek_name, title_case
 from backend.secret_store import get_secret
 
-ATTRIBUTES = ['name', 'sAMAccountName', 'mail', 'givenName', 'sn']
+ATTRIBUTES = ['name', 'sAMAccountName', 'mail', 'givenName', 'sn', 'extensionAttribute10']
 
 
 @dataclass(frozen=True)
@@ -18,11 +19,24 @@ class Person:
     first_name: str
     last_name: str
     username_attribute: str = 'samaccountname'
+    greek_first_name: str = ''
+    greek_last_name: str = ''
 
     @property
     def username(self) -> str:
         """The Crowd user name, per the configured attribute."""
         return (self.login if self.username_attribute == 'samaccountname' else self.cn).lower()
+
+    @property
+    def display_name(self) -> str:
+        return f"{self.first_name} {self.last_name}".strip()
+
+    @property
+    def name_mismatch(self) -> bool:
+        """Whether the Latin name disagrees with the romanized Greek one (the directory has mistakes)."""
+        return not (names_agree(self.first_name, self.greek_first_name)
+                    and names_agree(self.last_name, self.greek_last_name))
+
 
 
 def _first(value) -> str:
@@ -58,11 +72,13 @@ class LdapDirectory:
         people = []
         for entry in self.connection.entries:
             attrs = entry.entry_attributes_as_dict
+            greek_first, greek_last = split_greek_name(_first(attrs.get('extensionAttribute10')))
             people.append(Person(
                 cn=_first(attrs.get('name')), login=_first(attrs.get('sAMAccountName')),
                 mail=_first(attrs.get('mail')).lower(),
-                first_name=_first(attrs.get('givenName')).title(), last_name=_first(attrs.get('sn')).title(),
-                username_attribute=self.settings.ldap.username_attribute))
+                first_name=title_case(_first(attrs.get('givenName'))), last_name=title_case(_first(attrs.get('sn'))),
+                username_attribute=self.settings.ldap.username_attribute,
+                greek_first_name=greek_first, greek_last_name=greek_last))
         return people
 
     def find_people(self, query: str) -> list[Person]:

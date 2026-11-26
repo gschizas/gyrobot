@@ -36,6 +36,16 @@ class LdapDirectoryTest(unittest.TestCase):
         self.assertEqual((person.mail, person.first_name, person.last_name), ('alice.smith@x.test', 'Alice', 'Smith'))
         self.assertEqual(person.username, 'asmith')
 
+    def test_greek_name_cross_check(self):
+        greek = entry(name='A B', sAMAccountName='ab', mail='ab@x.test', givenName='ANNA-MARIA', sn='shizas',
+                      extensionAttribute10='ΑΝΝΑ-ΜΑΡΙΑ|ΣΧΙΖΑΣ')
+        ldap, _ = directory([greek])
+        person = ldap.find_person('ab')
+        self.assertEqual(person.display_name, 'Anna-Maria Shizas')
+        self.assertTrue(person.name_mismatch)
+        ldap, _ = directory([ALICE])
+        self.assertFalse(ldap.find_person('asmith').name_mismatch)
+
     def test_username_attribute_name_uses_cn(self):
         settings = CrowdSettings(crowd_url='u', ldap=LdapSettings('s', 'b', 'd', username_attribute='name'))
         connection = mock.MagicMock(entries=[ALICE])
