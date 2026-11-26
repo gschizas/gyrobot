@@ -1,6 +1,6 @@
 [project]
 name = "gyrobot"
-version = "3.1.6"
+version = "3.2.0"
 description = "Add your description here"
 requires-python = ">=3.14"
 dependencies = [
