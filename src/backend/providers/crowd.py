@@ -2,8 +2,8 @@
 to the requested Crowd groups and emailed a welcome message with the generated password.
 
 The password is only ever held in memory: it is never logged, returned in a result or stored in ``provision_data``.
-The requested groups are passed in ``account.provision_data['groups']``. Crowd has no canonical-team mapping,
-so there is no ``change_team``.
+The groups are the ones the canonical team maps to (``config/team_mapping.yml``, ``crowd:`` section) plus
+``account.provision_data['extra_groups']``.
 """
 import secrets
 
