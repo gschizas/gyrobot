@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["click", "tqdm", "ldap3>=2.9.1", "requests", "ruamel.yaml", "sqlalchemy", "python-dotenv"]
+# dependencies = ["click", "tqdm", "ldap3>=2.9.1", "pycryptodome", "requests", "ruamel.yaml", "sqlalchemy", "python-dotenv"]
 # ///
 """Check whether the AD CN (lower-cased) or sAMAccountName matches the Crowd user name, for every Crowd user.
 
