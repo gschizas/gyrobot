@@ -68,9 +68,9 @@ def main(env_name, mismatches_only, include_inactive, include_external, csv_path
             if email and not email.lower().endswith(suffix) and not include_external:
                 results.append((name, email, EXTERNAL, ''))
                 continue
-            people = ldap.find_people(email) if email else []
-            if not people:
-                people = ldap.find_people(name)
+            people = ldap.find_people(name)
+            if not people and email:
+                people = ldap.find_people(email)
             category, detail = classify(name, people)
             results.append((name, email, category, detail))
     finally:
