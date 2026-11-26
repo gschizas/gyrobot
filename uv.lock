@@ -603,6 +603,91 @@ wheels = [
 ]
 
 [[package]]
+name = "gyrobot"
+version = "3.1.6"
+source = { virtual = "." }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "alembic" },
+    { name = "azure-identity" },
+    { name = "azure-mgmt-kubernetesconfiguration" },
+    { name = "babel" },
+    { name = "beautifulsoup4" },
+    { name = "click" },
+    { name = "cloup" },
+    { name = "colorama" },
+    { name = "colorlog" },
+    { name = "cryptography" },
+    { name = "fastapi" },
+    { name = "itsdangerous" },
+    { name = "jinja2" },
+    { name = "ldap3" },
+    { name = "markdownify" },
+    { name = "packaging" },
+    { name = "pandas" },
+    { name = "pillow" },
+    { name = "praw" },
+    { name = "psycopg", extra = ["binary"] },
+    { name = "pycryptodome" },
+    { name = "pyjwt", extra = ["crypto"] },
+    { name = "python-dateutil" },
+    { name = "python-dotenv" },
+    { name = "python-multipart" },
+    { name = "requests" },
+    { name = "ruamel-yaml" },
+    { name = "sqlalchemy" },
+    { name = "tabulate" },
+    { name = "tqdm" },
+    { name = "uvicorn", extra = ["standard"] },
+    { name = "xlsxwriter" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "httpx2" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiohttp", specifier = ">=3.10.5" },
+    { name = "alembic", specifier = ">=1.13" },
+    { name = "azure-identity", specifier = ">=1.17.1" },
+    { name = "azure-mgmt-kubernetesconfiguration", specifier = ">=3.1.0" },
+    { name = "babel", specifier = ">=2.16.0" },
+    { name = "beautifulsoup4", specifier = ">=4.12.3" },
+    { name = "click", specifier = ">=8.1.7" },
+    { name = "cloup", specifier = ">=3.0.5" },
+    { name = "colorama", specifier = ">=0.4.6" },
+    { name = "colorlog", specifier = ">=6.8.2" },
+    { name = "cryptography", specifier = ">=43.0.1" },
+    { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "itsdangerous", specifier = ">=2.2.0" },
+    { name = "jinja2", specifier = ">=3.1.6" },
+    { name = "ldap3", specifier = ">=2.9.1" },
+    { name = "markdownify", specifier = ">=1.2.3" },
+    { name = "packaging", specifier = ">=24.0" },
+    { name = "pandas", specifier = ">=2.2.0" },
+    { name = "pillow", specifier = ">=10.4.0" },
+    { name = "praw", specifier = ">=7.7.1" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.2.2" },
+    { name = "pycryptodome", specifier = ">=3.23.0" },
+    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.9.0" },
+    { name = "python-dateutil", specifier = ">=2.9.0.post0" },
+    { name = "python-dotenv", specifier = ">=1.1.0" },
+    { name = "python-multipart", specifier = ">=0.0.12" },
+    { name = "requests", specifier = ">=2.32.3" },
+    { name = "ruamel-yaml", specifier = ">=0.18.6" },
+    { name = "sqlalchemy", specifier = ">=2.0" },
+    { name = "tabulate", specifier = ">=0.1.dev612" },
+    { name = "tqdm", specifier = ">=4.66.5" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.32.0" },
+    { name = "xlsxwriter", specifier = ">=3.2.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "httpx2", specifier = ">=2.13.0" }]
+
+[[package]]
 name = "h11"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1501,91 +1586,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/f0/7a/1c7270340330e575b92f397352af856a8c06f230aa3e76f86b39d01b416a/pyyaml-6.0.3-cp314-cp314t-win_amd64.whl", hash = "sha256:4ad1906908f2f5ae4e5a8ddfce73c320c2a1429ec52eafd27138b7f1cbe341c9", size = 174062, upload-time = "2025-09-25T21:32:55.767Z" },
     { url = "https://files.pythonhosted.org/packages/f1/12/de94a39c2ef588c7e6455cfbe7343d3b2dc9d6b6b2f40c4c6565744c873d/pyyaml-6.0.3-cp314-cp314t-win_arm64.whl", hash = "sha256:ebc55a14a21cb14062aa4162f906cd962b28e2e9ea38f9b4391244cd8de4ae0b", size = 149341, upload-time = "2025-09-25T21:32:56.828Z" },
 ]
-
-[[package]]
-name = "reddit-slack-bot"
-version = "3.1.6"
-source = { virtual = "." }
-dependencies = [
-    { name = "aiohttp" },
-    { name = "alembic" },
-    { name = "azure-identity" },
-    { name = "azure-mgmt-kubernetesconfiguration" },
-    { name = "babel" },
-    { name = "beautifulsoup4" },
-    { name = "click" },
-    { name = "cloup" },
-    { name = "colorama" },
-    { name = "colorlog" },
-    { name = "cryptography" },
-    { name = "fastapi" },
-    { name = "itsdangerous" },
-    { name = "jinja2" },
-    { name = "ldap3" },
-    { name = "markdownify" },
-    { name = "packaging" },
-    { name = "pandas" },
-    { name = "pillow" },
-    { name = "praw" },
-    { name = "psycopg", extra = ["binary"] },
-    { name = "pycryptodome" },
-    { name = "pyjwt", extra = ["crypto"] },
-    { name = "python-dateutil" },
-    { name = "python-dotenv" },
-    { name = "python-multipart" },
-    { name = "requests" },
-    { name = "ruamel-yaml" },
-    { name = "sqlalchemy" },
-    { name = "tabulate" },
-    { name = "tqdm" },
-    { name = "uvicorn", extra = ["standard"] },
-    { name = "xlsxwriter" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "httpx2" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiohttp", specifier = ">=3.10.5" },
-    { name = "alembic", specifier = ">=1.13" },
-    { name = "azure-identity", specifier = ">=1.17.1" },
-    { name = "azure-mgmt-kubernetesconfiguration", specifier = ">=3.1.0" },
-    { name = "babel", specifier = ">=2.16.0" },
-    { name = "beautifulsoup4", specifier = ">=4.12.3" },
-    { name = "click", specifier = ">=8.1.7" },
-    { name = "cloup", specifier = ">=3.0.5" },
-    { name = "colorama", specifier = ">=0.4.6" },
-    { name = "colorlog", specifier = ">=6.8.2" },
-    { name = "cryptography", specifier = ">=43.0.1" },
-    { name = "fastapi", specifier = ">=0.115.0" },
-    { name = "itsdangerous", specifier = ">=2.2.0" },
-    { name = "jinja2", specifier = ">=3.1.6" },
-    { name = "ldap3", specifier = ">=2.9.1" },
-    { name = "markdownify", specifier = ">=1.2.3" },
-    { name = "packaging", specifier = ">=24.0" },
-    { name = "pandas", specifier = ">=2.2.0" },
-    { name = "pillow", specifier = ">=10.4.0" },
-    { name = "praw", specifier = ">=7.7.1" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.2.2" },
-    { name = "pycryptodome", specifier = ">=3.23.0" },
-    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.9.0" },
-    { name = "python-dateutil", specifier = ">=2.9.0.post0" },
-    { name = "python-dotenv", specifier = ">=1.1.0" },
-    { name = "python-multipart", specifier = ">=0.0.12" },
-    { name = "requests", specifier = ">=2.32.3" },
-    { name = "ruamel-yaml", specifier = ">=0.18.6" },
-    { name = "sqlalchemy", specifier = ">=2.0" },
-    { name = "tabulate", specifier = ">=0.1.dev612" },
-    { name = "tqdm", specifier = ">=4.66.5" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.32.0" },
-    { name = "xlsxwriter", specifier = ">=3.2.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "httpx2", specifier = ">=2.13.0" }]
 
 [[package]]
 name = "requests"
