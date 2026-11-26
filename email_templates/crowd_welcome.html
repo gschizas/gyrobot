@@ -1,0 +1,69 @@
+{% extends "_base.html" %}
+
+{% block title %}Your account / Ο λογαριασμός σου{% endblock %}
+{% block heading %}Crowd / Atlassian{% endblock %}
+
+{% macro details(unchanged_text) %}
+<table cellpadding="6" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;margin:0 0 16px;font-size:14px;color:#444;">
+    <tr style="background-color:#f4f6f9;">
+        <th align="left" style="border:1px solid #dde3ec;width:30%;">Username</th>
+        <td style="border:1px solid #dde3ec;"><code>{{ username }}</code></td>
+    </tr>
+    <tr>
+        <th align="left" style="border:1px solid #dde3ec;">Password</th>
+        <td style="border:1px solid #dde3ec;">
+            {% if password %}<code>{{ password }}</code>{% else %}{{ unchanged_text }}{% endif %}
+        </td>
+    </tr>
+    {% if groups %}
+    <tr style="background-color:#f4f6f9;">
+        <th align="left" valign="top" style="border:1px solid #dde3ec;">Groups</th>
+        <td style="border:1px solid #dde3ec;">
+            <ul style="margin:0;padding-left:18px;">{% for group in groups %}<li>{{ group }}</li>{% endfor %}</ul>
+        </td>
+    </tr>
+    {% endif %}
+    {% if repos %}
+    <tr>
+        <th align="left" valign="top" style="border:1px solid #dde3ec;">Repositories</th>
+        <td style="border:1px solid #dde3ec;">
+            <ul style="margin:0;padding-left:18px;">{% for repo in repos %}<li><a href="{{ repo.url }}">{{ repo.title }}</a></li>{% endfor %}</ul>
+        </td>
+    </tr>
+    {% endif %}
+</table>
+{% endmacro %}
+
+{% block content %}
+<h2 style="color:#1e3a5f;font-size:18px;margin-top:0;">👋 Welcome, {{ first_name }}!</h2>
+<p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 16px;">
+    {% if is_new %}Your account has been created{% else %}Your account has been updated{% endif %}
+    for the Atlassian ecosystem (Bitbucket, JIRA, Confluence etc.).
+</p>
+{{ details('Unchanged') }}
+<p style="color:#444;font-size:14px;line-height:1.6;margin:0 0 8px;">First-time git setup:</p>
+<pre style="background-color:#f2f2f2;border:1px solid #ccc;padding:8px;margin:0 0 16px;font-size:13px;">git config --global user.name "{{ first_name }} {{ last_name }}"
+git config --global user.email "{{ email }}"</pre>
+<ul style="color:#444;font-size:14px;line-height:1.6;margin:0 0 16px;">
+    {% if portal_url %}<li>To change your password: <a href="{{ portal_url }}">{{ portal_url }}</a></li>{% endif %}
+    {% for link in help_links %}<li><a href="{{ link.url }}">{{ link.title }}</a></li>{% endfor %}
+    {% if hosts_note %}<li>{{ hosts_note }}</li>{% endif %}
+</ul>
+
+<div style="height:1px;background-color:#e8ecf1;margin:24px 0;"></div>
+
+<h2 style="color:#1e3a5f;font-size:18px;margin-top:0;">👋 Καλώς ήρθες, {{ first_name }}!</h2>
+<p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 16px;">
+    {% if is_new %}Ο λογαριασμός σου δημιουργήθηκε{% else %}Ο λογαριασμός σου ενημερώθηκε{% endif %}
+    στο οικοσύστημα της Atlassian (Bitbucket, JIRA, Confluence κλπ.).
+</p>
+{{ details('Παραμένει ως έχει') }}
+<p style="color:#444;font-size:14px;line-height:1.6;margin:0 0 8px;">Αρχικό setup του git:</p>
+<pre style="background-color:#f2f2f2;border:1px solid #ccc;padding:8px;margin:0 0 16px;font-size:13px;">git config --global user.name "{{ first_name }} {{ last_name }}"
+git config --global user.email "{{ email }}"</pre>
+{% if portal_url %}
+<p style="color:#444;font-size:14px;line-height:1.6;margin:0;">
+    Για αλλαγή του password: <a href="{{ portal_url }}">{{ portal_url }}</a>
+</p>
+{% endif %}
+{% endblock %}
