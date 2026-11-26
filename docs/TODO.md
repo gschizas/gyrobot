@@ -43,7 +43,8 @@ accepted/expired are not visible in the web UI or API. Options:
    so they're parked until the server leaves Ubuntu 22.04; see `SYSTEMD-CREDENTIALS.md`.) Plain-text files holding passwords/tokens are not good enough. The server runs on Linux, so
    there is no DPAPI equivalent. Evaluate alternatives (e.g. systemd credentials, an OS keyring or secret service,
    Vault or another secrets manager, or encrypting at rest with a key kept outside the config directory).
-3. **`accounts.name` column**: it is not used properly (currently the GitHub username is written there), and it may
+3. **`accounts.name` column**: decided: it holds the person's display name (see item 19). New GitHub onboardings
+   no longer write the GitHub login there; the old rows (and the import/backfill scripts) still have logins in it. It may
    not be needed at all. The GitHub username (login) should not live there; if anything it should be a calculated
    column derived from the account's GitHub provision (`data->>'username'`, or looked up by the stored `github_id`
    so that it survives renames). Decide whether to drop `name` or give it a proper meaning (the person's real name).
