@@ -7,7 +7,7 @@ emails them a bilingual welcome message with a generated password and the reposi
 
 | Command | Description |
 |---|---|
-| `onboard crowd [add] <login-or-email> <team> [-g group]...` | Approval-gated. Looks the person up in Active Directory, creates the Crowd user, adds the groups the canonical `team` maps to (plus every `--group`) and sends the welcome email. |
+| `onboard crowd [add] <login-or-email> <team> [-g group]... [--given-name N] [--surname N]` | Approval-gated. Looks the person up in Active Directory, creates the Crowd user, adds the groups the canonical `team` maps to (plus every `--group`) and sends the welcome email. The name comes from AD (Title Case); the name options override it, and it becomes the account name. |
 | `onboard crowd lookup <login-or-email>` | What AD and Crowd know about the person: names, email, Crowd user name, active state, groups. Not gated. |
 | `onboard crowd groups [text]` | The assignable groups with descriptions, optionally filtered. Not gated. |
 | `offboard <email>` | Removes the user from every group and deactivates them (Crowd has no safe delete). |
