@@ -3,6 +3,7 @@
 Example::
 
     crowd_url: https://crowd.example.com/crowd       # without /rest
+    bitbucket_url: https://bitbucket.example.com     # optional: lists the repositories in the welcome email
     group_prefixes: [team-, ext-]                    # which groups can be assigned
     ldap:
       server: ldap://ad.example.com
@@ -16,8 +17,9 @@ Example::
       help_links:
         - {title: Common git push errors, url: https://wiki.example.com/push-errors}
 
-The credentials are secrets (``backend.secret_store``): ``CROWD_USERNAME``/``CROWD_PASSWORD`` and
-``LDAP_BIND_USERNAME``/``LDAP_BIND_PASSWORD``.
+The credentials are secrets (``backend.secret_store``): ``CROWD_USERNAME``/``CROWD_PASSWORD``,
+``LDAP_BIND_USERNAME``/``LDAP_BIND_PASSWORD`` and, for the repository list, ``BITBUCKET_USERNAME``/
+``BITBUCKET_PASSWORD`` (a service account: the Crowd application credential is refused by Bitbucket).
 """
 import pathlib
 from dataclasses import dataclass, field
@@ -50,6 +52,7 @@ class CrowdSettings:
     crowd_url: str
     ldap: LdapSettings
     directory_id: int | None = None
+    bitbucket_url: str = ''
     group_prefixes: tuple[str, ...] = field(default_factory=tuple)
     welcome: WelcomeSettings = field(default_factory=WelcomeSettings)
 
@@ -73,7 +76,8 @@ def load_settings(path: pathlib.Path = CONFIG_PATH) -> CrowdSettings:
                              for link in welcome_raw.get('help_links') or ()))
         settings = CrowdSettings(
             crowd_url=str(raw['crowd_url']).rstrip('/'), ldap=ldap, welcome=welcome,
-            directory_id=raw.get('directory_id'), group_prefixes=tuple(raw.get('group_prefixes') or ()))
+            directory_id=raw.get('directory_id'), bitbucket_url=str(raw.get('bitbucket_url') or '').rstrip('/'),
+            group_prefixes=tuple(raw.get('group_prefixes') or ()))
     except KeyError as e:
         raise RuntimeError(f"{path}: missing setting {e}") from e
     if ldap.username_attribute not in USERNAME_ATTRIBUTES:

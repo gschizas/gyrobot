@@ -1,7 +1,7 @@
 """Client for the Atlassian Crowd REST API (users and groups).
 
-Authenticates as the Crowd application/user in the secrets ``CROWD_USERNAME`` / ``CROWD_PASSWORD``. Bitbucket and the
-other Atlassian products authenticate against Crowd, so this one credential is all that is needed.
+Authenticates as the Crowd application in the secrets ``CROWD_USERNAME`` / ``CROWD_PASSWORD``. The ``admin`` API
+refuses application credentials, so only ``usermanagement`` is used.
 """
 import time
 from typing import Optional
@@ -78,6 +78,12 @@ class CrowdApi:
     def get_user_groups(self, username: str) -> list[str]:
         response = self._check(self.session.get(f"{self._users_url}/user/group/direct", params={'username': username}),
                                f"listing the groups of {username}")
+        return [g['name'] for g in response.json().get('groups', [])]
+
+    def get_parent_groups(self, group: str) -> list[str]:
+        """The groups that contain ``group``, directly or through nesting."""
+        response = self._check(self.session.get(f"{self._users_url}/group/parent-group/nested",
+                                                params={'groupname': group}), f"listing the parents of {group}")
         return [g['name'] for g in response.json().get('groups', [])]
 
     def add_to_group(self, username: str, group: str) -> None:
