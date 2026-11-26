@@ -7,6 +7,9 @@
 Read-only. Run from the repo root:
 
     uv run scripts/check_crowd_usernames.py <env-name> [--mismatches-only] [--csv FILE]
+            [--include-inactive] [--include-external]
+
+    Deactivated users and users whose email is outside the AD mail domain are counted but skipped by default.
 """
 import csv
 import pathlib
@@ -23,6 +26,7 @@ from backend.ldap_directory import LdapDirectory  # noqa: E402
 from backend.secret_store import load_environment  # noqa: E402
 
 NO_MATCH, AMBIGUOUS, DIFFER, OK = 'no AD match', 'ambiguous AD match', 'CN and sAMAccountName differ', 'ok'
+INACTIVE, EXTERNAL = 'skipped: inactive in Crowd', 'skipped: email outside the mail domain'
 
 
 def classify(crowd_name, people):
@@ -45,34 +49,44 @@ def classify(crowd_name, people):
 @click.command()
 @click.argument('env_name')
 @click.option('--mismatches-only', is_flag=True, help='Do not list users that match.')
+@click.option('--include-inactive', is_flag=True, help='Also check deactivated Crowd users.')
+@click.option('--include-external', is_flag=True, help='Also check users whose email is outside the mail domain.')
 @click.option('--csv', 'csv_path', type=click.Path(dir_okay=False), default='crowd_username_mismatches.csv',
               show_default=True, help='Where to write the mismatches.')
-def main(env_name, mismatches_only, csv_path):
+def main(env_name, mismatches_only, include_inactive, include_external, csv_path):
     load_environment(env_name)
     crowd, ldap = CrowdApi(), LdapDirectory()
+    suffix = '@' + ldap.settings.ldap.mail_domain.lower()
     users = crowd.list_users()
     results = []
     try:
         for user in tqdm(users, desc='Checking users', unit='user'):
-            name = user['name']
-            people = ldap.find_people(user.get('email') or '') if user.get('email') else []
+            name, email = user['name'], user.get('email') or ''
+            if not user.get('active', True) and not include_inactive:
+                results.append((name, email, INACTIVE, ''))
+                continue
+            if email and not email.lower().endswith(suffix) and not include_external:
+                results.append((name, email, EXTERNAL, ''))
+                continue
+            people = ldap.find_people(email) if email else []
             if not people:
                 people = ldap.find_people(name)
             category, detail = classify(name, people)
-            results.append((name, user.get('email', ''), category, detail))
+            results.append((name, email, category, detail))
     finally:
         ldap.close()
 
+    skipped = (INACTIVE, EXTERNAL)
     counts = Counter(r[2] for r in results)
     for category, count in counts.most_common():
         click.echo(f"{count:6}  {category}")
     for row in results:
-        if row[2] != OK or not mismatches_only:
+        if row[2] not in skipped and (row[2] != OK or not mismatches_only):
             click.echo(f"{row[2]}: {row[0]} <{row[1]}> {row[3]}")
     with open(csv_path, 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.writer(f)
         writer.writerow(['crowd_user', 'email', 'category', 'detail'])
-        writer.writerows(r for r in sorted(results, key=lambda r: (r[2], r[0])) if r[2] != OK)
+        writer.writerows(r for r in sorted(results, key=lambda r: (r[2], r[0])) if r[2] not in (OK, *skipped))
     click.echo(f"Mismatches written to {csv_path}")
 
 
