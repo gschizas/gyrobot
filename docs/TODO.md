@@ -33,8 +33,9 @@ accepted/expired are not visible in the web UI or API. Options:
 
 ## Planned features and design notes
 
-1. **Crowd onboarding in gyrobot**: done (see `CROWD.md`). Left: run `scripts/check_crowd_usernames.py` against real
-   data to decide `ldap.username_attribute`, and replace the personal Bitbucket token with a service account's.
+1. **Crowd onboarding in gyrobot**: done (see `CROWD.md`). Left: `ldap.username_attribute` stays `samaccountname`
+   (the username part of the email is the correct one in nearly all cases; a few grandfathered users differ and
+   don't matter), and replace the personal Bitbucket token with a service account's. More work in item 19.
 2. **Secrets storage**: a pluggable secret store now exists (`backend/secret_store`, see `SECRET-STORE.md`) with
    systemd, directory, `pass`, keyring and Azure Key Vault backends; remaining work is choosing a backend, moving the
    real secrets, and routing the `config/*.credentials.yml` files through it.
@@ -162,6 +163,26 @@ accepted/expired are not visible in the web UI or API. Options:
     (`envvar='GYROBOT_ENV'` on the argument). Do after the missing GitHub users work.
 18. **Migrate the scripts from argparse to Click**: new and modified scripts use Click already; the rest
     (`import_provisions`, `backfill_*`, `export_github_members`, ...) get migrated when next touched.
+19. **Display names from the directory** (decided: `accounts.name` becomes the person's display name, see item 3).
+    Work, in order:
+    1. `backend/names.py`: proper Title Case (dashes and apostrophes: `ANNA-MARIA` -> `Anna-Maria`) and the Greek
+       name romanization with the `romanize` library (ISO 843); read the Greek name from `extensionAttribute10`
+       (`GIVEN|SURNAME`, all caps) in `LdapDirectory`. The AD names have mistakes, so compare the Latin name with
+       the romanized Greek one and flag differences.
+    2. `onboard crowd`: new options `--given-name`/`--surname` (or `--display-name`) to override the directory
+       names; the validate step resolves them, the provider and the welcome email use them.
+    3. `onboard github`: verify the email in the directory (the `ad_check_email_domains` hook in `_github_validate`
+       is still a `pass`), take the display name from it, and stop writing the GitHub login into `accounts.name`
+       (`get_or_create_account(..., name=username)` in `commands/onboarding/github.py`; the same options as above).
+    4. Crowd web page: verify the email (JSON route like the GitHub username validation), show the display name as a
+       label that can be clicked to edit when it differs from the Title Case/romanized expectation; a bulk page
+       (rows of email + team) like the GitHub one.
+    5. Crowd team tree instead of the plain text box. Crowd groups nest (a group can contain groups, and may have
+       several parents): read `group/child-group/direct` (verify with a read-only probe whether the hierarchy is
+       really a tree), build the tree from it, and compare the canonical teams (GitHub slugs) with the Crowd groups
+       to produce a seed `crowd:` section for `config/team_mapping.yml` (a script, with the differences listed).
+    6. `scripts/import_crowd_users.py`: import all active Crowd users as `crowd` provisions (skip deactivated ones),
+       matching accounts by email and naming them from the directory.
 
 ## Per-instance configuration and data
 
