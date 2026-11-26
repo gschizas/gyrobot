@@ -5,6 +5,7 @@ The password is only ever held in memory: it is never logged, returned in a resu
 The groups are the ones the canonical team maps to (``config/team_mapping.yml``, ``crowd:`` section) plus
 ``account.provision_data['extra_groups']``.
 """
+import functools
 import secrets
 
 from backend import bot_identity
@@ -43,13 +44,19 @@ def _find_person(settings: CrowdSettings, email: str) -> Person:
     return person
 
 
+@functools.lru_cache(maxsize=1)
+def _bitbucket(url: str) -> BitbucketApi:
+    """One shared client, so its cache serves consecutive onboardings."""
+    return BitbucketApi(url)
+
+
 def _repositories(ctx, settings: CrowdSettings, api: CrowdApi, groups: list[str]) -> list[dict]:
     """Repositories the groups give access to; empty if Bitbucket is not configured or cannot be reached."""
     if not settings.bitbucket_url or not groups:
         return []
     try:
         parents = {parent for group in groups for parent in api.get_parent_groups(group)}
-        return BitbucketApi(settings.bitbucket_url).repos_for_groups(groups, inherited_groups=parents)
+        return _bitbucket(settings.bitbucket_url).repos_for_groups(groups, inherited_groups=parents)
     except Exception as e:
         ctx.logger.warning(f"Could not list the Bitbucket repositories of {', '.join(groups)}: {e!r}")
         return []
