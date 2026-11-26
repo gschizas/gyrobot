@@ -58,8 +58,9 @@ FORMS = {
     'crowd': {
         'title': 'Onboard: Crowd',
         'fields': [
-            {'name': 'username', 'label': 'Username', 'required': True},
-            {'name': 'team', 'label': 'Team', 'required': True},
+            {'name': 'username', 'label': 'Login or email', 'required': True},
+            {'name': 'team', 'label': 'Canonical team', 'required': True},
+            {'name': 'groups', 'label': 'Extra Crowd groups (optional, comma separated)', 'required': False},
         ],
     },
     'jetbrains': {
@@ -424,7 +425,11 @@ def _build_args(action: str, form_data) -> list[str] | None:
             args += ['--role', role]
         return args
     if action == 'crowd':
-        return ['onboard', 'crowd', form_data['username'], form_data['team']]
+        args = ['onboard', 'crowd', form_data['username'], form_data['team']]
+        for group in str(form_data.get('groups') or '').split(','):
+            if group.strip():
+                args += ['--group', group.strip()]
+        return args
     if action == 'jetbrains':
         return ['onboard', 'jetbrains', form_data['email'], form_data['team_name']]
     if action == 'slack':

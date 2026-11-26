@@ -23,8 +23,9 @@ class GithubBulkOnboardRequest(BaseModel):
 
 
 class CrowdOnboardRequest(BaseModel):
-    username: str
-    team: str
+    username: str = Field(..., description="Directory login or email address of the person")
+    team: str = Field(..., description="Canonical team (mapped to Crowd groups in config/team_mapping.yml)")
+    groups: List[str] = Field(default_factory=list, description="Extra Crowd groups besides the team's ones")
 
 
 class JetbrainsOnboardRequest(BaseModel):
