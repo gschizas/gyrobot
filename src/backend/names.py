@@ -20,7 +20,7 @@ def title_case(text: str) -> str:
 
 
 def split_greek_name(value: str, separator: str = '|') -> tuple[str, str]:
-    """``ΓΙΩΡΓΟΣ|ΣΧΙΖΑΣ`` -> (title case given name, surname). Missing parts are empty."""
+    """``ΝΙΚΟΛΑΟΣ|ΣΧΙΝΑΣ`` -> (title case given name, surname). Missing parts are empty."""
     given, _, surname = (value or '').partition(separator)
     return title_case(given), title_case(surname)
 

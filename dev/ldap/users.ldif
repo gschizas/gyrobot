@@ -45,20 +45,20 @@ sn: Georgiou
 extensionAttribute10:: zpzOkc6hzpnOkS3Olc6bzpXOnc6XfM6TzpXOqc6hzpPOmc6fzqU=
 userAccountControl: 512
 
-# Wrong casing in AD (Title Case must fix it) and a non-ISO 843 Latin spelling (Gkiorgos)
-dn: cn=GKIORGOS SCHIZAS,dc=example,dc=com
+# Wrong casing in AD (Title Case must fix it); the Greek name is ΝΙΚΟΛΑΟΣ|ΣΧΙΝΑΣ
+dn: cn=NIKOLAOS SCHINAS,dc=example,dc=com
 objectClass: top
 objectClass: person
 objectClass: organizationalPerson
 objectClass: user
-cn: GKIORGOS SCHIZAS
-name: GKIORGOS SCHIZAS
-sAMAccountName: gschizas
-userPrincipalName: gschizas@example.com
-mail: gschizas@example.com
-givenName: GKIORGOS
-sn: SCHIZAS
-extensionAttribute10:: zpPOmc6pzqHOk86fzqN8zqPOp86ZzpbOkc6j
+cn: NIKOLAOS SCHINAS
+name: NIKOLAOS SCHINAS
+sAMAccountName: nschinas
+userPrincipalName: nschinas@example.com
+mail: nschinas@example.com
+givenName: NIKOLAOS
+sn: SCHINAS
+extensionAttribute10:: zp3Omc6azp/Om86Rzp/Oo3zOo86nzpnOnc6RzqM=
 userAccountControl: 512
 
 # Latin name differs from the Greek one (Helen vs Eleni): flagged as a name mismatch
