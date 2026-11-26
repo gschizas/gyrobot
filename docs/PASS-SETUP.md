@@ -52,21 +52,26 @@ max-cache-ttl 604800
 
 ```sh
 pass init <fingerprint>
-pass insert gyrobot/CROWD_PASSWORD
-pass insert gyrobot/LDAP_BIND_PASSWORD
+pass insert <env-name>/CROWD_PASSWORD
+pass insert <env-name>/LDAP_BIND_PASSWORD
 ```
+
+One folder per environment (`<env-name>` is the name of the `.env.d/<env-name>.env` file), so each instance has its
+own passwords.
 
 Keep a copy of the passwords (and an export of the key, `gpg --export-secret-keys --armor`) in your password manager:
 the store cannot be rebuilt without the key and passphrase.
 
 ## 5. Point the bot at it
 
-`config/secrets.yml`:
+The `prefix` in `secrets.yml` is a fixed string, so use one file per environment, `config/secrets.<env-name>.yml`,
+and select it with `SECRETS_CONFIGURATION=secrets.<env-name>.yml` in the process environment (it cannot come from the
+`.env.d` file itself, which is read through the store):
 
 ```yaml
 backends:
   - type: pass
-    prefix: gyrobot
+    prefix: <env-name>
     first_line_only: true
 ```
 
@@ -79,7 +84,7 @@ Unlock the key once, as the bot's user, before starting the bot:
 
 ```sh
 export GPG_TTY=$(tty)
-pass show gyrobot/CROWD_PASSWORD > /dev/null
+pass show <env-name>/CROWD_PASSWORD > /dev/null
 ```
 
 It asks for the passphrase and the agent then answers the bot without prompting, until the TTL ends. The backend runs
