@@ -3,7 +3,6 @@
 Example::
 
     crowd_url: https://crowd.example.com/crowd       # without /rest
-    directory_id: 32769                              # Crowd directory searched for groups
     group_prefixes: [team-, ext-]                    # which groups can be assigned
     ldap:
       server: ldap://ad.example.com

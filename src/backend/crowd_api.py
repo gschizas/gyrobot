@@ -12,6 +12,7 @@ from backend.crowd_config import CrowdSettings, load_settings
 from backend.secret_store import get_secret
 
 USER_PAGE_SIZE = 500
+GROUP_PAGE_SIZE = 500
 GROUPS_TTL_SECONDS = 300
 JSON = {'Accept': 'application/json', 'Content-Type': 'application/json'}
 
@@ -33,10 +34,6 @@ class CrowdApi:
     @property
     def _users_url(self) -> str:
         return f"{self.settings.crowd_url}/rest/usermanagement/latest"
-
-    @property
-    def _admin_url(self) -> str:
-        return f"{self.settings.crowd_url}/rest/admin/latest"
 
     def _check(self, response: requests.Response, what: str) -> requests.Response:
         if not response.ok:
@@ -96,24 +93,25 @@ class CrowdApi:
             self._check(response, f"removing {username} from {group}")
 
     def get_groups(self, max_age: float = GROUPS_TTL_SECONDS) -> dict[str, str]:
-        """The assignable groups (names starting with one of ``group_prefixes``) as ``{name: description}``, cached."""
+        """The assignable groups (names starting with one of ``group_prefixes``) as ``{name: description}``, cached.
+
+        Uses the application-level group search: the ``admin`` API refuses application credentials.
+        """
         if self._groups and time.monotonic() - self._groups[0] < max_age:
             return self._groups[1]
-        if self.settings.directory_id is None:
-            raise CrowdError("config/crowd.yml: directory_id is needed to list groups")
-        groups = {}
-        for prefix in self.settings.group_prefixes or ('',):
-            start = 0
-            while True:
-                response = self._check(self.session.get(
-                    f"{self._admin_url}/group/search/{self.settings.directory_id}",
-                    params={'term': prefix, 'limit': 100, 'start': start}), "listing groups")
-                data = response.json()
-                for group in data.get('values', []):
-                    if group['name'].startswith(prefix):
-                        groups[group['name']] = ' '.join(str(group.get('description') or '').split())
-                if data.get('isLastPage', True):
-                    break
-                start = data['start'] + data['size']
+        prefixes = tuple(self.settings.group_prefixes) or ('',)
+        groups, start = {}, 0
+        while True:
+            response = self._check(self.session.get(
+                f"{self._users_url}/search",
+                params={'entity-type': 'group', 'expand': 'group', 'start-index': start,
+                        'max-results': GROUP_PAGE_SIZE}), "listing groups")
+            page = response.json().get('groups', [])
+            for group in page:
+                if group['name'].startswith(prefixes):
+                    groups[group['name']] = ' '.join(str(group.get('description') or '').split())
+            if len(page) < GROUP_PAGE_SIZE:
+                break
+            start += len(page)
         self._groups = (time.monotonic(), dict(sorted(groups.items())))
         return self._groups[1]

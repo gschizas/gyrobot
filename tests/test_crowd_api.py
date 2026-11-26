@@ -54,14 +54,14 @@ class CrowdApiTest(unittest.TestCase):
 
     def test_groups_filtered_by_prefix_cached_and_described(self):
         session = mock.MagicMock()
-        session.get.return_value = response(200, {'values': [
+        session.get.return_value = response(200,         {'groups': [
             {'name': 'team-b', 'description': 'Team  B\n(x)'}, {'name': 'other', 'description': ''},
-            {'name': 'team-a'}], 'isLastPage': True})
+                    {'name': 'team-a'}]})
         crowd = api(session)
         groups = crowd.get_groups()
         self.assertEqual(groups, {'team-a': '', 'team-b': 'Team B (x)'})
         crowd.get_groups()
-        self.assertEqual(session.get.call_count, 2)  # one per prefix, then served from the cache
+        self.assertEqual(session.get.call_count, 1)  # a single page, then served from the cache
 
     def test_set_active_sends_the_whole_user_back(self):
         session = mock.MagicMock()
