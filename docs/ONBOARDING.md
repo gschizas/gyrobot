@@ -48,7 +48,8 @@ Removes everything the account holds and deactivates Slack:
   after fixing the cause. JetBrains refuses to revoke a licence in the first 30 days after it was assigned, so that
   case is reported as failed.
 
-The command looks the account up by its primary email.
+The command looks the account up by its primary email. When it is done, the per-resource result is emailed to the
+recipients in `config/email.yml` and to the person's manager (see the manager notes in [CROWD.md](CROWD.md)).
 
 ## `jetbrains` (read-only)
 

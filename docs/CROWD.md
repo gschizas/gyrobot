@@ -22,6 +22,14 @@ new password, and it refuses when the email in Crowd differs from the one in AD.
 The password is generated in memory, emailed and never logged, returned or stored. If that email fails the command
 reports it so the user can use the password-reset link.
 
+**Manager.** The AD `manager` attribute is read for each person: `onboard crowd lookup` shows it, and onboarding
+(Crowd and GitHub), `onboard whois` and `offboard` refresh it into the account (`metadata.manager_email` and
+`manager_name`; best effort, the stored value is kept when AD cannot be reached). After a Crowd onboarding the
+manager receives a separate notice with the user name, groups and repositories (template
+`email_templates/crowd_manager_notice.html`), **never the password**. `offboard` emails its per-resource result
+(`offboard_notice.html`) to the recipients of `config/email.yml` and the manager. Not done yet: notifying the manager
+on Slack and routing approvals to them, which need a Slack lookup by email.
+
 ## Configuration
 
 `config/crowd.yml` (gitignored; see the docstring of `backend/crowd_config.py`):
