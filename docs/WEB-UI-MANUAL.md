@@ -26,7 +26,7 @@ After logging in you land on the **Onboarding** page, which lists every action. 
 |---|---|---|
 | **GitHub Copilot** | GitHub username, email address, team, optionally a role | An invitation to the GitHub enterprise and, once accepted, assignment to the team. The role is stored with the team. |
 | **JetBrains IntelliJ IDEA** | Email address, team name | A licence of that team's pool is assigned. The team must have a free licence. |
-| **Crowd** | Login or email, canonical team, optional extra groups | A Crowd user in the team's groups; the welcome email is sent. |
+| **Crowd** | Email address (or login), canonical team, optional extra groups | A Crowd user in the team's groups; the welcome email is sent. |
 | **Slack** | Email address, member IDs (comma-separated) | Slack workspace membership. |
 | **Offboard** | Email address | Removal of all the person's active provisions, and Slack deactivation. |
 
@@ -35,6 +35,10 @@ Notes:
 - On the GitHub form, **choose the team from the tree** (click to expand). It shows the enterprise teams with their
   parents. If GitHub cannot be reached, you get a plain text field instead; type the team slug.
 - The email address must belong to an allowed domain.
+- On the Crowd form (and its bulk page) the address is checked in the company directory as soon as you leave the
+  field, and the person's name is shown under it. If the Latin name disagrees with the Greek one (the directory has
+  mistakes), the name is shown with a warning and the Greek name's romanization; **click it to correct** the given
+  name and surname. The corrected name is used for the Crowd user, the welcome email and the account.
 - The team is the canonical team name used by the company (see your administrator for the list).
 
 ### Bulk onboard: GitHub Copilot
@@ -46,6 +50,11 @@ For several people at once.
 2. Optionally use **Validate** to check that each GitHub username exists before sending.
 3. Submit. Each row becomes its own approval request, and a row that fails does not stop the others. The result
    page shows one line per person.
+
+### Bulk onboard: Crowd
+
+Like the GitHub one, with one row per person: email address (or login) and team. Every address is checked in the
+directory, the name is shown (and can be corrected when flagged), and each row is its own approval request.
 
 ### Bulk move
 
