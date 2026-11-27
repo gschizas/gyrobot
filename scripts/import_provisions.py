@@ -3,8 +3,8 @@
 
 Usage (from the repository root; reads APPROVAL_DATABASE_URL from .env.d/<env-name>.env):
 
-    uv run python tools/import_provisions.py <env-name> users.csv            # preview only
-    uv run python tools/import_provisions.py <env-name> users.xlsx --apply   # write to the database
+    uv run python scripts/import_provisions.py <env-name> users.csv            # preview only
+    uv run python scripts/import_provisions.py <env-name> users.xlsx --apply   # write to the database
 
 Columns (header row required, case-insensitive; CSV may be comma- or semicolon-separated, auto-detected):
 
