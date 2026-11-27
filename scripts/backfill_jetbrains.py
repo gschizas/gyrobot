@@ -41,6 +41,7 @@ Two helpers create the mapping files to fill in by hand (they refuse to overwrit
 import argparse
 import csv
 import json
+import os
 import pathlib
 import sys
 from collections import Counter
@@ -109,7 +110,7 @@ def report_misplaced(path: str, misplaced: list, cannot_judge: list) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('env_name')
+    parser.add_argument('env_name', nargs='?', default=os.environ.get('GYROBOT_ENV'))
     parser.add_argument('--apply', action='store_true', help='write to the database (default: preview only)')
     parser.add_argument('--map', metavar='CSV', help='external_email,account_email pairs for licences held by '
                                                       'emails outside the allowed domains')
@@ -118,6 +119,8 @@ def main() -> None:
     parser.add_argument('--report-misplaced', metavar='CSV', help='list holders whose canonical team maps to a different '
                                                                    'JetBrains team than the one they hold a licence in; also writes a new CSV')
     args = parser.parse_args()
+    if not args.env_name:
+        parser.error('no environment: pass its name or set GYROBOT_ENV')
     for target in (args.write_email_map, args.write_team_map, args.report_misplaced):
         if target and pathlib.Path(target).exists():
             sys.exit(f"{target} already exists; delete it first so a filled-in file is never overwritten")

@@ -10,6 +10,7 @@ Read only. A user in an organization but in no team is not listed; use ``--inclu
 """
 import argparse
 import csv
+import os
 import pathlib
 import sys
 
@@ -20,11 +21,13 @@ from dotenv import load_dotenv
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('env_name')
+    parser.add_argument('env_name', nargs='?', default=os.environ.get('GYROBOT_ENV'))
     parser.add_argument('-o', '--output', type=pathlib.Path, help='also write the list to this CSV file')
     parser.add_argument('--include-org-only', action='store_true',
                         help='also list members that are in an organization but in no team')
     args = parser.parse_args()
+    if not args.env_name:
+        parser.error('no environment: pass its name or set GYROBOT_ENV')
 
     load_dotenv(dotenv_path=f'.env.d/{args.env_name}.env', override=True)
     from backend.github_api import GitHubApi

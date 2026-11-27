@@ -42,7 +42,7 @@ def candidates(team: str, groups: list[str], cutoff: float, limit: int) -> list[
 
 
 @click.command()
-@click.argument('env_name')
+@click.argument('env_name', envvar='GYROBOT_ENV')
 @click.option('--output', type=click.Path(dir_okay=False), default='crowd_mapping_suggestion.yml', show_default=True)
 @click.option('--cutoff', type=float, default=0.5, show_default=True, help='Lowest similarity worth suggesting.')
 @click.option('--candidates', 'limit', type=int, default=3, show_default=True, help='Candidates listed per team.')

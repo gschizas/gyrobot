@@ -43,7 +43,7 @@ def classify(crowd_name, people):
 
 
 @click.command()
-@click.argument('env_name')
+@click.argument('env_name', envvar='GYROBOT_ENV')
 @click.option('--mismatches-only', is_flag=True, help='Do not list users that match.')
 @click.option('--include-inactive', is_flag=True, help='Also check deactivated Crowd users.')
 @click.option('--include-external', is_flag=True, help='Also check users whose email is outside the mail domain.')

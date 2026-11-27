@@ -14,6 +14,7 @@ a provision that already has a ``github_id`` different from the one GitHub retur
 ``mismatch`` and left untouched.
 """
 import argparse
+import os
 import pathlib
 import sys
 
@@ -26,9 +27,11 @@ from tqdm import tqdm
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('env_name')
+    parser.add_argument('env_name', nargs='?', default=os.environ.get('GYROBOT_ENV'))
     parser.add_argument('--apply', action='store_true', help='write to the database (default: preview only)')
     args = parser.parse_args()
+    if not args.env_name:
+        parser.error('no environment: pass its name or set GYROBOT_ENV')
 
     load_dotenv(dotenv_path=f'.env.d/{args.env_name}.env', override=True)
     from backend import account_storage as storage

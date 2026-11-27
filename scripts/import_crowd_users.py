@@ -39,7 +39,7 @@ def account_name(person, crowd_user: dict) -> str:
 
 
 @click.command()
-@click.argument('env_name')
+@click.argument('env_name', envvar='GYROBOT_ENV')
 @click.option('--apply', is_flag=True, help='Write to the database (default: preview only).')
 @click.option('--include-external', is_flag=True, help='Also import users whose email is outside the mail domain.')
 def main(env_name, apply, include_external):

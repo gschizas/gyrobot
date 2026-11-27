@@ -18,6 +18,7 @@ The file is ``;``-separated and its columns are compatible with ``scripts/import
   ``import_provisions.py`` needs an email to create the account.
 """
 import argparse
+import os
 import csv
 import pathlib
 import sys
@@ -31,9 +32,12 @@ COLUMNS = ['email', 'resource', 'status', 'username', 'team', 'name', 'other_ema
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('env', help='environment name; loads .env.d/<env>.env')
+    parser.add_argument('env', nargs='?', default=os.environ.get('GYROBOT_ENV'),
+                        help='environment name; loads .env.d/<env>.env (default: $GYROBOT_ENV)')
     parser.add_argument('-o', '--output', default='github_members.csv', help='CSV file to write')
     args = parser.parse_args()
+    if not args.env:
+        parser.error('no environment: pass its name or set GYROBOT_ENV')
 
     load_dotenv(dotenv_path=f'.env.d/{args.env}.env', override=True)
 

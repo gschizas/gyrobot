@@ -92,7 +92,7 @@ def load_team_rows(github, ses, env_name: str, refresh: bool, max_age_minutes: i
 
 
 @click.command(help=__doc__.split('\n\n', 1)[0])
-@click.argument('env_name')
+@click.argument('env_name', envvar='GYROBOT_ENV')
 @click.option('--emails', 'emails_file', type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
               help='CSV of login,email for members GitHub has no email for')
 @click.option('--apply', is_flag=True, help='write to the database (default: preview only)')

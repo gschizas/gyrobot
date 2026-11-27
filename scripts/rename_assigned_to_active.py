@@ -11,6 +11,7 @@ Updates ``account_provisions.status`` and both ``status`` and ``previous_status`
 with the code that no longer treats ``assigned`` as a live status. Safe to run again.
 """
 import argparse
+import os
 import pathlib
 import sys
 
@@ -21,9 +22,11 @@ from dotenv import load_dotenv
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('env_name')
+    parser.add_argument('env_name', nargs='?', default=os.environ.get('GYROBOT_ENV'))
     parser.add_argument('--apply', action='store_true', help='write to the database (default: preview only)')
     args = parser.parse_args()
+    if not args.env_name:
+        parser.error('no environment: pass its name or set GYROBOT_ENV')
 
     load_dotenv(dotenv_path=f'.env.d/{args.env_name}.env', override=True)
     from sqlalchemy import func, select, update

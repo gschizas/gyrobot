@@ -21,6 +21,7 @@ and appear in the audit table like any other change.
 """
 import argparse
 import csv
+import os
 import pathlib
 import sys
 from datetime import datetime, timezone
@@ -83,12 +84,14 @@ def validate(row: dict, default_status: str) -> tuple[dict | None, str | None]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('env_name')
+    parser.add_argument('env_name', nargs='?', default=os.environ.get('GYROBOT_ENV'))
     parser.add_argument('file', type=pathlib.Path)
     parser.add_argument('--default-status', default='active')
     parser.add_argument('--overwrite', action='store_true', help='replace provisions that already exist')
     parser.add_argument('--apply', action='store_true', help='write to the database (default: preview only)')
     args = parser.parse_args()
+    if not args.env_name:
+        parser.error('no environment: pass its name or set GYROBOT_ENV')
 
     load_dotenv(dotenv_path=f'.env.d/{args.env_name}.env', override=True)
     from backend import account_storage as storage
