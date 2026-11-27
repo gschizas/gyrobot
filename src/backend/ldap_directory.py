@@ -5,7 +5,7 @@ import ldap3
 from ldap3.utils.conv import escape_filter_chars
 
 from backend.crowd_config import CrowdSettings, load_settings
-from backend.names import names_agree, split_greek_name, title_case
+from backend.names import names_agree, romanize_greek, split_greek_name, title_case
 from backend.secret_store import get_secret
 
 ATTRIBUTES = ['name', 'sAMAccountName', 'mail', 'givenName', 'sn']
@@ -30,6 +30,14 @@ class Person:
     @property
     def display_name(self) -> str:
         return f"{self.first_name} {self.last_name}".strip()
+
+    @property
+    def expected_first_name(self) -> str:
+        return romanize_greek(self.greek_first_name)
+
+    @property
+    def expected_last_name(self) -> str:
+        return romanize_greek(self.greek_last_name)
 
     @property
     def name_mismatch(self) -> bool:
@@ -106,18 +114,22 @@ class LdapDirectory:
         return people[0] if people else None
 
 
-def verify_person(query: str, settings: CrowdSettings | None = None) -> tuple[Person | None, str | None]:
+def verify_person(query: str, settings: CrowdSettings | None = None,
+                  directory: LdapDirectory | None = None) -> tuple[Person | None, str | None]:
     """Look ``query`` (email or login) up in the directory: ``(person, None)``, or ``(None, reason)``.
 
     Lookup problems (no config, server unreachable) raise, so callers can tell them from a wrong address.
+    Pass `directory` to reuse one connection for several lookups (the caller closes it).
     """
-    directory = LdapDirectory(settings)
+    own = directory is None
+    directory = directory or LdapDirectory(settings)
     try:
         person = directory.find_person(query)
     except ValueError as e:
         return None, f"{e}; use the email address."
     finally:
-        directory.close()
+        if own:
+            directory.close()
     if not person:
         return None, f"{query} was not found in the directory."
     if not (person.mail and person.first_name and person.last_name and person.username):

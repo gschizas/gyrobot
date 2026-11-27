@@ -11,7 +11,8 @@ from fastapi.testclient import TestClient
 
 from webapp import main
 
-JSON_401 = {'/onboarding/github/validate-users', '/onboarding/github/missing-emails/status'}
+JSON_401 = {'/onboarding/github/validate-users', '/onboarding/github/missing-emails/status',
+            '/onboarding/crowd/verify'}
 
 
 class DenyByDefault(unittest.TestCase):
