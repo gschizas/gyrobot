@@ -1,0 +1,35 @@
+{% extends "_base.html" %}
+
+{% block title %}New Crowd account{% endblock %}
+{% block heading %}Crowd / Atlassian{% endblock %}
+
+{% block content %}
+<h2 style="color:#1e3a5f;font-size:18px;margin-top:0;">Crowd account for {{ first_name }} {{ last_name }}</h2>
+<p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 16px;">
+    You are receiving this because you are the manager of {{ first_name }} {{ last_name }}.
+    {% if is_new %}A Crowd account has been created{% else %}The Crowd account has been updated{% endif %}
+    for the Atlassian ecosystem (Bitbucket, JIRA, Confluence etc.). The credentials were sent to {{ first_name }} only.
+</p>
+<table cellpadding="6" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;margin:0 0 16px;font-size:14px;color:#444;">
+    <tr style="background-color:#f4f6f9;">
+        <th align="left" style="border:1px solid #dde3ec;width:30%;">Username</th>
+        <td style="border:1px solid #dde3ec;"><code>{{ username }}</code></td>
+    </tr>
+    {% if groups %}
+    <tr>
+        <th align="left" valign="top" style="border:1px solid #dde3ec;">Groups</th>
+        <td style="border:1px solid #dde3ec;">
+            <ul style="margin:0;padding-left:18px;">{% for group in groups %}<li>{{ group }}</li>{% endfor %}</ul>
+        </td>
+    </tr>
+    {% endif %}
+    {% if repos %}
+    <tr style="background-color:#f4f6f9;">
+        <th align="left" valign="top" style="border:1px solid #dde3ec;">Repositories</th>
+        <td style="border:1px solid #dde3ec;">
+            <ul style="margin:0;padding-left:18px;">{% for repo in repos %}<li><a href="{{ repo.url }}">{{ repo.title }}</a></li>{% endfor %}</ul>
+        </td>
+    </tr>
+    {% endif %}
+</table>
+{% endblock %}

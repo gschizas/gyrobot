@@ -12,6 +12,7 @@ from backend.providers.base import ProvisionRequest
 
 SETTINGS = CrowdSettings(crowd_url='https://crowd.test', ldap=LdapSettings('s', 'b', 'x.test'))
 PERSON = Person(cn='Alice Smith', login='asmith', mail='alice@x.test', first_name='Alice', last_name='Smith')
+MANAGER = Person(cn='Bob Jones', login='bjones', mail='bob@x.test', first_name='Bob', last_name='Jones')
 
 
 def request(team='', extra=()):
@@ -30,16 +31,30 @@ class CrowdProviderTest(unittest.TestCase):
                    mock.patch.object(crowd, 'generate_password', return_value='secret-words-42'),
                    mock.patch.object(crowd, 'send_email'),
                    mock.patch.object(crowd.bot_identity, 'bot_name', return_value='bot'),
+                   mock.patch.object(crowd, '_find_manager', return_value=MANAGER),
                    mock.patch.object(crowd, 'resolve_teams', side_effect=lambda r, t: {'pay': ['team-a', 'team-b']}.get(t, []))]
         self.send_email = [p.start() for p in patches][3]
         self.addCleanup(mock.patch.stopall)
+
+    def test_manager_gets_a_notice_without_the_password(self):
+        message = crowd.provision(self.ctx, request('pay'), self.api)
+        notice = [c for c in self.send_email.call_args_list if c.args[0] == 'crowd_manager_notice'][0]
+        self.assertEqual(notice.kwargs['to'], 'bob@x.test')
+        self.assertNotIn('password', notice.kwargs)
+        self.assertNotIn('secret-words', str(notice))
+        self.assertIn('bob@x.test', message)
+
+    def test_manager_failures_never_fail_the_onboarding(self):
+        for broken in ({'return_value': None}, {'side_effect': OSError('ldap down')}):
+            with mock.patch.object(crowd, '_find_manager', **broken):
+                crowd.provision(self.ctx, request('pay'), self.api)
 
     def test_new_user_gets_mapped_and_extra_groups_and_the_password_never_leaks(self):
         req = request('pay', ['extra'])
         message = crowd.provision(self.ctx, req, self.api)
         self.api.create_user.assert_called_once_with('asmith', 'Alice', 'Smith', 'alice@x.test', 'secret-words-42')
         self.assertEqual([c.args[1] for c in self.api.add_to_group.call_args_list], ['team-a', 'team-b', 'extra'])
-        self.assertEqual(self.send_email.call_args.kwargs['password'], 'secret-words-42')
+        self.assertEqual(self.send_email.call_args_list[0].kwargs['password'], 'secret-words-42')
         self.assertNotIn('secret-words', message + str(req.provision_data))
 
     def test_given_names_override_the_directory(self):
@@ -66,7 +81,7 @@ class CrowdProviderTest(unittest.TestCase):
         crowd.provision(self.ctx, request('pay'), self.api)
         self.api.set_active.assert_called_once_with('asmith', True)
         self.api.create_user.assert_not_called()
-        self.assertIsNone(self.send_email.call_args.kwargs['password'])
+        self.assertIsNone(self.send_email.call_args_list[0].kwargs['password'])
 
     def test_mail_failure_for_new_user_is_an_error(self):
         self.send_email.side_effect = OSError('smtp down')

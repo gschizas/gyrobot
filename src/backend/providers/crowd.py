@@ -123,9 +123,9 @@ def provision(ctx, account: ProvisionRequest, api: CrowdApi | None = None) -> st
                                    'team_groups': team_groups, 'extra_groups': extra_groups})
     verb = 'Created' if password else 'Updated existing'
     message = f"{verb} Crowd user {person.username}, groups: {', '.join(groups) or '(none)'}"
+    repos = _repositories(ctx, settings, api, groups)
     try:
-        _send_welcome(settings, person, password, groups, is_new=bool(password),
-                      repos=_repositories(ctx, settings, api, groups))
+        _send_welcome(settings, person, password, groups, is_new=bool(password), repos=repos)
     except Exception as e:
         ctx.logger.warning(f"Could not send the Crowd welcome email to {person.mail}: {e!r}")
         if password:
@@ -134,7 +134,32 @@ def provision(ctx, account: ProvisionRequest, api: CrowdApi | None = None) -> st
                                f"ask the user to reset the password in Crowd") from e
         return f"{message} (welcome email to {person.mail} FAILED: {e})"
     ctx.logger.info(message)
-    return f"{message} (welcome email sent to {person.mail})"
+    return f"{message} (welcome email sent to {person.mail}){_notify_manager(ctx, settings, person, groups, bool(password), repos)}"
+
+
+def _find_manager(settings: CrowdSettings, person: Person) -> Person | None:
+    directory = LdapDirectory(settings)
+    try:
+        return directory.get_manager(person)
+    finally:
+        directory.close()
+
+
+def _notify_manager(ctx, settings: CrowdSettings, person: Person, groups: list[str], is_new: bool,
+                    repos: list[dict]) -> str:
+    """Tell the person's manager about the account (never the password). Best effort: returns a note for the result."""
+    try:
+        manager = _find_manager(settings, person)
+        if manager is None or not manager.mail:
+            return ''
+        send_email(
+            'crowd_manager_notice', to=manager.mail, subject=f"Crowd account for {person.display_name}",
+            username=person.username, first_name=person.first_name, last_name=person.last_name, is_new=is_new,
+            groups=groups, repos=repos)
+    except Exception as e:
+        ctx.logger.warning(f"Could not notify the manager of {person.mail}: {e!r}")
+        return f" (notifying the manager FAILED: {e})"
+    return f" (manager {manager.mail} notified)"
 
 
 def deprovision(ctx, provision: Provision, api: CrowdApi | None = None) -> str:
