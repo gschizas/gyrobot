@@ -188,6 +188,8 @@ accepted/expired are not visible in the web UI or API. Options:
     6. Done: `scripts/import_crowd_users.py` imports all active Crowd users as `crowd` provisions (deactivated and
        outside-domain users are skipped), matching accounts by email and naming new ones from the directory. Preview
        by default, `--apply` writes. Untested against the real Crowd.
+20. **Rename Crowd groups to match the canonical teams, and replace the special access groups** (e.g.
+    `erb-ocp-dev-anonymous`): planned only, see `CROWD-RENAMING.md`.
 
 ## Per-instance configuration and data
 
