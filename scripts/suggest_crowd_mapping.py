@@ -18,8 +18,8 @@ from tqdm import tqdm
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'src'))
 
+from backend.cli import gyrobot_env  # noqa: E402
 from backend.crowd_api import CrowdApi  # noqa: E402
-from backend.secret_store import load_environment  # noqa: E402
 
 
 def tokens(name: str) -> list[str]:
@@ -42,15 +42,14 @@ def candidates(team: str, groups: list[str], cutoff: float, limit: int) -> list[
 
 
 @click.command()
-@click.argument('env_name', envvar='GYROBOT_ENV')
 @click.option('--output', type=click.Path(dir_okay=False), default='crowd_mapping_suggestion.yml', show_default=True)
 @click.option('--cutoff', type=float, default=0.5, show_default=True, help='Lowest similarity worth suggesting.')
 @click.option('--candidates', 'limit', type=int, default=3, show_default=True, help='Candidates listed per team.')
-def main(env_name, output, cutoff, limit):
+@gyrobot_env
+def main(output, cutoff, limit):
     path = pathlib.Path(output)
     if path.exists():
         raise click.ClickException(f"{path} exists; refusing to overwrite it.")
-    load_environment(env_name)
     from backend.github_api import GitHubApi  # needs APPROVAL_DATABASE_URL, which the environment provides
     teams = [o['value'] for o in GitHubApi.flatten_team_tree(GitHubApi().build_team_tree())]
     groups = sorted(CrowdApi().get_groups())

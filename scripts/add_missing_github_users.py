@@ -23,14 +23,16 @@ recorded only when the member is in exactly one enterprise team.
 """
 import csv
 import datetime
+import os
 import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'src'))
 
 import click
-from dotenv import load_dotenv
 from tqdm import tqdm
+
+from backend.cli import gyrobot_env  # noqa: E402
 
 
 def read_email_map(path: pathlib.Path) -> dict[str, str]:
@@ -92,7 +94,6 @@ def load_team_rows(github, ses, env_name: str, refresh: bool, max_age_minutes: i
 
 
 @click.command(help=__doc__.split('\n\n', 1)[0])
-@click.argument('env_name', envvar='GYROBOT_ENV')
 @click.option('--emails', 'emails_file', type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
               help='CSV of login,email for members GitHub has no email for')
 @click.option('--apply', is_flag=True, help='write to the database (default: preview only)')
@@ -103,14 +104,15 @@ def load_team_rows(github, ses, env_name: str, refresh: bool, max_age_minutes: i
 @click.option('--refresh', is_flag=True, help='ignore the cached team members and read them again')
 @click.option('--max-age', type=int, default=60, metavar='MINUTES', show_default=True,
               help='how long the cached team members stay valid')
-def main(env_name: str, emails_file: pathlib.Path | None, apply: bool, user: str | None, user_email: str | None,
+@gyrobot_env
+def main(emails_file: pathlib.Path | None, apply: bool, user: str | None, user_email: str | None,
          verbose: bool, refresh: bool, max_age: int) -> None:
     if (verbose or user_email) and not user:
         raise click.UsageError('--verbose and --email need --user')
     if user_email and '@' not in user_email:
         raise click.UsageError('--email is not an email address')
 
-    load_dotenv(dotenv_path=f'.env.d/{env_name}.env', override=True)
+    env_name = os.environ['GYROBOT_ENV']
     from backend import account_storage as storage
     from backend.github_api import GitHubApi
 

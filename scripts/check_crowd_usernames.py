@@ -17,9 +17,9 @@ from tqdm import tqdm
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'src'))
 
+from backend.cli import gyrobot_env  # noqa: E402
 from backend.crowd_api import CrowdApi  # noqa: E402
 from backend.ldap_directory import LdapDirectory  # noqa: E402
-from backend.secret_store import load_environment  # noqa: E402
 
 NO_MATCH, AMBIGUOUS, DIFFER, OK = 'no AD match', 'ambiguous AD match', 'CN and sAMAccountName differ', 'ok'
 INACTIVE, EXTERNAL = 'skipped: inactive in Crowd', 'skipped: email outside the mail domain'
@@ -43,14 +43,13 @@ def classify(crowd_name, people):
 
 
 @click.command()
-@click.argument('env_name', envvar='GYROBOT_ENV')
 @click.option('--mismatches-only', is_flag=True, help='Do not list users that match.')
 @click.option('--include-inactive', is_flag=True, help='Also check deactivated Crowd users.')
 @click.option('--include-external', is_flag=True, help='Also check users whose email is outside the mail domain.')
 @click.option('--csv', 'csv_path', type=click.Path(dir_okay=False), default='crowd_username_mismatches.csv',
               show_default=True, help='Where to write the mismatches.')
-def main(env_name, mismatches_only, include_inactive, include_external, csv_path):
-    load_environment(env_name)
+@gyrobot_env
+def main(mismatches_only, include_inactive, include_external, csv_path):
     crowd, ldap = CrowdApi(), LdapDirectory()
     suffix = '@' + ldap.settings.ldap.mail_domain.lower()
     users = crowd.list_users()

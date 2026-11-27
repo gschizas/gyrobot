@@ -23,10 +23,10 @@ from tqdm import tqdm
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'src'))
 
+from backend.cli import gyrobot_env  # noqa: E402
 from backend.crowd_api import CrowdApi, epoch_ms_to_iso  # noqa: E402
 from backend.ldap_directory import LdapDirectory  # noqa: E402
 from backend.names import title_case  # noqa: E402
-from backend.secret_store import load_environment  # noqa: E402
 
 
 def account_name(person, crowd_user: dict) -> str:
@@ -39,11 +39,10 @@ def account_name(person, crowd_user: dict) -> str:
 
 
 @click.command()
-@click.argument('env_name', envvar='GYROBOT_ENV')
 @click.option('--apply', is_flag=True, help='Write to the database (default: preview only).')
 @click.option('--include-external', is_flag=True, help='Also import users whose email is outside the mail domain.')
-def main(env_name, apply, include_external):
-    load_environment(env_name)
+@gyrobot_env
+def main(apply, include_external):
     from backend import account_storage as storage
 
     crowd, ldap = CrowdApi(), LdapDirectory()
