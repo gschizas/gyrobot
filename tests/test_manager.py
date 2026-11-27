@@ -14,7 +14,8 @@ def person(mail, first='A', last='B', manager_dn=''):
 
 
 def account(metadata=None):
-    return SimpleNamespace(id=1, primary_email='alice@x.test', metadata=metadata or {'additional_emails': ['a@x.test']})
+    return SimpleNamespace(id=1, name='Alice', primary_email='alice@x.test',
+                           metadata=metadata or {'additional_emails': ['a@x.test']})
 
 
 class RefreshManagerTest(unittest.TestCase):
@@ -48,6 +49,27 @@ class RefreshManagerTest(unittest.TestCase):
         with mock.patch.object(manager, 'lookup_manager', side_effect=OSError('down')):
             self.assertIs(manager.refresh_manager(acct), acct)
         self.update.assert_not_called()
+
+
+class OffboardingNoticeTest(unittest.TestCase):
+    def notify(self, recipients, stored):
+        from commands import onboarding
+        acct = account({'manager_email': stored} if stored else {})
+        with mock.patch.object(onboarding, 'refresh_manager', return_value=acct), \
+                mock.patch.object(onboarding, 'configured_recipients', return_value=recipients), \
+                mock.patch.object(onboarding, 'send_email') as send:
+            onboarding._notify_offboarding(mock.Mock(), acct, 'alice@x.test', [{'Resource': 'r', 'Result': 'ok'}])
+        return send
+
+    def test_goes_to_the_recipients_and_the_manager_once(self):
+        send = self.notify(['hr@x.test', 'bob@x.test'], 'bob@x.test')
+        self.assertEqual(send.call_args.kwargs['to'], ['hr@x.test', 'bob@x.test'])
+
+    def test_nobody_to_tell_sends_nothing_and_errors_are_swallowed(self):
+        self.notify([], None).assert_not_called()
+        from commands import onboarding
+        with mock.patch.object(onboarding, 'refresh_manager', side_effect=OSError('x')):
+            onboarding._notify_offboarding(mock.Mock(), account(), 'a@x.test', [])
 
 
 if __name__ == '__main__':

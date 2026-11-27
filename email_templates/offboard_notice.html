@@ -1,0 +1,20 @@
+{% extends "_base.html" %}
+
+{% block title %}Offboarding{% endblock %}
+{% block heading %}Offboarding{% endblock %}
+
+{% block content %}
+<h2 style="color:#1e3a5f;font-size:18px;margin-top:0;">Offboarded {{ name or email }}</h2>
+<p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 16px;">
+    The accounts of <b>{{ name or email }}</b> ({{ email }}) were removed or deactivated. Anything marked FAILED
+    is still active and will be retried.
+</p>
+<table cellpadding="6" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;margin:0 0 16px;font-size:14px;color:#444;">
+    {% for row in results %}
+    <tr{% if loop.index is odd %} style="background-color:#f4f6f9;"{% endif %}>
+        <th align="left" valign="top" style="border:1px solid #dde3ec;width:30%;">{{ row.Resource }}</th>
+        <td style="border:1px solid #dde3ec;">{{ row.Result }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% endblock %}

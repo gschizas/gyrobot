@@ -28,6 +28,14 @@ def _load_config():
     )
 
 
+def configured_recipients() -> list[str]:
+    """The log recipients from ``config/email.yml`` (empty if the file or the key is missing)."""
+    try:
+        return list(_load_config().recipients)
+    except FileNotFoundError:
+        return []
+
+
 def send_email_log(template_name, **kwargs):
     """Send a templated email to the configured recipients (or ``to=`` if given)."""
     cfg = _load_config()

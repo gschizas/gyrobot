@@ -24,7 +24,8 @@ from backend.account_storage import (
 from backend.accounts import Provision
 from backend.approval import requires_approval
 from backend.arguments import extract_email
-from backend.manager import refresh_manager
+from backend.email_logging import configured_recipients, send_email
+from backend.manager import refresh_manager, stored_manager_email
 from backend.providers import PROVIDERS, RESOURCE_LABELS
 from backend.providers import slack_provision
 from backend.providers.base import ProvisionRequest
@@ -129,7 +130,21 @@ def offboard(ctx: ExtendedContext, email: str):
         set_provision_status(provision.account_id, provision.resource, 'deprovisioned', data)
 
     ctx.chat.send_table(title=f'Offboarded {email}', table=results)
+    _notify_offboarding(ctx, account, email, results)
     return '\n'.join(f"{row['Resource']}: {row['Result']}" for row in results)
+
+
+def _notify_offboarding(ctx: ExtendedContext, account, email: str, results: list[dict]) -> None:
+    """Email the outcome to the configured recipients and the person's manager. Best effort."""
+    try:
+        account = refresh_manager(account)
+        recipients = [*configured_recipients(), stored_manager_email(account)]
+        recipients = list(dict.fromkeys(r for r in recipients if r))
+        if recipients:
+            send_email('offboard_notice', to=recipients, subject=f"Offboarded {account.name or email}",
+                       name=account.name, email=email, results=results)
+    except Exception as e:
+        ctx.logger.warning(f"Could not send the offboarding notice for {email}: {e!r}")
 
 
 @onboard.command('whois')
