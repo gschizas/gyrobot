@@ -10,6 +10,7 @@ emails them a bilingual welcome message with a generated password and the reposi
 | `onboard crowd [add] <login-or-email> <team> [-g group]... [--given-name N] [--surname N]` | Approval-gated. Looks the person up in Active Directory, creates the Crowd user, adds the groups the canonical `team` maps to (plus every `--group`) and sends the welcome email. The name comes from AD (Title Case); the name options override it, and it becomes the account name. |
 | `onboard crowd lookup <login-or-email>` | What AD and Crowd know about the person: names, email, Crowd user name, active state, groups. Not gated. |
 | `onboard crowd groups [text]` | The assignable groups with descriptions, optionally filtered. Not gated. |
+| `onboard crowd teams [text] [-d N] [-f]` | The groups as a tree (only those whose name has `text`, with their parents; `-d` limits the levels; `-f` lists the names flat). A group inside several groups is listed under each, but expanded only once: later copies are marked `(*)`. Not gated. |
 | `offboard <email>` | Removes the user from every group and deactivates them (Crowd has no safe delete). |
 | `onboard move <email> <team>` | Adds the groups of the new canonical team and removes the ones of the old team (extra groups are kept). |
 
