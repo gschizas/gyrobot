@@ -38,17 +38,17 @@ Two helpers create the mapping files to fill in by hand (they refuse to overwrit
                              different JetBrains team than the one they hold a licence in, plus the canonical teams that
                              have no jetbrains mapping (cannot judge). Also written to a new CSV. Report only.
 """
-import argparse
 import csv
 import json
-import os
 import pathlib
 import sys
 from collections import Counter
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'src'))
 
-from dotenv import load_dotenv
+import click
+
+from backend.cli import gyrobot_env  # noqa: E402
 
 
 def read_mapping(path: str) -> dict[str, str]:
@@ -108,30 +108,30 @@ def report_misplaced(path: str, misplaced: list, cannot_judge: list) -> None:
     print(f"wrote {len(misplaced) + len(cannot_judge)} row(s) to {path}")
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('env_name', nargs='?', default=os.environ.get('GYROBOT_ENV'))
-    parser.add_argument('--apply', action='store_true', help='write to the database (default: preview only)')
-    parser.add_argument('--map', metavar='CSV', help='external_email,account_email pairs for licences held by '
-                                                      'emails outside the allowed domains')
-    parser.add_argument('--write-email-map', metavar='FILE', help='write the still unmapped outside-domain emails to a new CSV')
-    parser.add_argument('--write-team-map', metavar='FILE', help='write the JetBrains teams no canonical team maps to, to a new YAML')
-    parser.add_argument('--report-misplaced', metavar='CSV', help='list holders whose canonical team maps to a different '
-                                                                   'JetBrains team than the one they hold a licence in; also writes a new CSV')
-    args = parser.parse_args()
-    if not args.env_name:
-        parser.error('no environment: pass its name or set GYROBOT_ENV')
-    for target in (args.write_email_map, args.write_team_map, args.report_misplaced):
+@click.command(help=__doc__.split('\n\n', 1)[0])
+@click.option('--apply', is_flag=True, help='write to the database (default: preview only)')
+@click.option('--map', 'map_file', metavar='CSV',
+              help='external_email,account_email pairs for licences held by emails outside the allowed domains')
+@click.option('--write-email-map', 'email_map_file', metavar='FILE',
+              help='write the still unmapped outside-domain emails to a new CSV')
+@click.option('--write-team-map', 'team_map_file', metavar='FILE',
+              help='write the JetBrains teams no canonical team maps to, to a new YAML')
+@click.option('--report-misplaced', 'misplaced_file', metavar='CSV',
+              help='list holders whose canonical team maps to a different JetBrains team than the one they hold a '
+                   'licence in; also writes a new CSV')
+@gyrobot_env
+def main(apply: bool, map_file: str | None, email_map_file: str | None, team_map_file: str | None,
+         misplaced_file: str | None) -> None:
+    for target in (email_map_file, team_map_file, misplaced_file):
         if target and pathlib.Path(target).exists():
             sys.exit(f"{target} already exists; delete it first so a filled-in file is never overwritten")
 
-    load_dotenv(dotenv_path=f'.env.d/{args.env_name}.env', override=True)
     from backend import account_storage as storage
     from backend.email_domains import allowed_email_domains, is_allowed_email
     from backend.jetbrains_api import JetBrainsApi
     from backend.team_mapping import mapped_teams, resolve_team
 
-    mapping = read_mapping(args.map) if args.map else {}
+    mapping = read_mapping(map_file) if map_file else {}
     domains = allowed_email_domains()
     if not domains:
         print("note: no allowed_email_domains configured, every email is treated as internal\n")
@@ -199,8 +199,8 @@ def main() -> None:
             seen[account.id] = email
 
         if link_to:
-            print(f"{'link' if args.apply else 'would link':14} {email:40} additional email of {link_to.primary_email}")
-            if args.apply:
+            print(f"{'link' if apply else 'would link':14} {email:40} additional email of {link_to.primary_email}")
+            if apply:
                 storage.add_additional_email(link_to.id, email)
             counts['link'] += 1
 
@@ -213,27 +213,27 @@ def main() -> None:
             if not missing:
                 counts['already'] += 1
                 continue
-            print(f"{'complete' if args.apply else 'would complete':14} {email:40} {', '.join(missing)}{note}")
-            if args.apply:
+            print(f"{'complete' if apply else 'would complete':14} {email:40} {', '.join(missing)}{note}")
+            if apply:
                 storage.merge_provision_data(existing.account_id, 'jetbrains', missing)
             counts['complete'] += 1
             continue
 
-        print(f"{'create' if args.apply else 'would create':14} {email:40} {lic['team']['name']}{note}"
+        print(f"{'create' if apply else 'would create':14} {email:40} {lic['team']['name']}{note}"
               f"{'' if account else ' (new account)'}")
-        if args.apply:
+        if apply:
             if not account:
                 account = storage.create_account(name=holder_name or email, primary_email=email)
             storage.set_provision_status(account.id, 'jetbrains', 'active', data)
         counts['create'] += 1
 
-    print(f"\n{counts['create']} {'created' if args.apply else 'to create'}, "
-          f"{counts['complete']} {'completed' if args.apply else 'to complete'}, "
-          f"{counts['link']} {'linked' if args.apply else 'to link'}, {counts['already']} already complete, "
+    print(f"\n{counts['create']} {'created' if apply else 'to create'}, "
+          f"{counts['complete']} {'completed' if apply else 'to complete'}, "
+          f"{counts['link']} {'linked' if apply else 'to link'}, {counts['already']} already complete, "
           f"{counts['not live']} not live, {counts['external']} external and skipped, "
           f"{counts['duplicate']} duplicate, "
           f"{skipped_holders} not held by a person"
-          + ('' if args.apply else "  -- preview only, rerun with --apply to write"))
+          + ('' if apply else "  -- preview only, rerun with --apply to write"))
 
     mapped_values = {v.strip().lower() for v in mapped_teams('jetbrains')}
     unmapped_teams = [t for t in jetbrains_teams
@@ -242,12 +242,12 @@ def main() -> None:
         print(f"\n{len(unmapped_teams)} JetBrains team(s) without a canonical team in config/team_mapping.yml:")
         for team in unmapped_teams:
             print(f"  {team.name} (id {team.id}, {team.total_licenses} licences)")
-    if args.write_team_map:
-        write_team_map(args.write_team_map, unmapped_teams, team_hints)
-    if args.write_email_map:
-        write_email_map(args.write_email_map, unmapped_users)
-    if args.report_misplaced:
-        report_misplaced(args.report_misplaced, misplaced, cannot_judge)
+    if team_map_file:
+        write_team_map(team_map_file, unmapped_teams, team_hints)
+    if email_map_file:
+        write_email_map(email_map_file, unmapped_users)
+    if misplaced_file:
+        report_misplaced(misplaced_file, misplaced, cannot_judge)
 
 
 if __name__ == '__main__':

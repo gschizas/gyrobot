@@ -10,25 +10,20 @@ Updates ``account_provisions.status`` and both ``status`` and ``previous_status`
 ``account_provision_history``, for every resource, in one transaction. Run it before restarting the bot
 with the code that no longer treats ``assigned`` as a live status. Safe to run again.
 """
-import argparse
-import os
 import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'src'))
 
-from dotenv import load_dotenv
+import click
+
+from backend.cli import gyrobot_env  # noqa: E402
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('env_name', nargs='?', default=os.environ.get('GYROBOT_ENV'))
-    parser.add_argument('--apply', action='store_true', help='write to the database (default: preview only)')
-    args = parser.parse_args()
-    if not args.env_name:
-        parser.error('no environment: pass its name or set GYROBOT_ENV')
-
-    load_dotenv(dotenv_path=f'.env.d/{args.env_name}.env', override=True)
+@click.command(help=__doc__.split('\n\n', 1)[0])
+@click.option('--apply', is_flag=True, help='write to the database (default: preview only)')
+@gyrobot_env
+def main(apply: bool) -> None:
     from sqlalchemy import func, select, update
     from backend import account_storage as storage
     from backend.models.accounts import ProvisionHistoryRow, ProvisionRow
@@ -45,7 +40,7 @@ def main() -> None:
         print(f"provisions: {sum(by_resource.values())} {by_resource or ''}")
         print(f"history rows: {history_status} with status, {history_previous} with previous_status")
 
-        if not args.apply:
+        if not apply:
             print("\nPreview only, rerun with --apply to write.")
             return
         session.execute(update(ProvisionRow).where(ProvisionRow.status == 'assigned').values(status='active'))

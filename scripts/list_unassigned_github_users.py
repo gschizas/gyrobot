@@ -8,28 +8,23 @@ Usage (from the repository root; reads the GitHub settings from .env.d/<env-name
 
 Read only. A user in an organization but in no team is not listed; use ``--include-org-only`` to list those too.
 """
-import argparse
 import csv
-import os
 import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'src'))
 
-from dotenv import load_dotenv
+import click
+
+from backend.cli import gyrobot_env  # noqa: E402
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('env_name', nargs='?', default=os.environ.get('GYROBOT_ENV'))
-    parser.add_argument('-o', '--output', type=pathlib.Path, help='also write the list to this CSV file')
-    parser.add_argument('--include-org-only', action='store_true',
-                        help='also list members that are in an organization but in no team')
-    args = parser.parse_args()
-    if not args.env_name:
-        parser.error('no environment: pass its name or set GYROBOT_ENV')
-
-    load_dotenv(dotenv_path=f'.env.d/{args.env_name}.env', override=True)
+@click.command(help=__doc__.split('\n\n', 1)[0])
+@click.option('-o', '--output', type=click.Path(dir_okay=False, path_type=pathlib.Path),
+              help='also write the list to this CSV file')
+@click.option('--include-org-only', is_flag=True, help='also list members that are in an organization but in no team')
+@gyrobot_env
+def main(output: pathlib.Path | None, include_org_only: bool) -> None:
     from backend.github_api import GitHubApi
 
     github = GitHubApi()
@@ -39,17 +34,17 @@ def main() -> None:
 
     rows = [{'login': m['login'], 'name': m['name'], 'organizations': ' '.join(m['orgs'])}
             for m in sorted(members, key=lambda m: m['login'].lower())
-            if m['login'].lower() not in in_team and (args.include_org_only or not m['orgs'])]
+            if m['login'].lower() not in in_team and (include_org_only or not m['orgs'])]
     print(f"{len(members)} members, {len(in_team)} in a team, {len(rows)} listed\n")
     for row in rows:
         print(f"{row['login']:30} {row['name']:30} {row['organizations']}")
 
-    if args.output:
-        with args.output.open('w', newline='', encoding='utf-8') as f:
+    if output:
+        with output.open('w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=['login', 'name', 'organizations'])
             writer.writeheader()
             writer.writerows(rows)
-        print(f"\nWritten to {args.output}")
+        print(f"\nWritten to {output}")
 
 
 if __name__ == '__main__':

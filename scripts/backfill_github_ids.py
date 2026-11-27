@@ -13,27 +13,22 @@ If the stored username was reassigned to a different person, the id will be wron
 a provision that already has a ``github_id`` different from the one GitHub returns is reported as a
 ``mismatch`` and left untouched.
 """
-import argparse
-import os
 import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'src'))
 
+import click
 import requests
-from dotenv import load_dotenv
 from tqdm import tqdm
 
+from backend.cli import gyrobot_env  # noqa: E402
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('env_name', nargs='?', default=os.environ.get('GYROBOT_ENV'))
-    parser.add_argument('--apply', action='store_true', help='write to the database (default: preview only)')
-    args = parser.parse_args()
-    if not args.env_name:
-        parser.error('no environment: pass its name or set GYROBOT_ENV')
 
-    load_dotenv(dotenv_path=f'.env.d/{args.env_name}.env', override=True)
+@click.command(help=__doc__.split('\n\n', 1)[0])
+@click.option('--apply', is_flag=True, help='write to the database (default: preview only)')
+@gyrobot_env
+def main(apply: bool) -> None:
     from backend import account_storage as storage
     from backend.github_api import GitHubApi
 
@@ -65,15 +60,15 @@ def main() -> None:
                        f"({provision.status})")
             counts['mismatch'] += 1
             continue
-        tqdm.write(f"{'set' if args.apply else 'would set':12} {username:30} -> {ids['github_id']} "
+        tqdm.write(f"{'set' if apply else 'would set':12} {username:30} -> {ids['github_id']} "
                    f"{ids['global_id']} ({provision.status})")
-        if args.apply:
+        if apply:
             storage.merge_provision_data(provision.account_id, 'github', ids)
         counts['updated'] += 1
 
-    print(f"\n{counts['updated']} {'updated' if args.apply else 'to update'}, {counts['already']} already complete, "
+    print(f"\n{counts['updated']} {'updated' if apply else 'to update'}, {counts['already']} already complete, "
           f"{counts['not_found']} not found, {counts['mismatch']} mismatches, {counts['no_username']} without "
-          f"username, {counts['error']} errors" + ('' if args.apply else "  -- preview only, rerun with --apply to write"))
+          f"username, {counts['error']} errors" + ('' if apply else "  -- preview only, rerun with --apply to write"))
 
 
 if __name__ == '__main__':

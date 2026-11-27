@@ -17,30 +17,23 @@ The file is ``;``-separated and its columns are compatible with ``scripts/import
 * Members without a verified email are still exported (empty ``email``) and listed on stderr, because
   ``import_provisions.py`` needs an email to create the account.
 """
-import argparse
-import os
 import csv
 import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'src'))
 
-from dotenv import load_dotenv
+import click
+
+from backend.cli import gyrobot_env  # noqa: E402
 
 COLUMNS = ['email', 'resource', 'status', 'username', 'team', 'name', 'other_emails']
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('env', nargs='?', default=os.environ.get('GYROBOT_ENV'),
-                        help='environment name; loads .env.d/<env>.env (default: $GYROBOT_ENV)')
-    parser.add_argument('-o', '--output', default='github_members.csv', help='CSV file to write')
-    args = parser.parse_args()
-    if not args.env:
-        parser.error('no environment: pass its name or set GYROBOT_ENV')
-
-    load_dotenv(dotenv_path=f'.env.d/{args.env}.env', override=True)
-
+@click.command(help=__doc__.split('\n\n', 1)[0])
+@click.option('-o', '--output', default='github_members.csv', show_default=True, help='CSV file to write')
+@gyrobot_env
+def main(output: str) -> None:
     # backend.github_api imports account_storage, which needs APPROVAL_DATABASE_URL (no connection is made)
     from backend.github_api import GitHubApi
     api = GitHubApi()
@@ -51,7 +44,7 @@ def main() -> int:
     teams_by_login = api.get_ent_team_logins(api.ses_usr)
 
     no_email = []
-    with open(args.output, 'w', newline='', encoding='utf-8-sig') as f:
+    with open(output, 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.writer(f, delimiter=';')
         writer.writerow(COLUMNS)
         for member in sorted(members, key=lambda m: m['login'].lower()):
@@ -64,11 +57,10 @@ def main() -> int:
                 member['name'], ','.join(emails[1:]),
             ])
 
-    print(f'Wrote {len(members)} members to {args.output}.', file=sys.stderr)
+    print(f'Wrote {len(members)} members to {output}.', file=sys.stderr)
     if no_email:
         print(f'{len(no_email)} member(s) have no verified email: {", ".join(no_email)}', file=sys.stderr)
-    return 0
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    main()

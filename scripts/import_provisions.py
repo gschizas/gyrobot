@@ -19,16 +19,16 @@ Existing account+resource provisions are skipped unless --overwrite is given. Ex
 ``openpyxl`` (``uv pip install openpyxl``). Imported rows are marked ``imported: true`` in the data
 and appear in the audit table like any other change.
 """
-import argparse
 import csv
-import os
 import pathlib
 import sys
 from datetime import datetime, timezone
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'src'))
 
-from dotenv import load_dotenv
+import click
+
+from backend.cli import gyrobot_env  # noqa: E402
 
 RESOURCES = {'github', 'jetbrains', 'crowd', 'slack'}
 STATUSES = {'pending', 'invited', 'active', 'expired', 'deprovisioned'}
@@ -82,23 +82,18 @@ def validate(row: dict, default_status: str) -> tuple[dict | None, str | None]:
             'created_at': created_at, 'name': row.get('username') or email}, None
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('env_name', nargs='?', default=os.environ.get('GYROBOT_ENV'))
-    parser.add_argument('file', type=pathlib.Path)
-    parser.add_argument('--default-status', default='active')
-    parser.add_argument('--overwrite', action='store_true', help='replace provisions that already exist')
-    parser.add_argument('--apply', action='store_true', help='write to the database (default: preview only)')
-    args = parser.parse_args()
-    if not args.env_name:
-        parser.error('no environment: pass its name or set GYROBOT_ENV')
-
-    load_dotenv(dotenv_path=f'.env.d/{args.env_name}.env', override=True)
+@click.command(help=__doc__.split('\n\n', 1)[0])
+@click.option('--default-status', default='active', show_default=True)
+@click.option('--overwrite', is_flag=True, help='replace provisions that already exist')
+@click.option('--apply', is_flag=True, help='write to the database (default: preview only)')
+@gyrobot_env
+@click.argument('file', type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path))
+def main(file: pathlib.Path, default_status: str, overwrite: bool, apply: bool) -> None:
     from backend import account_storage as storage
 
     rows, errors = [], []
-    for number, raw in enumerate(read_rows(args.file), start=2):
-        row, error = validate(raw, args.default_status)
+    for number, raw in enumerate(read_rows(file), start=2):
+        row, error = validate(raw, default_status)
         if error:
             errors.append(f"row {number}: {error}")
         else:
@@ -111,14 +106,14 @@ def main() -> None:
     for row in rows:
         account = storage.get_account_by_email(row['email'])
         existing = storage.get_provision(account.id, row['resource']) if account else None
-        if existing and not args.overwrite:
+        if existing and not overwrite:
             action = 'skip'
         else:
             action = 'overwrite' if existing else 'create'
         counts[action] += 1
         print(f"{action:9} {row['email']:40} {row['resource']:10} {row['status']:10}"
               f"{' (new account)' if not account else ''}")
-        if action == 'skip' or not args.apply:
+        if action == 'skip' or not apply:
             continue
         if not account:
             account = storage.create_account(name=row['name'], primary_email=row['email'])
@@ -126,7 +121,7 @@ def main() -> None:
                                      created_at=row['created_at'])
 
     print(f"\n{counts['create']} to create, {counts['overwrite']} to overwrite, {counts['skip']} skipped"
-          + ('' if args.apply else "  -- preview only, rerun with --apply to write"))
+          + ('' if apply else "  -- preview only, rerun with --apply to write"))
 
 
 if __name__ == '__main__':
