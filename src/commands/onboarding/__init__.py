@@ -24,6 +24,7 @@ from backend.account_storage import (
 from backend.accounts import Provision
 from backend.approval import requires_approval
 from backend.arguments import extract_email
+from backend.manager import refresh_manager
 from backend.providers import PROVIDERS, RESOURCE_LABELS
 from backend.providers import slack_provision
 from backend.providers.base import ProvisionRequest
@@ -148,12 +149,15 @@ def onboard_whois(ctx: ExtendedContext, email: str):
         ctx.chat.send_text(f"No account found for {email}", is_error=True)
         return
 
+    account = refresh_manager(account)
     metadata = dict(account.metadata)
     additional = metadata.pop('additional_emails', [])
+    manager_name, manager_email = metadata.pop('manager_name', ''), metadata.pop('manager_email', '')
     fields = [
         {'Field': 'Name', 'Value': account.name or ''},
         {'Field': 'Primary email', 'Value': account.primary_email or ''},
         {'Field': 'Additional emails', 'Value': ', '.join(additional)},
+        {'Field': 'Manager', 'Value': f"{manager_name} <{manager_email}>" if manager_email else ''},
         {'Field': 'Canonical team', 'Value': account.team or ''},
         {'Field': 'Created', 'Value': f"{account.created_at:%Y-%m-%d %H:%M}"},
         {'Field': 'Updated', 'Value': f"{account.updated_at:%Y-%m-%d %H:%M}"},

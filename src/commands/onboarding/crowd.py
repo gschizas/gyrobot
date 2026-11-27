@@ -9,6 +9,7 @@ from backend.approval import requires_approval
 from backend.crowd_api import CrowdApi
 from backend.crowd_config import load_settings
 from backend.ldap_directory import LdapDirectory
+from backend.manager import refresh_manager
 from backend.providers import ProvisionRequest, PROVIDERS, RESOURCE_LABELS
 from backend.team_mapping import resolve_teams
 from commands import DefaultCommandGroup
@@ -91,6 +92,7 @@ def onboard_crowd(ctx: ExtendedContext, user: str, team: str, group: tuple, give
 
     data = account_obj.provision_data
     account = get_or_create_account(primary_email=data['email'], name=display_name, team=team)
+    refresh_manager(account)
     set_provision_status(account.id, 'crowd', 'active', data)
     set_membership(account.id, team, None)
 
@@ -110,6 +112,7 @@ def crowd_lookup(ctx: ExtendedContext, user: str):
     directory = LdapDirectory(settings)
     try:
         people = directory.find_people(user)
+        managers = {person.login: directory.get_manager(person) for person in people}
     finally:
         directory.close()
     if not people:
@@ -119,8 +122,10 @@ def crowd_lookup(ctx: ExtendedContext, user: str):
     rows = []
     for person in people:
         crowd_user = api.get_user(person.username)
+        manager = managers[person.login]
         rows.append({
             'Name': f"{person.first_name} {person.last_name}", 'Email': person.mail, 'Crowd user': person.username,
+            'Manager': f"{manager.display_name} <{manager.mail}>" if manager else '',
             'CN': person.cn, 'sAMAccountName': person.login,
             'In Crowd': 'no' if crowd_user is None else ('active' if crowd_user.get('active') else 'inactive'),
             'Groups': ', '.join(api.get_user_groups(person.username)) if crowd_user else ''})

@@ -19,6 +19,7 @@ from backend.email_domains import domain_in, is_allowed_email
 from backend.email_logging import send_email
 from backend.github_api import GitHubApi
 from backend.ldap_directory import verify_person
+from backend.manager import refresh_manager
 from backend.providers import ProvisionRequest, PROVIDERS, RESOURCE_LABELS
 from backend.team_mapping import normalize
 from commands import DefaultCommandGroup
@@ -295,6 +296,7 @@ def onboard_github(ctx: ExtendedContext, username: str, email: str, team: str, r
     # Store account and provision status
     display_name = _display_name(given_name, surname)
     account = get_or_create_account(primary_email=email, name=display_name, team=team)
+    account = refresh_manager(account)
     if display_name and account.name != display_name:
         account = update_account(account.id, name=display_name) or account
     set_provision_status(account.id, 'github', 'invited', provision_data)
