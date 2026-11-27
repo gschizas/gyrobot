@@ -37,10 +37,13 @@ def _crowd_validate(params: dict, ctx: ExtendedContext) -> str | None:
     if not (person.mail and person.first_name and person.last_name and person.username):
         return f"The directory entry of {params['user']} lacks a mail address or a name."
 
-    groups = resolve_teams('crowd', params['team'])
-    if not groups:
-        return f"No Crowd group mapping for canonical team '{params['team']}' (config/team_mapping.yml)."
     available = CrowdApi(settings).get_groups()
+    groups = resolve_teams('crowd', params['team'])
+    if not groups and params['team'] in available:
+        groups = [params['team']]  # a Crowd group picked directly (the web UI's group tree)
+    if not groups:
+        return f"No Crowd group mapping for canonical team '{params['team']}' (config/team_mapping.yml), " \
+               f"and no Crowd group of that name."
     unknown = [g for g in [*groups, *params['group']] if g not in available]
     if unknown:
         return f"Unknown Crowd group(s): {', '.join(unknown)}. See 'onboard crowd groups'."

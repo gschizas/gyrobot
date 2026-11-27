@@ -2,8 +2,8 @@
 to the requested Crowd groups and emailed a welcome message with the generated password.
 
 The password is only ever held in memory: it is never logged, returned in a result or stored in ``provision_data``.
-The groups are the ones the canonical team maps to (``config/team_mapping.yml``, ``crowd:`` section) plus
-``account.provision_data['extra_groups']``.
+The groups are the ones the canonical team maps to (``config/team_mapping.yml``, ``crowd:`` section), or the Crowd
+group of the same name when there is no mapping, plus ``account.provision_data['extra_groups']``.
 """
 import dataclasses
 import functools
@@ -30,6 +30,14 @@ def generate_password() -> str:
     from xkcdpass import xkcd_password as xp
     words = xp.generate_wordlist(wordfile=xp.locate_wordfile(), min_length=5, max_length=8, valid_chars='[a-z]')
     return f"{xp.generate_xkcdpassword(words, numwords=2, delimiter='-')}-{secrets.randbelow(100):02}"
+
+
+def team_groups_for(team: str, available) -> list[str]:
+    """The Crowd groups of ``team``: the ones the canonical team maps to, else the Crowd group of that very name."""
+    mapped = resolve_teams('crowd', team)
+    if mapped:
+        return mapped
+    return [team] if team in available else []
 
 
 def _find_person(settings: CrowdSettings, email: str) -> Person:
@@ -79,11 +87,7 @@ def provision(ctx, account: ProvisionRequest, api: CrowdApi | None = None) -> st
     Groups are the ones the canonical team ``account.team`` maps to, plus ``account.provision_data['extra_groups']``.
     """
     settings = load_settings()
-    team_groups = resolve_teams('crowd', account.team) if account.team else []
-    if account.team and not team_groups:
-        raise RuntimeError(f"No Crowd group mapping for team {account.team}")
     extra_groups = list(account.provision_data.get('extra_groups') or [])
-    groups = list(dict.fromkeys(team_groups + extra_groups))
     person = _find_person(settings, account.email)
     given_name = (account.provision_data.get('given_name') or '').strip()
     surname = (account.provision_data.get('surname') or '').strip()
@@ -93,6 +97,10 @@ def provision(ctx, account: ProvisionRequest, api: CrowdApi | None = None) -> st
     api = api or CrowdApi(settings)
 
     available = api.get_groups()
+    team_groups = team_groups_for(account.team, available) if account.team else []
+    if account.team and not team_groups:
+        raise RuntimeError(f"No Crowd group mapping for team {account.team}")
+    groups = list(dict.fromkeys(team_groups + extra_groups))
     unknown = [g for g in groups if g not in available]
     if unknown:
         raise RuntimeError(f"Unknown Crowd group(s): {', '.join(unknown)}")
