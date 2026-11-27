@@ -26,7 +26,8 @@ never logged.
 ## Existing code: `secret:` references in `.env.d/*.env`
 
 The entry points (`src/__main__.py`, `src/run_webapp.py`, `src/plugins.py requirements`) call
-`load_environment(<env-name>)` instead of `load_dotenv`. It loads the env file as before and then resolves any value
+`load_environment(<env-name>)` instead of `load_dotenv`. The name comes from the command line, or from the
+`GYROBOT_ENV` variable when it is omitted (`backend.secret_store.environment_name`). It loads the env file as before and then resolves any value
 that starts with `secret:`:
 
 ```

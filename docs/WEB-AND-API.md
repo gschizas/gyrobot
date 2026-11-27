@@ -5,7 +5,8 @@ and `offboard` commands, so they go through the same validation, [approval queue
 [permission rules](PERMISSIONS.md) as chat. Requests are approved in chat. The "new approval request" announcement is
 posted to the notify channel in chat, not shown in the web page.
 
-Run with `python src/run_webapp.py <env-name>` (reads `.env.d/<env-name>.env`) or point an ASGI server at
+Run with `python src/run_webapp.py <env-name>` (reads `.env.d/<env-name>.env`; the name may be omitted when
+`GYROBOT_ENV` is set) or point an ASGI server at
 `webapp.main:app`, from the repository root.
 
 | Variable | Purpose |

@@ -157,11 +157,10 @@ accepted/expired are not visible in the web UI or API. Options:
     `X-Github-Next-Global-ID: 1`) next to `github_id`, and `scripts/backfill_github_ids.py <env> --apply` fills in
     both for existing provisions. The API exposes `GlobalId` (stored) next to `NodeId` (the legacy id, derived from
     the numeric one). Once everything is backfilled, decide whether to drop the derived `NodeId`.
-17. **`GYROBOT_ENV` for the environment**: if the `GYROBOT_ENV` variable is set, read the environment name from it
-    instead of requiring it as an argument. Applies to `src/__main__.py` and the scripts in `scripts/`, which
-    take the environment as a positional argument (the argument stays and overrides the variable). Scripts
-    that are touched meanwhile are also being moved from argparse to Click, where this is a one-liner
-    (`envvar='GYROBOT_ENV'` on the argument). Do after the missing GitHub users work.
+17. **`GYROBOT_ENV` for the environment** (done): when the environment name is omitted, `src/__main__.py`,
+    `src/run_webapp.py`, `src/plugins.py requirements` and the scripts in `scripts/` read it from the `GYROBOT_ENV`
+    variable (an argument still overrides it). Click scripts use `envvar='GYROBOT_ENV'`, argparse ones an optional
+    positional; `backend.secret_store.environment_name` is the shared helper.
 18. **Migrate the scripts from argparse to Click**: new and modified scripts use Click already; the rest
     (`import_provisions`, `backfill_*`, `export_github_members`, ...) get migrated when next touched.
 19. **Display names from the directory** (decided: `accounts.name` becomes the person's display name, see item 3).

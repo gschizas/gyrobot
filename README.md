@@ -49,7 +49,7 @@ Quick start (from the repository root; the bot must always run from there):
 git submodule update --init
 uv sync
 uv run alembic -x env=<env-name> upgrade head     # database schema
-python src/__main__.py <env-name>                 # loads .env.d/<env-name>.env
+python src/__main__.py <env-name>                 # loads .env.d/<env-name>.env (or $GYROBOT_ENV when omitted)
 ```
 
 ## Which commands are enabled
