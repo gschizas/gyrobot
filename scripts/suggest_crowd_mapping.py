@@ -1,11 +1,7 @@
-# /// script
-# requires-python = ">=3.12"
-# dependencies = ["click", "tqdm", "requests", "ruamel.yaml", "sqlalchemy", "python-dotenv", "pycryptodome", "ldap3>=2.9.1"]
-# ///
 """Suggest the ``crowd:`` section of config/team_mapping.yml by fuzzy-matching the GitHub canonical teams with the
 Crowd groups. Read-only; the output is a starting point to edit by hand, not a mapping to trust.
 
-Run from the repo root:
+Run from the repo root (it uses the project environment, since it imports the bot's backend):
 
     uv run scripts/suggest_crowd_mapping.py <env-name> [--output FILE] [--cutoff 0.5] [--candidates 3]
 
@@ -23,7 +19,6 @@ from tqdm import tqdm
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'src'))
 
 from backend.crowd_api import CrowdApi  # noqa: E402
-from backend.github_api import GitHubApi  # noqa: E402
 from backend.secret_store import load_environment  # noqa: E402
 
 
@@ -56,6 +51,7 @@ def main(env_name, output, cutoff, limit):
     if path.exists():
         raise click.ClickException(f"{path} exists; refusing to overwrite it.")
     load_environment(env_name)
+    from backend.github_api import GitHubApi  # needs APPROVAL_DATABASE_URL, which the environment provides
     teams = [o['value'] for o in GitHubApi.flatten_team_tree(GitHubApi().build_team_tree())]
     groups = sorted(CrowdApi().get_groups())
     lines, matched = ['crowd:'], 0
