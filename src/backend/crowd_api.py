@@ -5,7 +5,8 @@ refuses application credentials, so only ``usermanagement`` is used.
 """
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Any, Optional
 
 import requests
 
@@ -15,9 +16,37 @@ from backend.secret_store import get_secret
 USER_PAGE_SIZE = 500
 GROUP_PAGE_SIZE = 500
 GROUPS_TTL_SECONDS = 300
+# Crowd user attributes holding a Unix epoch in milliseconds
+DATE_ATTRIBUTES = ('lastActive', 'lastAuthenticated', 'passwordLastChanged')
 # The group tree takes one request per group, and the web process creates a client per page view
 _TREE_CACHE: dict[str, tuple[float, dict]] = {}
 JSON = {'Accept': 'application/json', 'Content-Type': 'application/json'}
+
+
+def epoch_ms_to_iso(value) -> Optional[str]:
+    """A Crowd timestamp (Unix epoch in milliseconds, as a number or a string) as UTC ISO 8601, or None."""
+    try:
+        return datetime.fromtimestamp(int(value) / 1000, tz=timezone.utc).isoformat(timespec='seconds')
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
+
+
+def convert_attributes(attributes: list[dict], date_attributes=DATE_ATTRIBUTES) -> dict[str, Any]:
+    """Crowd's ``[{'name', 'values': [...]}]`` as a plain dict: dates become ISO strings, ``true``/``false`` and
+    integers their types, a single value a scalar and several values a list."""
+
+    def convert(name: str, value: str):
+        if name in date_attributes:
+            return epoch_ms_to_iso(value) or value
+        if value in ('true', 'false'):
+            return value == 'true'
+        if value.isdigit():
+            return int(value)
+        return value
+
+    return {a['name']: (lambda vs: vs[0] if len(vs) == 1 else vs)([convert(a['name'], str(v)) for v in a['values']])
+            for a in attributes if a.get('values')}
+
 
 
 class CrowdError(RuntimeError):
@@ -77,6 +106,12 @@ class CrowdApi:
         user.pop('password', None)
         self._check(self.session.put(f"{self._users_url}/user", params={'username': username}, json=user),
                     f"updating user {username}")
+
+    def get_user_attributes(self, username: str) -> dict[str, Any]:
+        """The user's custom attributes, converted by :func:`convert_attributes`."""
+        response = self._check(self.session.get(f"{self._users_url}/user/attribute", params={'username': username}),
+                               f"reading the attributes of {username}")
+        return convert_attributes(response.json().get('attributes', []))
 
     def get_user_groups(self, username: str) -> list[str]:
         response = self._check(self.session.get(f"{self._users_url}/user/group/direct", params={'username': username}),

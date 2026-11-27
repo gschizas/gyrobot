@@ -31,3 +31,17 @@ class GroupTreeTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class AttributeConversionTest(unittest.TestCase):
+    def test_conversion(self):
+        attrs = [{'name': 'lastActive', 'values': ['1672838960823']}, {'name': 'requiresPasswordChange', 'values': ['false']},
+                 {'name': 'invalidPasswordAttempts', 'values': ['0']}, {'name': 'erb:role', 'values': ['a', 'b']},
+                 {'name': 'slack-user-id', 'values': ['U1']}, {'name': 'empty', 'values': []}]
+        self.assertEqual({'lastActive': '2023-01-04T13:29:20+00:00', 'requiresPasswordChange': False,
+                          'invalidPasswordAttempts': 0, 'erb:role': ['a', 'b'], 'slack-user-id': 'U1'},
+                         crowd_api.convert_attributes(attrs))
+
+    def test_bad_epoch(self):
+        self.assertIsNone(crowd_api.epoch_ms_to_iso(None))
+        self.assertIsNone(crowd_api.epoch_ms_to_iso('x'))
