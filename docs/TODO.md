@@ -182,8 +182,9 @@ accepted/expired are not visible in the web UI or API. Options:
        the canonical team has no mapping). `scripts/suggest_crowd_mapping.py` fuzzy-matches the canonical teams with
        the Crowd groups to seed the `crowd:` section by hand. Left: `onboard move` still resolves only through the
        mapping.
-    6. `scripts/import_crowd_users.py`: import all active Crowd users as `crowd` provisions (skip deactivated ones),
-       matching accounts by email and naming them from the directory.
+    6. Done: `scripts/import_crowd_users.py` imports all active Crowd users as `crowd` provisions (deactivated and
+       outside-domain users are skipped), matching accounts by email and naming new ones from the directory. Preview
+       by default, `--apply` writes. Untested against the real Crowd.
 
 ## Per-instance configuration and data
 

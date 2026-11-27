@@ -55,7 +55,12 @@ crowd:
 A team without an entry may also be the name of a Crowd group, which is then used as it is (the web pages pick it
 from a tree of the Crowd groups; a group inside several groups appears under each). To seed the section, run
 `uv run scripts/suggest_crowd_mapping.py <env-name>`: it fuzzy-matches the canonical teams with the Crowd groups and
-writes a suggestion file to edit by hand. `onboard move` resolves teams through the mapping only., see `SECRET-STORE.md` and `PASS-SETUP.md`):
+writes a suggestion file to edit by hand. `onboard move` resolves teams through the mapping only.
+
+To record the users that already exist in Crowd, run `uv run scripts/import_crowd_users.py <env-name>` (a preview;
+add `--apply` to write). It imports the active users inside the mail domain as `crowd` provisions, creating the
+missing accounts named from the directory, and keeps their current groups as extra groups so `onboard move` never
+removes them., see `SECRET-STORE.md` and `PASS-SETUP.md`):
 
 | Secret | Used for |
 |---|---|
