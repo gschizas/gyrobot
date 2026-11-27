@@ -23,15 +23,17 @@ class RenderGroupTreeTest(unittest.TestCase):
                      'children': [n('a', n('shared', n('leaf'))), n('b', n('shared', n('leaf')))]}
 
     def test_multi_parent_is_marked_and_not_expanded_twice(self):
-        self.assertEqual(command.render_group_tree(self.tree), [
-            '|-- a', '|   `-- shared', '|       `-- leaf',
-            '`-- b', '    `-- shared (*)'])
+        self.assertEqual(command.render_group_tree(self.tree).splitlines(), [
+            '📁 Crowd', '├── 📁 a', '│   └── 📁 shared', '│       └── 📄 leaf',
+            '└── 📁 b', '    └── 📁 shared (*)'])
 
     def test_filter_keeps_ancestors_and_depth_limits(self):
-        self.assertEqual(command.render_group_tree(self.tree, 'LEAF'),
-                         ['|-- a', '|   `-- shared', '|       `-- leaf',
-                          '`-- b', '    `-- shared (*)'])
-        self.assertEqual(command.render_group_tree(self.tree, None, 1), ['|-- a ...', '`-- b ...'])
+        self.assertEqual(command.render_group_tree(self.tree, 'LEAF').splitlines(), [
+            '📁 Crowd', '├── 📁 a', '│   └── 📁 shared', '│       └── 📄 leaf',
+            '└── 📁 b', '    └── 📁 shared (*)'])
+        self.assertEqual(command.render_group_tree(self.tree, None, 1).splitlines(),
+                         ['📁 Crowd', '├── 📁 a ...', '└── 📁 b ...'])
+        self.assertEqual('', command.render_group_tree(self.tree, 'nothing'))
 
 
 class CrowdValidateTest(unittest.TestCase):

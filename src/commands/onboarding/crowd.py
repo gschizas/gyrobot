@@ -1,6 +1,7 @@
 import os
 
 import click
+from treelib import Tree
 
 from backend.account_storage import LIVE_STATUSES, get_account_by_email, get_or_create_account, get_provision, \
     set_membership, set_provision_status
@@ -126,10 +127,11 @@ def crowd_lookup(ctx: ExtendedContext, user: str):
     ctx.chat.send_table(title=f'Directory and Crowd: {user}', table=rows)
 
 
-def render_group_tree(tree: dict, text: str | None = None, max_depth: int | None = None) -> list[str]:
-    """Lines of the Crowd group tree. A group inside several groups is listed under each, but expanded only the
-    first time: later copies that have children end in ``(*)``. With ``text``, only the groups whose name has it
-    are shown (with everything below them) plus their ancestors. ``max_depth`` limits the levels shown (1 = roots)."""
+def render_group_tree(tree: dict, text: str | None = None, max_depth: int | None = None) -> str:
+    """The Crowd group tree as text, drawn like ``onboard github teams``. A group inside several groups is listed
+    under each, but expanded only the first time: later copies that have children end in ``(*)``. With ``text``,
+    only the groups whose name has it are shown (with everything below them) plus their ancestors. ``max_depth``
+    limits the levels shown (1 = the top groups). Returns an empty string when nothing matches."""
     wanted = (text or '').lower()
     memo: dict[str, bool] = {}
 
@@ -141,9 +143,10 @@ def render_group_tree(tree: dict, text: str | None = None, max_depth: int | None
             memo[name] = wanted in name.lower() or any(leads_to_match(c, (*path, name)) for c in node['children'])
         return memo[name]
 
-    lines, expanded = [], set()
+    drawing, expanded = Tree(), set()
+    drawing.create_node(f"📁 {tree['label']}", '')
 
-    def visit(node: dict, prefix: str, last: bool, level: int, show_all: bool, path: tuple) -> None:
+    def visit(node: dict, parent_id: str, level: int, show_all: bool, path: tuple) -> None:
         name = node['value']
         show_all = show_all or not wanted or wanted in name.lower()
         children = [c for c in node['children'] if c['value'] not in path and (show_all or leads_to_match(c, path))]
@@ -153,15 +156,18 @@ def render_group_tree(tree: dict, text: str | None = None, max_depth: int | None
         elif children and max_depth is not None and level >= max_depth:
             mark, children = ' ...', []
         expanded.add(name)
-        lines.append(f"{prefix}{'`-- ' if last else '|-- '}{name}{mark}")
-        for i, child in enumerate(children):
-            visit(child, prefix + ('    ' if last else '|   '), i == len(children) - 1, level + 1, show_all,
-                  (*path, name))
+        # The identifier is the path, so a group under several parents gets one node each; it also sorts siblings
+        node_id = f"{parent_id}/{name.lower()}"
+        drawing.create_node(f"{'📁' if node['children'] else '📄'} {name}{mark}", node_id, parent=parent_id)
+        for child in sorted(children, key=lambda c: c['value'].lower()):
+            visit(child, node_id, level + 1, show_all, (*path, name))
 
     roots = [c for c in tree['children'] if leads_to_match(c)]
-    for i, root in enumerate(roots):
-        visit(root, '', i == len(roots) - 1, 1, False, ())
-    return lines
+    for root in sorted(roots, key=lambda c: c['value'].lower()):
+        visit(root, '', 1, False, ())
+    if not roots:
+        return ''
+    return drawing.show(key=lambda x: x.identifier, line_type='ascii-ex', stdout=False)
 
 
 @crowd_group.command('teams')
@@ -180,14 +186,13 @@ def crowd_teams(ctx: ExtendedContext, text: str | None, depth: int | None, flat:
     api = CrowdApi()
     if flat:
         wanted = (text or '').lower()
-        names = sorted((n for n in api.get_groups() if wanted in n.lower()), key=str.lower)
-        lines = names
+        output = '\n'.join(sorted((n for n in api.get_groups() if wanted in n.lower()), key=str.lower))
     else:
-        lines = render_group_tree(api.build_group_tree(), text, depth)
-    if not lines:
+        output = render_group_tree(api.build_group_tree(), text, depth)
+    if not output:
         ctx.chat.send_text("No matching groups.")
         return
-    ctx.chat.send_code('\n'.join(lines))
+    ctx.chat.send_code(output)
 
 
 @crowd_group.command('groups')
