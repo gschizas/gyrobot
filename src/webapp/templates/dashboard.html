@@ -11,6 +11,7 @@ Greyed-out entries are not available to you.</p>
     <li>{{ action_link(action, request.url_for('onboarding_form', action=action), form.title) }}</li>
     {% endfor %}
     <li>{{ action_link('onboard_github', request.url_for('github_bulk_form'), 'Bulk onboard: GitHub Copilot (multiple users)') }}</li>
+    <li>{{ action_link('onboard_crowd', request.url_for('crowd_bulk_form'), 'Bulk onboard: Crowd (multiple users)') }}</li>
     <li>{{ action_link('move', request.url_for('move_bulk_form'), 'Bulk move: change the team of multiple colleagues') }}</li>
     <li>{{ action_link('set_email', request.url_for('missing_emails_form'), 'Fill in missing emails of GitHub members') }}</li>
     <li>{{ action_link('reinvite', request.url_for('reinvite_form'), 'Reinvite GitHub users whose invitation expired') }}</li>

@@ -1,0 +1,197 @@
+<style>
+    .crowd-status { font-size: 0.85rem; }
+    .crowd-status.status-cell { font-size: 1.1rem; cursor: help; width: 2rem; text-align: center; padding: 0; }
+    .crowd-status.ok { color: #1a7f37; }
+    .crowd-status.not_found { color: #cf222e; }
+    .crowd-status.already_onboarded { color: #8250df; }
+    .crowd-status.error { color: #9a6700; }
+    .crowd-status.pending { color: #57606a; }
+    .crowd-name { display: block; font-size: 0.85rem; margin-top: 0.15rem; }
+    .crowd-name.editable { color: #9a6700; cursor: pointer; text-decoration: underline dotted; }
+    .crowd-name-edit input { width: 8rem; margin-right: 0.25rem; }
+</style>
+<script>
+// Checks the email addresses of a form in the directory (a backend route) and shows the person's name under
+// each one. When the Latin name does not agree with the romanized Greek one (the directory has mistakes), the
+// label can be clicked to edit the name; the edited name travels in the given_name/surname inputs of the row,
+// which are always submitted (empty = use the directory's name).
+//   attachCrowdVerification(form, url[, beforeSubmit])
+// Rows may contain a .status-cell (compact status icon) and a .name-cell (where the name goes) and the
+// given_name/surname inputs; otherwise they are created under the email input.
+function attachCrowdVerification(form, url, beforeSubmit) {
+    const SELECTOR = 'input[name="email"], input[name="username"]';
+    const TIMEOUT_MS = 30000;
+    const ICONS = { ok: '✔ ', not_found: '✖ ', already_onboarded: '🚫 ', error: '⚠ ' };
+    const state = new WeakMap(); // input -> {value, status}
+
+    function scope(input) { return input.closest('tr') || form; }
+
+    function parts(input) {
+        const root = scope(input);
+        const compact = !!root.querySelector('.status-cell');
+        let status = root.querySelector('.status-cell');
+        if (!status) {
+            status = root.querySelector('.crowd-status');
+            if (!status) {
+                status = document.createElement('span');
+                input.insertAdjacentElement('afterend', status);
+            }
+        }
+        let box = root.querySelector('.name-cell') || root.querySelector('.crowd-namebox');
+        if (!box) {
+            box = document.createElement('div');
+            box.className = 'crowd-namebox';
+            status.insertAdjacentElement('afterend', box);
+        }
+        let label = box.querySelector('.crowd-name');
+        if (!label) {
+            label = document.createElement('span');
+            label.className = 'crowd-name';
+            box.appendChild(label);
+        }
+        let given = root.querySelector('input[name="given_name"]');
+        let surname = root.querySelector('input[name="surname"]');
+        if (!given) {
+            const edit = document.createElement('span');
+            edit.className = 'crowd-name-edit';
+            edit.hidden = true;
+            given = Object.assign(document.createElement('input'), { type: 'text', name: 'given_name', placeholder: 'Given name' });
+            surname = Object.assign(document.createElement('input'), { type: 'text', name: 'surname', placeholder: 'Surname' });
+            edit.append(given, surname);
+            box.appendChild(edit);
+        }
+        return { label: label, edit: given.closest('.crowd-name-edit'), given: given, surname: surname,
+                 status: status, compact: compact };
+    }
+
+    function showStatus(input, kind, text) {
+        const p = parts(input);
+        const label = kind === 'pending' ? 'Checking...' : ICONS[kind] + text;
+        p.status.className = (p.compact ? 'status-cell ' : '') + 'crowd-status ' + kind;
+        p.status.textContent = p.compact ? (kind === 'pending' ? '⏳' : ICONS[kind].trim()) : label;
+        p.status.title = label;
+    }
+
+    function clear(input) {
+        const p = parts(input);
+        p.status.textContent = '';
+        p.status.title = '';
+        p.label.textContent = '';
+        p.label.className = 'crowd-name';
+        p.label.hidden = false;
+        p.label.onclick = null;
+        p.given.value = '';
+        p.surname.value = '';
+        p.edit.hidden = true;
+        state.delete(input);
+    }
+
+    function showName(input, result) {
+        const p = parts(input);
+        const full = (result.given_name + ' ' + result.surname).trim();
+        p.label.className = 'crowd-name';
+        p.label.onclick = null;
+        p.edit.hidden = true;
+        p.label.hidden = false;
+        if (!result.mismatch) {
+            p.label.textContent = full;
+            return;
+        }
+        const expected = ((result.expected_given_name || '') + ' ' + (result.expected_surname || '')).trim();
+        p.label.textContent = '⚠ ' + full + ' (the Greek name suggests ' + expected + ') - click to edit';
+        p.label.className = 'crowd-name editable';
+        p.label.onclick = function () {
+            p.given.value = result.expected_given_name || result.given_name;
+            p.surname.value = result.expected_surname || result.surname;
+            p.label.hidden = true;
+            p.edit.hidden = false;
+            p.given.focus();
+        };
+    }
+
+    async function validate(inputs) {
+        const targets = inputs.filter(function (input) {
+            const value = input.value.trim();
+            if (!value) { clear(input); return false; }
+            const known = state.get(input);
+            return !(known && known.value === value && known.status !== 'error');
+        });
+        if (!targets.length) return;
+        targets.forEach(function (input) { showStatus(input, 'pending'); });
+
+        let results = {};
+        const controller = new AbortController();
+        const timer = setTimeout(function () { controller.abort(); }, TIMEOUT_MS);
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ emails: targets.map(function (i) { return i.value.trim(); }) }),
+                signal: controller.signal,
+            });
+            if (!response.ok) throw new Error((await response.json()).error || response.statusText);
+            results = (await response.json()).results;
+        } catch (err) {
+            const reason = err.name === 'AbortError' ? 'timed out' : err.message;
+            targets.forEach(function (input) { showStatus(input, 'error', 'Could not check: ' + reason); });
+            return;
+        } finally {
+            clearTimeout(timer);
+        }
+        targets.forEach(function (input) {
+            const value = input.value.trim();
+            const result = results[value];
+            if (!result) { clear(input); return; }
+            if (result.mail) input.value = result.mail;
+            state.set(input, { value: input.value.trim(), status: result.status });
+            showStatus(input, result.status, result.status === 'ok' ? 'Found in the directory' : result.message);
+            if (result.mail) showName(input, result);
+        });
+    }
+
+    let queued = new Set();
+    let timer = null;
+    form.addEventListener('change', function (event) {
+        if (!event.target.matches(SELECTOR)) return;
+        queued.add(event.target);
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+            const batch = Array.from(queued);
+            queued = new Set();
+            validate(batch);
+        }, 300);
+    });
+    form.addEventListener('input', function (event) {
+        if (event.target.matches(SELECTOR)) clear(event.target);
+    });
+
+    form.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const inputs = Array.from(form.querySelectorAll(SELECTOR));
+        const button = form.querySelector('button[type="submit"]');
+        const caption = button ? button.textContent : '';
+        if (button) { button.disabled = true; button.textContent = 'Checking addresses...'; }
+        try {
+            await validate(inputs);
+        } finally {
+            if (button) { button.disabled = false; button.textContent = caption; }
+        }
+        const MESSAGES = { not_found: ' address(es) not found in the directory.',
+                           already_onboarded: ' person(s) already have a Crowd user.' };
+        const lines = [];
+        let first = null;
+        Object.keys(MESSAGES).forEach(function (kind) {
+            const bad = inputs.filter(function (i) { const k = state.get(i); return k && k.status === kind; });
+            if (bad.length) { first = first || bad[0]; lines.push(bad.length + MESSAGES[kind]); }
+        });
+        if (first) {
+            first.focus();
+            alert(lines.join('\n') + '\nPlease fix them and resubmit.');
+            return;
+        }
+        if (!form.reportValidity()) return;
+        if (beforeSubmit && beforeSubmit() === false) return;
+        HTMLFormElement.prototype.submit.call(form);
+    });
+}
+</script>

@@ -19,8 +19,10 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from backend.account_storage import find_provisions_by_username, list_reinvitable_github, list_roles
+from backend.account_storage import LIVE_STATUSES, find_provisions_by_username, get_account_by_email, get_provision, \
+    list_reinvitable_github, list_roles
 from backend.github_api import GitHubApi
+from backend.ldap_directory import LdapDirectory, verify_person
 from webapp import config
 from webapp.auth import current_user, current_user_json, session_user
 from webapp.auth_ldap import ldap_authenticate
@@ -58,11 +60,9 @@ FORMS = {
     'crowd': {
         'title': 'Onboard: Crowd',
         'fields': [
-            {'name': 'username', 'label': 'Login or email', 'required': True},
+            {'name': 'username', 'label': 'Email address (or login)', 'required': True},
             {'name': 'team', 'label': 'Canonical team', 'required': True},
             {'name': 'groups', 'label': 'Extra Crowd groups (optional, comma separated)', 'required': False},
-            {'name': 'given_name', 'label': 'Given name (optional, overrides the directory)', 'required': False},
-            {'name': 'surname', 'label': 'Surname (optional, overrides the directory)', 'required': False},
         ],
     },
     'jetbrains': {
@@ -247,6 +247,91 @@ def _check_github_usernames(usernames: list[str]) -> dict[str, dict]:
                 'status': 'already_onboarded', 'login': results[username]['login'],
                 'message': f"Already onboarded ({provision.status}, {provision.data.get('email', 'unknown email')})"}
     return results
+
+
+@json_router.post('/onboarding/crowd/verify', include_in_schema=False)
+async def crowd_verify_emails(request: Request):
+    """Check email addresses (or logins) in the directory, for the Crowd onboarding forms.
+
+    Body: ``{"emails": [...]}``. Returns ``{"results": {<input>: {"status": "ok"|"not_found"|"already_onboarded"|
+    "error", "mail", "given_name", "surname", "expected_given_name", "expected_surname", "mismatch", "message"}}}``.
+    The expected names are the romanized Greek name; ``mismatch`` tells the form to offer editing the name.
+    """
+    try:
+        emails = (await request.json())['emails']
+        if not isinstance(emails, list) or not all(isinstance(e, str) for e in emails):
+            raise ValueError
+    except (ValueError, KeyError, TypeError):
+        return JSONResponse({'error': 'Expected {"emails": [...]}'}, status_code=status.HTTP_400_BAD_REQUEST)
+    unique = list(dict.fromkeys(e.strip() for e in emails if e.strip()))
+    if len(unique) > MAX_VALIDATE_USERNAMES:
+        return JSONResponse({'error': f'At most {MAX_VALIDATE_USERNAMES} addresses per request'},
+                            status_code=status.HTTP_400_BAD_REQUEST)
+    return {'results': await run_in_threadpool(_check_crowd_emails, unique)}
+
+
+def _check_crowd_emails(emails: list[str]) -> dict[str, dict]:
+    results: dict[str, dict] = {}
+    try:
+        directory = LdapDirectory()
+    except Exception as ex:
+        logger.warning(f"Directory is not available: {ex!r}")
+        return {e: {'status': 'error', 'message': f'Could not check: {ex}'} for e in emails}
+    try:
+        for email in emails:
+            try:
+                person, error = verify_person(email, directory=directory)
+            except Exception as ex:
+                logger.warning(f"Directory lookup failed for {email}: {ex!r}")
+                results[email] = {'status': 'error', 'message': f'Could not check: {ex}'}
+                continue
+            if error:
+                results[email] = {'status': 'not_found', 'message': error}
+                continue
+            result = {'status': 'ok', 'mail': person.mail, 'given_name': person.first_name,
+                      'surname': person.last_name, 'expected_given_name': person.expected_first_name,
+                      'expected_surname': person.expected_last_name, 'mismatch': person.name_mismatch}
+            try:
+                account = get_account_by_email(person.mail)
+                existing = get_provision(account.id, 'crowd') if account else None
+                if existing and existing.status in LIVE_STATUSES:
+                    result.update(status='already_onboarded',
+                                  message=f"Already has a Crowd user ({existing.data.get('username', 'unknown')})")
+            except Exception as ex:
+                logger.warning(f"Database lookup of the Crowd provision of {email} failed: {ex!r}")
+            results[email] = result
+    finally:
+        directory.close()
+    return results
+
+
+@router.get('/onboarding/crowd/bulk', include_in_schema=False)
+def crowd_bulk_form(request: Request):
+    return templates.TemplateResponse(request, 'bulk_crowd.html', {'user': _current_user(request)})
+
+
+@router.post('/onboarding/crowd/bulk', include_in_schema=False)
+async def crowd_bulk_submit(request: Request):
+    form_data = await request.form()
+    user = _current_user(request)
+    rows = []
+    for email, team, given_name, surname in zip(*(form_data.getlist(k) for k in ('email', 'team', 'given_name',
+                                                                                 'surname'))):
+        email, team, given_name, surname = email.strip(), team.strip(), given_name.strip(), surname.strip()
+        if not (email or team):
+            continue  # fully blank row - silently skipped
+        if not (email and team):
+            rows.append({'email': email, 'team': team, 'result': None, 'error': 'Missing email or team.'})
+            continue
+        args = ['onboard', 'crowd', email, team]
+        for option, value in (('--given-name', given_name), ('--surname', surname)):
+            if value:
+                args += [option, value]
+        result = run_bot_command(args, user_id=user, channel_name=config.web_channel_name(),
+                                 team_name=config.web_team_name())
+        rows.append({'email': email, 'team': team, 'name': f'{given_name} {surname}'.strip(), 'result': result,
+                     'error': None})
+    return templates.TemplateResponse(request, 'bulk_crowd_result.html', {'user': user, 'rows': rows})
 
 
 @router.get('/onboarding/github/bulk', include_in_schema=False)

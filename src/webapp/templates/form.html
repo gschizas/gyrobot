@@ -39,6 +39,13 @@ attachGithubUserValidation(document.getElementById('onboarding-form'),
 </script>
 {% endif %}
 
+{% if action == 'crowd' %}
+{% include "_crowd_verify.html" %}
+<script>
+attachCrowdVerification(document.getElementById('onboarding-form'), "{{ request.url_for('crowd_verify_emails') }}");
+</script>
+{% endif %}
+
 {% if team_tree %}
 <script>
 (function () {

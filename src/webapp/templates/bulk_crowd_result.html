@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block title %}Bulk onboard: Crowd - Result{% endblock %}
+{% block content %}
+<h1>Bulk onboard: Crowd</h1>
+<p>{{ rows|length }} row(s) processed.</p>
+
+{% for row in rows %}
+<div class="bulk-row">
+    <h2>{{ row.email }}</h2>
+    <p>Team: {{ row.team }}{% if row.name %} &middot; Name: {{ row.name }}{% endif %}</p>
+    {% if row.error %}
+    <div class="error">{{ row.error }}</div>
+    {% else %}
+    {{ macros.render_command_result(row.result) }}
+    {% endif %}
+</div>
+{% endfor %}
+
+<p>
+    <a href="{{ request.url_for('crowd_bulk_form') }}">&larr; Add more</a> |
+    <a href="{{ request.url_for('dashboard') }}">Back to onboarding</a>
+</p>
+{% endblock %}
