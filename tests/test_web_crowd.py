@@ -65,6 +65,19 @@ class CrowdPagesTest(unittest.TestCase):
                          [['onboard', 'crowd', 'a@x.test', 'pay'],
                           ['onboard', 'crowd', 'b@x.test', 'pay', '--given-name', 'Eleni']])
 
+    def test_group_tree_is_offered_with_a_text_fallback(self):
+        client = TestClient(main.app, base_url='http://localhost', follow_redirects=False)
+        with mock.patch('webapp.routers.web.ldap_authenticate', return_value='bob'):
+            client.post('/login', data={'username': 'bob', 'password': 'x'})
+        tree = {'label': 'Crowd', 'value': None, 'children': [{'label': 'grp-a', 'value': 'grp-a', 'children': []}]}
+        with mock.patch.object(web, 'CrowdApi') as api:
+            api.return_value.build_group_tree.return_value = tree
+            self.assertIn('grp-a', client.get('/onboarding/crowd').text)
+            self.assertIn('browse-team', client.get('/onboarding/crowd/bulk').text)
+        with mock.patch.object(web, 'CrowdApi', side_effect=RuntimeError('down')):
+            page = client.get('/onboarding/crowd').text
+        self.assertIn('Could not load the Crowd group list', page)
+
 
 if __name__ == '__main__':
     unittest.main()

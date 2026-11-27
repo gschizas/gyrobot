@@ -21,6 +21,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 from backend.account_storage import LIVE_STATUSES, find_provisions_by_username, get_account_by_email, get_provision, \
     list_reinvitable_github, list_roles
+from backend.crowd_api import CrowdApi
 from backend.github_api import GitHubApi
 from backend.ldap_directory import LdapDirectory, verify_person
 from webapp import config
@@ -61,7 +62,7 @@ FORMS = {
         'title': 'Onboard: Crowd',
         'fields': [
             {'name': 'username', 'label': 'Email address (or login)', 'required': True},
-            {'name': 'team', 'label': 'Canonical team', 'required': True},
+            {'name': 'team', 'label': 'Crowd group (or canonical team)', 'required': True, 'type': 'team_tree'},
             {'name': 'groups', 'label': 'Extra Crowd groups (optional, comma separated)', 'required': False},
         ],
     },
@@ -103,6 +104,15 @@ def _github_team_tree() -> tuple[Optional[dict], Optional[str]]:
     except Exception as ex:
         logger.warning(f"Failed to build GitHub team tree: {ex!r}")
         return None, f"Could not load the GitHub team list ({ex}); enter the team slug manually."
+
+
+def _crowd_group_tree() -> tuple[Optional[dict], Optional[str]]:
+    """The Crowd group hierarchy for the tree widget, as ``(tree, error)`` like :func:`_github_team_tree`."""
+    try:
+        return CrowdApi().build_group_tree(), None
+    except Exception as ex:
+        logger.warning(f"Failed to build the Crowd group tree: {ex!r}")
+        return None, f"Could not load the Crowd group list ({ex}); enter the group name manually."
 
 
 def _github_email_placeholder() -> str:
@@ -171,6 +181,8 @@ def onboarding_form(request: Request, action: str):
                              for f in form['fields']]
         context['team_tree'], context['team_tree_error'] = _github_team_tree()
         context['roles'] = [(r.key, r.display_name) for r in list_roles()]
+    if action == 'crowd':
+        context['team_tree'], context['team_tree_error'] = _crowd_group_tree()
     return templates.TemplateResponse(request, 'form.html', context)
 
 
@@ -307,7 +319,9 @@ def _check_crowd_emails(emails: list[str]) -> dict[str, dict]:
 
 @router.get('/onboarding/crowd/bulk', include_in_schema=False)
 def crowd_bulk_form(request: Request):
-    return templates.TemplateResponse(request, 'bulk_crowd.html', {'user': _current_user(request)})
+    team_tree, team_tree_error = _crowd_group_tree()
+    return templates.TemplateResponse(request, 'bulk_crowd.html', {
+        'user': _current_user(request), 'team_tree': team_tree, 'team_tree_error': team_tree_error})
 
 
 @router.post('/onboarding/crowd/bulk', include_in_schema=False)

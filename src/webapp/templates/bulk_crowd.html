@@ -2,7 +2,8 @@
 {% block title %}Bulk onboard: Crowd - GyroBot Onboarding{% endblock %}
 {% block content %}
 <h1>Bulk onboard: Crowd</h1>
-<p>Add one row per colleague: the email address (or login) and the canonical team. Each address is checked in the
+{% if team_tree_error %}<div class="error">{{ team_tree_error }}</div>{% endif %}
+<p>Add one row per colleague: the email address (or login) and the Crowd group (or a canonical team). Each address is checked in the
 directory and the person's name is shown; when it disagrees with the Greek name, click the name to correct it.
 Entirely blank rows are ignored.</p>
 <p class="hint">Tip: you can copy a range of cells (email / team columns, in that order) from Excel and paste it
@@ -30,7 +31,14 @@ into any cell below.</p>
                 <input type="text" name="surname" placeholder="Surname">
             </span>
         </td>
-        <td><input type="text" name="team" class="team-input" placeholder="canonical team"></td>
+        <td>
+            <div class="team-cell">
+                <input type="text" name="team" class="team-input" placeholder="Crowd group">
+                {% if team_tree %}
+                <button type="button" class="browse-team" title="Browse groups">🌳</button>
+                {% endif %}
+            </div>
+        </td>
         <td><button type="button" class="remove-row">&times;</button></td>
     </tr>
 </template>
@@ -57,6 +65,7 @@ attachCrowdVerification(document.getElementById('bulk-form'), "{{ request.url_fo
     for (let i = 0; i < 3; i++) addRow();
 
     attachGridPaste(tbody, ['email', 'team'], addRow);
+    attachTeamPicker(tbody);
 })();
 </script>
 {% endblock %}
