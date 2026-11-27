@@ -60,7 +60,10 @@ writes a suggestion file to edit by hand. `onboard move` resolves teams through 
 To record the users that already exist in Crowd, run `uv run scripts/import_crowd_users.py <env-name>` (a preview;
 add `--apply` to write). It imports the active users inside the mail domain as `crowd` provisions, creating the
 missing accounts named from the directory, and keeps their current groups as extra groups so `onboard move` never
-removes them., see `SECRET-STORE.md` and `PASS-SETUP.md`):
+removes them. Crowd's attributes (last login, password change, role, Slack id, ...) are stored too, with the epoch
+timestamps converted to UTC ISO 8601, and the provision is dated from Crowd's creation date.
+
+Secrets (`backend.secret_store`, see `SECRET-STORE.md` and `PASS-SETUP.md`):
 
 | Secret | Used for |
 |---|---|
