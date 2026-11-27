@@ -160,9 +160,13 @@ accepted/expired are not visible in the web UI or API. Options:
 17. **`GYROBOT_ENV` for the environment** (done): when the environment name is omitted, `src/__main__.py`,
     `src/run_webapp.py`, `src/plugins.py requirements` and the scripts in `scripts/` read it from the `GYROBOT_ENV`
     variable (an argument still overrides it). Click scripts use `envvar='GYROBOT_ENV'`, argparse ones an optional
-    positional; `backend.secret_store.environment_name` is the shared helper.
-18. **Migrate the scripts from argparse to Click**: new and modified scripts use Click already; the rest
-    (`import_provisions`, `backfill_*`, `export_github_members`, ...) get migrated when next touched.
+    positional; `backend.secret_store.environment_name` is the shared helper. Every script that takes an environment
+    is now a Click command decorated with `@gyrobot_env` (`backend.cli`), which adds the `ENV_NAME` argument (default
+    `$GYROBOT_ENV`, required), exports it and loads the environment, so none can run without one. Because Click
+    reads positional arguments in order, a script with further arguments (`import_provisions`) still needs the
+    environment first when the variable is set.
+18. **Migrate the scripts from argparse to Click** (done for the scripts that take an environment; the standalone
+    `check_entra_credentials.py`, `compare_credentials.py` and `migrate_permissions.py` stay as they are).
 19. **Display names from the directory** (decided: `accounts.name` becomes the person's display name, see item 3).
     Work, in order:
     1. Done: `backend/names.py` (Title Case with dashes and apostrophes, ISO 843 romanization with `romanize`) and the
