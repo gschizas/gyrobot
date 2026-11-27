@@ -4,6 +4,7 @@ Authenticates as the Crowd application in the secrets ``CROWD_USERNAME`` / ``CRO
 refuses application credentials, so only ``usermanagement`` is used.
 """
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 import requests
@@ -14,6 +15,8 @@ from backend.secret_store import get_secret
 USER_PAGE_SIZE = 500
 GROUP_PAGE_SIZE = 500
 GROUPS_TTL_SECONDS = 300
+# The group tree takes one request per group, and the web process creates a client per page view
+_TREE_CACHE: dict[str, tuple[float, dict]] = {}
 JSON = {'Accept': 'application/json', 'Content-Type': 'application/json'}
 
 
@@ -85,6 +88,37 @@ class CrowdApi:
         response = self._check(self.session.get(f"{self._users_url}/group/parent-group/nested",
                                                 params={'groupname': group}), f"listing the parents of {group}")
         return [g['name'] for g in response.json().get('groups', [])]
+
+    def get_child_groups(self, group: str) -> list[str]:
+        """The groups directly inside ``group``."""
+        response = self._check(self.session.get(f"{self._users_url}/group/child-group/direct",
+                                                params={'groupname': group}), f"listing the children of {group}")
+        return [g['name'] for g in response.json().get('groups', [])]
+
+    def build_group_tree(self, max_age: float = GROUPS_TTL_SECONDS) -> dict:
+        """The assignable groups as a nested ``{'label', 'value', 'children'}`` tree for the web UI, cached.
+
+        A group inside several groups appears under each of them; ``value`` is the group name. Only groups
+        returned by :meth:`get_groups` take part, so the tree never leads outside the configured prefixes.
+        """
+        cached = _TREE_CACHE.get(self.settings.crowd_url)
+        if cached and time.monotonic() - cached[0] < max_age:
+            return cached[1]
+        groups = self.get_groups(max_age)
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            children = dict(zip(groups, pool.map(
+                lambda name: [c for c in self.get_child_groups(name) if c in groups], groups)))
+        inside = {child for kids in children.values() for child in kids}
+
+        def make_node(name: str, path: tuple) -> dict:
+            return {'label': name, 'value': name,
+                    'children': [make_node(child, (*path, name)) for child in children[name]
+                                 if child not in path and child != name]}
+
+        tree = {'label': 'Crowd', 'value': None,
+                'children': [make_node(name, ()) for name in groups if name not in inside]}
+        _TREE_CACHE[self.settings.crowd_url] = (time.monotonic(), tree)
+        return tree
 
     def add_to_group(self, username: str, group: str) -> None:
         response = self.session.post(f"{self._users_url}/user/group/direct", params={'username': username},
