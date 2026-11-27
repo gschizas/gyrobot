@@ -4,7 +4,9 @@ Deactivated Crowd users are skipped, and so are users whose email is outside the
 --include-external). Accounts are found by email (primary or additional); new ones are named from the directory
 (the romanized Greek name when the Latin one disagrees with it), else from Crowd's own first and last name.
 The groups the user is in (among the configured prefixes) are recorded as ``extra_groups``, so a later
-``onboard move`` never removes them. Existing live provisions are only completed, never overwritten.
+``onboard move`` never removes them. The Crowd attributes (last login, password change, role, Slack id, ...) are
+stored under ``attributes`` with the epoch timestamps converted to UTC ISO 8601, and the provision is dated from
+Crowd's creation date. Existing live provisions are only completed, never overwritten.
 
 Run from the repo root (it uses the project environment, since it imports the bot's backend):
 
@@ -14,13 +16,14 @@ Run from the repo root (it uses the project environment, since it imports the bo
 import pathlib
 import sys
 from collections import Counter
+from datetime import datetime
 
 import click
 from tqdm import tqdm
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'src'))
 
-from backend.crowd_api import CrowdApi  # noqa: E402
+from backend.crowd_api import CrowdApi, epoch_ms_to_iso  # noqa: E402
 from backend.ldap_directory import LdapDirectory  # noqa: E402
 from backend.names import title_case  # noqa: E402
 from backend.secret_store import load_environment  # noqa: E402
@@ -62,8 +65,10 @@ def main(env_name, apply, include_external):
                 counts['external'] += 1
                 continue
             groups = [g for g in crowd.get_user_groups(username) if g in assignable]
+            created, updated = epoch_ms_to_iso(user.get('created-date')), epoch_ms_to_iso(user.get('updated-date'))
             data = {'username': username, 'email': email, 'team_groups': [], 'extra_groups': groups,
-                    'imported': True}
+                    'imported': True, 'attributes': crowd.get_user_attributes(username),
+                    'crowd_created': created, 'crowd_updated': updated}
 
             account = storage.find_account_by_any_email(email)
             existing = storage.get_provision(account.id, 'crowd') if account else None
@@ -99,7 +104,8 @@ def main(env_name, apply, include_external):
                 lines.append(f"create    {username} <{email}>: provision for {account.name!r}")
                 counts['create'] += 1
             if apply:
-                storage.set_provision_status(account.id, 'crowd', 'active', data)
+                storage.set_provision_status(account.id, 'crowd', 'active', data,
+                                             created_at=datetime.fromisoformat(created) if created else None)
     finally:
         ldap.close()
 
