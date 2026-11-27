@@ -12,15 +12,15 @@ SETTINGS = CrowdSettings(
     ldap=LdapSettings(server='ldap://x', search_base='DC=x', mail_domain='x.test'))
 
 
-def entry(**attrs):
-    return mock.Mock(entry_attributes_as_dict=attrs)
+def entry(dn='', **attrs):
+    return mock.Mock(entry_attributes_as_dict=attrs, entry_dn=dn)
 
 
 def directory(*results):
     connection = mock.MagicMock()
     pending = list(results)
 
-    def search(base, ldap_filter, attributes=None):
+    def search(base, ldap_filter, attributes=None, **kwargs):
         connection.entries = pending.pop(0)
     connection.search.side_effect = search
     return LdapDirectory(SETTINGS, connection=connection), connection
@@ -61,6 +61,20 @@ class LdapDirectoryTest(unittest.TestCase):
         connection = mock.MagicMock(entries=[ALICE])
         person = LdapDirectory(settings, connection=connection).find_person('asmith')
         self.assertEqual(person.username, 'alice smith')
+
+    def test_manager_is_resolved_from_the_distinguished_name(self):
+        bob = entry(dn='CN=Bob Jones,OU=x,DC=x', name='Bob Jones', sAMAccountName='bjones', mail='bob@x.test',
+                    givenName='Bob', sn='Jones')
+        alice = entry(dn='CN=Alice Smith,OU=x,DC=x', name='Alice Smith', sAMAccountName='asmith',
+                      mail='alice@x.test', givenName='Alice', sn='Smith', manager='CN=Bob Jones,OU=x,DC=x')
+        ldap, connection = directory([alice], [bob], [])
+        person = ldap.find_person('asmith')
+        self.assertEqual(person.manager_dn, 'CN=Bob Jones,OU=x,DC=x')
+        manager = ldap.get_manager(person)
+        self.assertEqual(manager.login, 'bjones')
+        self.assertEqual(connection.search.call_args.args[0], 'CN=Bob Jones,OU=x,DC=x')
+        self.assertIsNone(ldap.get_manager(manager))
+        self.assertIsNone(ldap.get_manager(person))
 
     def test_falls_back_to_mail_domain(self):
         ldap, connection = directory([], [ALICE])

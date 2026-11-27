@@ -8,7 +8,7 @@ from backend.crowd_config import CrowdSettings, load_settings
 from backend.names import names_agree, romanize_greek, split_greek_name, title_case
 from backend.secret_store import get_secret
 
-ATTRIBUTES = ['name', 'sAMAccountName', 'mail', 'givenName', 'sn']
+ATTRIBUTES = ['name', 'sAMAccountName', 'mail', 'givenName', 'sn', 'manager']
 
 
 @dataclass(frozen=True)
@@ -21,6 +21,8 @@ class Person:
     username_attribute: str = 'samaccountname'
     greek_first_name: str = ''
     greek_last_name: str = ''
+    dn: str = ''
+    manager_dn: str = ''
 
     @property
     def username(self) -> str:
@@ -75,10 +77,13 @@ class LdapDirectory:
             self._connection.unbind()
             self._connection = None
 
-    def _search(self, ldap_filter: str) -> list[Person]:
+    def _search(self, ldap_filter: str, base: str | None = None) -> list[Person]:
         ldap = self.settings.ldap
         attributes = ATTRIBUTES + ([ldap.greek_name_attribute] if ldap.greek_name_attribute else [])
-        self.connection.search(ldap.search_base, ldap_filter, attributes=attributes)
+        if base:
+            self.connection.search(base, ldap_filter, search_scope=ldap3.BASE, attributes=attributes)
+        else:
+            self.connection.search(ldap.search_base, ldap_filter, attributes=attributes)
         people = []
         for entry in self.connection.entries:
             attrs = entry.entry_attributes_as_dict
@@ -89,8 +94,16 @@ class LdapDirectory:
                 mail=_first(attrs.get('mail')).lower(),
                 first_name=title_case(_first(attrs.get('givenName'))), last_name=title_case(_first(attrs.get('sn'))),
                 username_attribute=self.settings.ldap.username_attribute,
-                greek_first_name=greek_first, greek_last_name=greek_last))
+                greek_first_name=greek_first, greek_last_name=greek_last,
+                dn=str(entry.entry_dn or ''), manager_dn=_first(attrs.get('manager'))))
         return people
+
+    def get_manager(self, person: Person) -> Person | None:
+        """The person's manager (the AD ``manager`` attribute is a distinguished name); ``None`` if unset or gone."""
+        if not person.manager_dn:
+            return None
+        found = self._search('(objectclass=person)', base=person.manager_dn)
+        return found[0] if found else None
 
     def find_people(self, query: str) -> list[Person]:
         """Find people by login or email address. Returns every match (callers must treat more than one as ambiguous)."""
