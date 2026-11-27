@@ -51,7 +51,10 @@ crowd:
   payments: [team-payments, team-payments-dev]
 ```
 
-Secrets (`backend.secret_store`, see `SECRET-STORE.md` and `PASS-SETUP.md`):
+A team without an entry may also be the name of a Crowd group, which is then used as it is (the web pages pick it
+from a tree of the Crowd groups; a group inside several groups appears under each). To seed the section, run
+`uv run scripts/suggest_crowd_mapping.py <env-name>`: it fuzzy-matches the canonical teams with the Crowd groups and
+writes a suggestion file to edit by hand. `onboard move` resolves teams through the mapping only., see `SECRET-STORE.md` and `PASS-SETUP.md`):
 
 | Secret | Used for |
 |---|---|

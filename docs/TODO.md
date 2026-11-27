@@ -177,10 +177,11 @@ accepted/expired are not visible in the web UI or API. Options:
     4. Crowd web page: verify the email (JSON route like the GitHub username validation), show the display name as a
        label that can be clicked to edit when it differs from the Title Case/romanized expectation; a bulk page
        (rows of email + team) like the GitHub one.
-    5. Crowd team tree instead of the plain text box. Crowd groups nest (a group can contain groups, and may have
-       several parents): read `group/child-group/direct` (verify with a read-only probe whether the hierarchy is
-       really a tree), build the tree from it, and compare the canonical teams (GitHub slugs) with the Crowd groups
-       to produce a seed `crowd:` section for `config/team_mapping.yml` (a script, with the differences listed).
+    5. Done: the Crowd pages pick the group from a tree (`CrowdApi.build_group_tree`; a probe showed the hierarchy is a
+       DAG, so a group with several parents appears under each). The team may be a Crowd group directly (used when
+       the canonical team has no mapping). `scripts/suggest_crowd_mapping.py` fuzzy-matches the canonical teams with
+       the Crowd groups to seed the `crowd:` section by hand. Left: `onboard move` still resolves only through the
+       mapping.
     6. `scripts/import_crowd_users.py`: import all active Crowd users as `crowd` provisions (skip deactivated ones),
        matching accounts by email and naming them from the directory.
 
