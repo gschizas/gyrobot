@@ -45,3 +45,14 @@ class AttributeConversionTest(unittest.TestCase):
     def test_bad_epoch(self):
         self.assertIsNone(crowd_api.epoch_ms_to_iso(None))
         self.assertIsNone(crowd_api.epoch_ms_to_iso('x'))
+
+
+class EnvironmentNameTest(unittest.TestCase):
+    def test_argument_wins_then_variable(self):
+        from backend.secret_store import environment_name
+        with mock.patch.dict(os.environ, {'GYROBOT_ENV': 'fromvar'}):
+            self.assertEqual('arg', environment_name('arg'))
+            self.assertEqual('fromvar', environment_name(None))
+        with mock.patch.dict(os.environ, clear=True):
+            with self.assertRaises(SystemExit):
+                environment_name(None)

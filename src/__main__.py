@@ -13,7 +13,7 @@ import click.testing
 import praw
 import requests
 from backend import bot_identity
-from backend.secret_store import load_environment
+from backend.secret_store import environment_name, load_environment
 
 import chat.chat_wrapper
 import commands
@@ -253,6 +253,6 @@ def main():
 
 
 if __name__ == '__main__':
-    load_environment(sys.argv[1])
+    load_environment(environment_name(sys.argv[1] if len(sys.argv) > 1 else None))
     do_imports()
     main()

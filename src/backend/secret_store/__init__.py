@@ -144,6 +144,19 @@ def get_secret(name: str, default: Optional[str] = None, *, required: bool = Fal
     return default
 
 
+ENVIRONMENT_VARIABLE = 'GYROBOT_ENV'
+
+
+def environment_name(value: Optional[str] = None) -> str:
+    """The environment name: ``value`` if given (a command-line argument), else the ``GYROBOT_ENV`` variable.
+
+    Exits with a message when neither is set."""
+    name = value or os.environ.get(ENVIRONMENT_VARIABLE)
+    if not name:
+        raise SystemExit(f"No environment given: pass its name or set {ENVIRONMENT_VARIABLE}")
+    return name
+
+
 def load_environment(env_name: str, *, dotenv_path: Optional[str] = None) -> None:
     """Load ``.env.d/<env_name>.env`` into ``os.environ`` and resolve ``secret:`` references in it.
 

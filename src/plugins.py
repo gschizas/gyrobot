@@ -255,9 +255,9 @@ def required_packages() -> list[str]:
 if __name__ == '__main__':
     import sys
     if len(sys.argv) in (2, 3) and sys.argv[1] == 'requirements':
-        if len(sys.argv) == 3:
-            from backend.secret_store import load_environment
-            load_environment(sys.argv[2])
+        if len(sys.argv) == 3 or os.environ.get('GYROBOT_ENV'):
+            from backend.secret_store import environment_name, load_environment
+            load_environment(environment_name(sys.argv[2] if len(sys.argv) == 3 else None))
         print('\n'.join(required_packages()))
     else:
         sys.exit("usage: python src/plugins.py requirements [env-name]")

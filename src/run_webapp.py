@@ -4,9 +4,9 @@
 
 Usage (from the repository root, same convention as ``src/__main__.py``):
 
-    python src/run_webapp.py <env-name>
+    python src/run_webapp.py [env-name]
 
-which loads ``.env.d/<env-name>.env`` and starts a uvicorn server hosting
+which loads ``.env.d/<env-name>.env`` (the name defaults to ``GYROBOT_ENV``) and starts a uvicorn server hosting
 ``webapp.main:app``. Configure the bind address/port with ``WEBAPP_HOST``
 (default ``0.0.0.0``) and ``WEBAPP_PORT`` (default ``8080``).
 """
@@ -14,14 +14,10 @@ import os
 import sys
 
 import uvicorn
-from backend.secret_store import load_environment
+from backend.secret_store import environment_name, load_environment
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        load_environment(sys.argv[1])
-    else:
-        print("Usage: python src/run_webapp.py <env-name>")
-        sys.exit(1)
+    load_environment(environment_name(sys.argv[1] if len(sys.argv) > 1 else None))
     uvicorn.run(
         'webapp.main:app',
         host=os.environ.get('WEBAPP_HOST', '127.0.0.1'),
