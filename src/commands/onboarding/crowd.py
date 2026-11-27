@@ -61,7 +61,7 @@ def _crowd_validate(params: dict, ctx: ExtendedContext) -> str | None:
 
 @click.group('crowd', cls=DefaultCommandGroup)
 def crowd_group():
-    """Crowd users: add (default), lookup, groups"""
+    """Crowd users: add (default), lookup, groups, teams"""
 
 
 @crowd_group.command('add', default_command=True)
@@ -124,6 +124,70 @@ def crowd_lookup(ctx: ExtendedContext, user: str):
             'In Crowd': 'no' if crowd_user is None else ('active' if crowd_user.get('active') else 'inactive'),
             'Groups': ', '.join(api.get_user_groups(person.username)) if crowd_user else ''})
     ctx.chat.send_table(title=f'Directory and Crowd: {user}', table=rows)
+
+
+def render_group_tree(tree: dict, text: str | None = None, max_depth: int | None = None) -> list[str]:
+    """Lines of the Crowd group tree. A group inside several groups is listed under each, but expanded only the
+    first time: later copies that have children end in ``(*)``. With ``text``, only the groups whose name has it
+    are shown (with everything below them) plus their ancestors. ``max_depth`` limits the levels shown (1 = roots)."""
+    wanted = (text or '').lower()
+    memo: dict[str, bool] = {}
+
+    def leads_to_match(node: dict, path: tuple = ()) -> bool:
+        name = node['value']
+        if name in path:
+            return False
+        if name not in memo:
+            memo[name] = wanted in name.lower() or any(leads_to_match(c, (*path, name)) for c in node['children'])
+        return memo[name]
+
+    lines, expanded = [], set()
+
+    def visit(node: dict, prefix: str, last: bool, level: int, show_all: bool, path: tuple) -> None:
+        name = node['value']
+        show_all = show_all or not wanted or wanted in name.lower()
+        children = [c for c in node['children'] if c['value'] not in path and (show_all or leads_to_match(c, path))]
+        mark = ''
+        if children and name in expanded:
+            mark, children = ' (*)', []
+        elif children and max_depth is not None and level >= max_depth:
+            mark, children = ' ...', []
+        expanded.add(name)
+        lines.append(f"{prefix}{'`-- ' if last else '|-- '}{name}{mark}")
+        for i, child in enumerate(children):
+            visit(child, prefix + ('    ' if last else '|   '), i == len(children) - 1, level + 1, show_all,
+                  (*path, name))
+
+    roots = [c for c in tree['children'] if leads_to_match(c)]
+    for i, root in enumerate(roots):
+        visit(root, '', i == len(roots) - 1, 1, False, ())
+    return lines
+
+
+@crowd_group.command('teams')
+@click.argument('text', required=False)
+@click.option('-d', '--depth', type=click.IntRange(min=1), help='Show only this many levels (1 = the top groups)')
+@click.option('-f', '--flat', is_flag=True, help='List the matching group names, sorted, instead of a tree')
+@click.pass_context
+def crowd_teams(ctx: ExtendedContext, text: str | None, depth: int | None, flat: bool):
+    """Display the Crowd groups as a tree, optionally only those whose name has TEXT (and their parents).
+
+    A group inside several groups is listed under each of them; its later occurrences are marked (*) and not
+    expanded again. With --flat, the group names are listed sorted, one per line.
+
+    USAGE: bot onboard crowd teams [text] [--depth N] [--flat]
+    """
+    api = CrowdApi()
+    if flat:
+        wanted = (text or '').lower()
+        names = sorted((n for n in api.get_groups() if wanted in n.lower()), key=str.lower)
+        lines = names
+    else:
+        lines = render_group_tree(api.build_group_tree(), text, depth)
+    if not lines:
+        ctx.chat.send_text("No matching groups.")
+        return
+    ctx.chat.send_code('\n'.join(lines))
 
 
 @crowd_group.command('groups')

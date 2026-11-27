@@ -12,6 +12,28 @@ SETTINGS = CrowdSettings(crowd_url='https://crowd.test', ldap=LdapSettings('s', 
 PERSON = Person(cn='Alice Smith', login='asmith', mail='alice@x.test', first_name='Alice', last_name='Smith')
 
 
+class RenderGroupTreeTest(unittest.TestCase):
+    @staticmethod
+    def node(name, *children):
+        return {'label': name, 'value': name, 'children': list(children)}
+
+    def setUp(self):
+        n = self.node
+        self.tree = {'label': 'Crowd', 'value': None,
+                     'children': [n('a', n('shared', n('leaf'))), n('b', n('shared', n('leaf')))]}
+
+    def test_multi_parent_is_marked_and_not_expanded_twice(self):
+        self.assertEqual(command.render_group_tree(self.tree), [
+            '|-- a', '|   `-- shared', '|       `-- leaf',
+            '`-- b', '    `-- shared (*)'])
+
+    def test_filter_keeps_ancestors_and_depth_limits(self):
+        self.assertEqual(command.render_group_tree(self.tree, 'LEAF'),
+                         ['|-- a', '|   `-- shared', '|       `-- leaf',
+                          '`-- b', '    `-- shared (*)'])
+        self.assertEqual(command.render_group_tree(self.tree, None, 1), ['|-- a ...', '`-- b ...'])
+
+
 class CrowdValidateTest(unittest.TestCase):
     def setUp(self):
         self.directory = mock.Mock()
