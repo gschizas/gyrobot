@@ -7,6 +7,7 @@ literal ``PLUGIN`` dict at the top of its own module (or package ``__init__``)::
         'requires': ['DATABASE_URL'],        # all of these env vars must be set
         'requires_any': ['WEGO_EXE', 'WEATHER_URL'],  # at least one of these
         'requires_files': ['config/github.yml'],   # all of these files must exist (relative to the working directory)
+        'requires_tables': ['kudos'],              # all of these tables must exist in the DATABASE_URL database
         'dependencies': ['yfinance>=0.2.43'],      # pip requirements private to this plugin
         'priority': 10,                            # chat platforms only: order for ``chat: auto``
     }
@@ -51,7 +52,7 @@ KINDS = {'chat': SOURCE_FOLDER / 'chat', 'commands': SOURCE_FOLDER / 'commands'}
 _lock = threading.Lock()
 _command_status: dict[str, str] | None = None
 _chat_module: ModuleType | None = None
-
+_tables: set[str] | None = None
 
 @dataclass
 class Plugin:
@@ -63,6 +64,7 @@ class Plugin:
     dependencies: list[str] = field(default_factory=list)
     priority: int = 100
     requires_files: list[str] = field(default_factory=list)
+    requires_tables: list[str] = field(default_factory=list)
 
     def merged_with(self, parent: 'Plugin') -> 'Plugin':
         return Plugin(
@@ -71,7 +73,20 @@ class Plugin:
             parent.requires_any + self.requires_any,
             parent.dependencies + self.dependencies,
             self.priority,
-            parent.requires_files + self.requires_files)
+            parent.requires_files + self.requires_files,
+            parent.requires_tables + self.requires_tables)
+
+    def missing_tables(self) -> list[str]:
+        """Required tables that don't exist in the ``DATABASE_URL`` database."""
+        if not self.requires_tables:
+            return []
+        if 'DATABASE_URL' not in os.environ:
+            return [f"DATABASE_URL (to check table {name})" for name in self.requires_tables]
+        try:
+            existing = _existing_tables()
+        except Exception as e:
+            return [f"database unreachable ({type(e).__name__})"]
+        return [f"table {name}" for name in self.requires_tables if name not in existing]
 
     def missing_environment(self) -> list[str]:
         """Unmet env vars and files, as readable names."""
@@ -93,6 +108,16 @@ class Plugin:
             if not requirement.specifier.contains(installed, prereleases=True):
                 missing.append(f"{text} (installed {installed})")
         return missing
+
+
+def _existing_tables() -> set[str]:
+    """Table names of the ``DATABASE_URL`` database (queried once per process)."""
+    global _tables
+    if _tables is None:
+        from sqlalchemy import inspect
+        from backend.database import get_engine
+        _tables = set(inspect(get_engine()).get_table_names())
+    return _tables
 
 
 def load_config() -> dict:
@@ -143,7 +168,8 @@ def discover(kind: str) -> dict[str, Plugin]:
             list(declaration.get('requires_any', [])),
             list(declaration.get('dependencies', [])),
             int(declaration.get('priority', 100)),
-            list(declaration.get('requires_files', [])))
+            list(declaration.get('requires_files', [])),
+            list(declaration.get('requires_tables', [])))
     for name in sorted(found, key=lambda n: n.count('.')):
         parent = name.rpartition('.')[0]
         while parent:
@@ -163,6 +189,8 @@ def _skip_reason(plugin: Plugin) -> str | None:
         return f"missing environment: {', '.join(missing)}"
     if missing := plugin.missing_dependencies():
         return f"missing packages: {', '.join(missing)}"
+    if missing := plugin.missing_tables():
+        return f"missing database: {', '.join(missing)}"
     return None
 
 

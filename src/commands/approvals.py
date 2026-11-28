@@ -9,7 +9,7 @@ the ``backend.approval.GLOBAL_APPROVAL_FUNCTION`` sentinel row rather than any s
 approval-gated command's own name, since these commands operate the whole shared
 queue (see ``backend.approval`` / ``check_approval_security``).
 """
-PLUGIN = {'requires': ['DATABASE_URL']}
+PLUGIN = {'requires': ['DATABASE_URL'], 'requires_tables': ['approval_requests']}
 
 import os
 import traceback

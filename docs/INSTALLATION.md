@@ -171,6 +171,10 @@ PLUGIN = {'requires': ['MY_API_TOKEN'], 'dependencies': ['somelib>=1.2']}
 
 Only libraries shared by several plugins or by the core belong in `pyproject.toml`.
 
+A plugin that needs tables of the `DATABASE_URL` database declares them with `'requires_tables': ['kudos']`. The tables
+are created by `alembic upgrade head`; a plugin whose tables are missing (or whose database is unreachable) is skipped
+and logged like a missing library, so an instance only runs the features its database has.
+
 ## Docker
 
 The current `Dockerfile` is out of date (it references a missing `requirements.txt` and

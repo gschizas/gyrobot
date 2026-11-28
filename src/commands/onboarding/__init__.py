@@ -8,7 +8,7 @@ provisioning runs. Provisioning itself is delegated to the provider stubs in
 Account metadata and provisioning state are persisted to PostgreSQL via account_storage
 for tracking and deprovisioning workflows.
 """
-PLUGIN = {'requires_files': ['config/github.yml'], 'dependencies': ['treelib>=1.8.0', 'xkcdpass', 'jinja2', 'ldap3', 'romanize']}
+PLUGIN = {'requires_files': ['config/github.yml'], 'requires_tables': ['accounts', 'approval_requests'], 'dependencies': ['treelib>=1.8.0', 'xkcdpass', 'jinja2', 'ldap3', 'romanize']}
 
 import copy
 import datetime

@@ -1,4 +1,4 @@
-PLUGIN = {'requires': ['DATABASE_URL'], 'dependencies': ['imageio[ffmpeg]>=2.35.1', 'numpy>=1.26']}
+PLUGIN = {'requires': ['DATABASE_URL'], 'requires_tables': ['kudos'], 'dependencies': ['imageio[ffmpeg]>=2.35.1', 'numpy>=1.26']}
 
 import html
 import io

@@ -133,6 +133,7 @@ PLUGIN = {
     'requires': ['SUBREDDIT_NAME'],                 # all env vars must be set
     'requires_any': ['WEGO_EXE', 'WEATHER_URL'],    # at least one
     'requires_files': ['config/github.yml'],        # files that must exist (relative to the repo root)
+    'requires_tables': ['kudos'],                   # tables that must exist in the DATABASE_URL database
     'dependencies': ['yfinance>=0.2.43'],           # pip libs private to this plugin
     'priority': 10,                                 # chat platforms only (chat: auto order)
 }
