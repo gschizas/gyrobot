@@ -11,8 +11,8 @@ from backend.providers import ProvisionRequest, PROVIDERS, RESOURCE_LABELS
 from backend.team_mapping import resolve_team
 from commands.extended_context import ExtendedContext
 
-if 'APPROVAL_DATABASE_URL' not in os.environ:
-    raise ImportError('APPROVAL_DATABASE_URL not found in environment')
+if 'DATABASE_URL' not in os.environ:
+    raise ImportError('DATABASE_URL not found in environment')
 
 
 def _jetbrains_summary(params: dict) -> str:

@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest import mock
 
-os.environ.setdefault('APPROVAL_DATABASE_URL', 'postgresql://u:p@localhost/x')
+os.environ.setdefault('DATABASE_URL', 'postgresql://u:p@localhost/x')
 
 from backend.accounts import Provision
 from backend.crowd_config import CrowdSettings, LdapSettings

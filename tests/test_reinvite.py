@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest import mock
 
-os.environ.setdefault('APPROVAL_DATABASE_URL', 'postgresql://user:pw@localhost/none')  # engine is created lazily
+os.environ.setdefault('DATABASE_URL', 'postgresql://user:pw@localhost/none')  # engine is created lazily
 
 from backend.accounts import Provision
 from commands.onboarding import github

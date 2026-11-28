@@ -2,7 +2,7 @@
 
 Any command decorated with `requires_approval` (today: `onboard ...` and `offboard`) does not run when issued. It is
 validated and queued as a **pending request**, and a designated approver must approve it. Approving re-runs the
-original command with the stored parameters. Needs `APPROVAL_DATABASE_URL`.
+original command with the stored parameters. Needs `DATABASE_URL`.
 
 ## Life of a request
 

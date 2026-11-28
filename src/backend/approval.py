@@ -6,7 +6,7 @@ the invocation (command name + click parameters) is serialized into the
 run the ``approvals`` command group to approve/reject pending requests; on approval
 the original command body is executed via :func:`execute_approved`.
 
-Storage is PostgreSQL (SQLAlchemy model ``backend/models/approval.py``), configured through ``APPROVAL_DATABASE_URL``.
+Storage is PostgreSQL (SQLAlchemy model ``backend/models/approval.py``), configured through ``DATABASE_URL``.
 Permissions (who may request/approve, allowed channels, ``notify_channel``,
 ``allow_self``) come from the ``permission_rules`` table via
 ``backend.permissions`` (see ``scripts/migrate_permissions.py``), not from YAML.
@@ -27,8 +27,8 @@ from backend.email_logging import send_email_log
 from backend.models.approval import ApprovalRequest
 from commands.extended_context import ExtendedContext
 
-if 'APPROVAL_DATABASE_URL' not in os.environ:
-    raise ImportError('APPROVAL_DATABASE_URL not found in environment')
+if 'DATABASE_URL' not in os.environ:
+    raise ImportError('DATABASE_URL not found in environment')
 
 # Roles distinguished within the approval queue: who may request approval-gated
 # commands vs. who may approve them. These match the `role` column values
@@ -50,7 +50,7 @@ GLOBAL_APPROVAL_FUNCTION = 'backend.approval:_global'
 APPROVAL_COMMANDS: dict = {}
 
 def _session() -> Session:
-    return Session(get_engine('APPROVAL_DATABASE_URL'))
+    return Session(get_engine())
 
 
 def _as_dict(row: ApprovalRequest) -> dict:

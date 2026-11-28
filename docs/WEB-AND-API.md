@@ -16,7 +16,7 @@ Run with `python src/run_webapp.py <env-name>` (reads `.env.d/<env-name>.env`; t
 | `LDAP_SERVER`, `LDAP_USERNAME_PATTERN`, `LDAP_AUTHENTICATION_TYPE` | LDAP authentication of the web UI: the server, the bind name with `{}` for the username (`DOMAIN\{}`, `{}@domain.corp` or a DN), and `NTLM` (default) or `SIMPLE`. |
 | `OAUTH2_CLIENTS_CONFIGURATION` | API client registry (default `config/oauth2_clients.yml`). |
 | `WEBAPP_ROOT_PATH`, `WEBAPP_ALLOWED_HOSTS` | URL prefix (default `/eurobot/`) and accepted host names. |
-| `APPROVAL_DATABASE_URL`, `PERMISSIONS_DATABASE_URL` | Needed by the underlying commands. |
+| `DATABASE_URL` | Needed by the underlying commands. |
 | Chat platform variables, `BOT_NAME` | Needed so the web process can post notifications to chat. |
 
 Requests from the web UI run as the LDAP user in the `$webui` pseudo-channel, and from the API as the OAuth2

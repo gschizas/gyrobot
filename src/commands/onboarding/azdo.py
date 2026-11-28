@@ -21,8 +21,8 @@ from backend.team_mapping import normalize
 from commands import ClickAliasedGroup
 from commands.extended_context import ExtendedContext
 
-if 'APPROVAL_DATABASE_URL' not in os.environ:
-    raise ImportError('APPROVAL_DATABASE_URL not found in environment')
+if 'DATABASE_URL' not in os.environ:
+    raise ImportError('DATABASE_URL not found in environment')
 
 ADO_MESSAGE = """\
 *ADO* stands for *ActiveX Data Object*, Microsoft's data-access library from 1996. It is what let VBScript and \

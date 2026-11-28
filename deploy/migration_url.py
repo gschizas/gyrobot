@@ -14,7 +14,7 @@ from sqlalchemy.engine import URL, make_url  # noqa: E402
 
 from backend.secret_store import load_environment  # noqa: E402
 
-DSN_VARIABLES = ('MIGRATIONS_DATABASE_URL', 'APPROVAL_DATABASE_URL', 'PERMISSIONS_DATABASE_URL', 'KUDOS_DATABASE_URL')
+DSN_VARIABLES = ('MIGRATIONS_DATABASE_URL', 'DATABASE_URL')
 
 
 def main(env_name: str, db_user: str) -> None:

@@ -1,4 +1,4 @@
-PLUGIN = {'requires': ['KUDOS_DATABASE_URL'], 'dependencies': ['imageio[ffmpeg]>=2.35.1', 'numpy>=1.26']}
+PLUGIN = {'requires': ['DATABASE_URL'], 'dependencies': ['imageio[ffmpeg]>=2.35.1', 'numpy>=1.26']}
 
 import html
 import io
@@ -19,8 +19,8 @@ from backend.models.kudos import Kudos
 from commands import gyrobot, DefaultCommandGroup
 from commands.extended_context import ExtendedContext
 
-if 'KUDOS_DATABASE_URL' not in os.environ:
-    raise ImportError('KUDOS_DATABASE_URL not found in environment')
+if 'DATABASE_URL' not in os.environ:
+    raise ImportError('DATABASE_URL not found in environment')
 
 
 @gyrobot.group('kudos',
@@ -125,7 +125,7 @@ def kudos_view(ctx: ExtendedContext, days_to_check: int, channel: str,
     if channel != '*':
         channel_id = ctx.chat.channel_id if channel == '' else (EXTRACT_SLACK_ID.findall(channel) or [''])[0]
         query = query.where(Kudos.channel_id == channel_id)
-    with Session(get_engine('KUDOS_DATABASE_URL')) as session:
+    with Session(get_engine()) as session:
         table = [dict(row._mapping) for row in session.execute(query)]
     if len(table) == 0:
         ctx.chat.send_text("No kudos yet!")
@@ -261,7 +261,7 @@ def _create_kudos_video(high_scores, title_size):
 
 
 def _record_kudos(ctx: ExtendedContext, sender_name, recipient_name, recipient_user_id, reason):
-    with Session(get_engine('KUDOS_DATABASE_URL')) as session, session.begin():
+    with Session(get_engine()) as session, session.begin():
         session.add(Kudos(
             from_user=sender_name, from_user_id=ctx.chat.user_id,
             to_user=recipient_name, to_user_id=recipient_user_id,

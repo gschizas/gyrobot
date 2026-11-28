@@ -50,7 +50,7 @@ def main(output, cutoff, limit):
     path = pathlib.Path(output)
     if path.exists():
         raise click.ClickException(f"{path} exists; refusing to overwrite it.")
-    from backend.github_api import GitHubApi  # needs APPROVAL_DATABASE_URL, which the environment provides
+    from backend.github_api import GitHubApi  # needs DATABASE_URL, which the environment provides
     teams = [o['value'] for o in GitHubApi.flatten_team_tree(GitHubApi().build_team_tree())]
     groups = sorted(CrowdApi().get_groups())
     lines, matched = ['crowd:'], 0

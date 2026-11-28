@@ -1,6 +1,6 @@
 # Onboarding and offboarding
 
-Needs `config/github.yml`. The accounts and approval queue are stored in PostgreSQL (`APPROVAL_DATABASE_URL`), which is not used to gate the plugin.
+Needs `config/github.yml`. The accounts and approval queue are stored in PostgreSQL (`DATABASE_URL`), which is not used to gate the plugin.
 
 **Every `onboard`/`offboard` command is gated by the [approval queue](APPROVALS.md).** Issuing one checks that you
 are allowed to request it, validates it, and queues a pending request. Nothing is provisioned until an approver runs

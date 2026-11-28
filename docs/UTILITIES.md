@@ -20,7 +20,7 @@ Commands without special setup, unless noted. Output is sent to the channel wher
 
 ## Kudos
 
-Needs `KUDOS_DATABASE_URL`.
+Needs `DATABASE_URL`.
 
 | Command | Description |
 |---|---|

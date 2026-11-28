@@ -1,6 +1,6 @@
 # Permissions
 
-Who may run a command, and where, is stored in the PostgreSQL table `permission_rules` (`PERMISSIONS_DATABASE_URL`)
+Who may run a command, and where, is stored in the PostgreSQL table `permission_rules` (`DATABASE_URL`)
 and cached by each process. The schema is managed by Alembic (`uv run alembic -x env=<env-name> upgrade head`).
 
 ## Rules

@@ -45,12 +45,12 @@ def function_full_name(func) -> str:
 
 
 def _engine():
-    if 'PERMISSIONS_DATABASE_URL' not in os.environ:
+    if 'DATABASE_URL' not in os.environ:
         raise RuntimeError(
-            "PERMISSIONS_DATABASE_URL not set - required to resolve permissions "
+            "DATABASE_URL not set - required to resolve permissions "
             "from the permission_rules table. See scripts/migrate_permissions.py "
             "--to-db to populate it.")
-    return get_engine('PERMISSIONS_DATABASE_URL')
+    return get_engine()
 
 
 def _load_all() -> dict:

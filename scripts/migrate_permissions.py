@@ -20,9 +20,7 @@ Usage:
     python scripts/migrate_permissions.py --to-db --skip-yaml
 
 ``--to-db`` additionally (or, with ``--skip-yaml``, instead) upserts every rule
-into the ``permission_rules`` table via ``PERMISSIONS_DATABASE_URL`` (currently
-pointed at the same physical database as ``APPROVAL_DATABASE_URL``, just a
-separate env var so it can be split out later). ``--prune`` deletes rows for
+into the ``permission_rules`` table via ``DATABASE_URL``. ``--prune`` deletes rows for
 function names produced by this run whose (environment, role) combo no longer
 appears in the source YAML - use with care.
 
@@ -437,8 +435,8 @@ def flatten_to_rows(ordered: dict) -> list[dict]:
 
 def write_to_db(rows: list[dict], warnings: list, prune: bool = False) -> int:
     """Upsert the rows; the table itself is created by ``alembic upgrade head``."""
-    if not os.environ.get('PERMISSIONS_DATABASE_URL'):
-        warnings.append("[error] PERMISSIONS_DATABASE_URL not set - skipping DB write")
+    if not os.environ.get('DATABASE_URL'):
+        warnings.append("[error] DATABASE_URL not set - skipping DB write")
         return 0
 
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'src'))
@@ -448,7 +446,7 @@ def write_to_db(rows: list[dict], warnings: list, prune: bool = False) -> int:
     from backend.database import get_engine
     from backend.models.permissions import PermissionRule
 
-    with Session(get_engine('PERMISSIONS_DATABASE_URL')) as session, session.begin():
+    with Session(get_engine()) as session, session.begin():
         for row in rows:
             stmt = insert(PermissionRule).values(
                 function_name=row['function_name'], environment=row['environment'], role=row['role'],
@@ -483,7 +481,7 @@ def main():
     parser.add_argument('--out', default=None, type=pathlib.Path)
     parser.add_argument('--to-db', action='store_true',
                         help="Also (or, with --skip-yaml, instead) upsert rules into "
-                             "permission_rules via PERMISSIONS_DATABASE_URL")
+                             "permission_rules via DATABASE_URL")
     parser.add_argument('--skip-yaml', action='store_true',
                         help="Don't write the config/permissions.yml file (use with --to-db)")
     parser.add_argument('--prune', action='store_true',
@@ -542,7 +540,7 @@ def main():
         written = write_to_db(rows, warnings, prune=args.prune)
         if written:
             print(f"Upserted {written} row(s) into permission_rules "
-                  f"via PERMISSIONS_DATABASE_URL.")
+                  f"via DATABASE_URL.")
 
     print()
     if warnings:

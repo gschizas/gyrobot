@@ -9,7 +9,7 @@ the ``backend.approval.GLOBAL_APPROVAL_FUNCTION`` sentinel row rather than any s
 approval-gated command's own name, since these commands operate the whole shared
 queue (see ``backend.approval`` / ``check_approval_security``).
 """
-PLUGIN = {'requires': ['APPROVAL_DATABASE_URL']}
+PLUGIN = {'requires': ['DATABASE_URL']}
 
 import os
 import traceback
@@ -24,8 +24,8 @@ from backend.email_logging import send_email_log
 from commands import gyrobot, ClickAliasedGroup
 from commands.extended_context import ExtendedContext
 
-if 'APPROVAL_DATABASE_URL' not in os.environ:
-    raise ImportError('APPROVAL_DATABASE_URL not found in environment')
+if 'DATABASE_URL' not in os.environ:
+    raise ImportError('DATABASE_URL not found in environment')
 
 # Human-readable action labels per subcommand, consumed by check_approval_security
 # (mirrors the ctx.obj['security_text'] convention used by check_security).

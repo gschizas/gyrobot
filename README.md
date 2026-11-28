@@ -63,9 +63,9 @@ disable commands by name. Details are in [docs/INSTALLATION.md](docs/INSTALLATIO
 | Reddit commands | `SUBREDDIT_NAME` (`make` also needs `REDDIT_ALT_USER`) |
 | `deployment`, `cronjob`, `scaledown`, `actuator`, `mock`, `deploy` | `OPENSHIFT_DEPLOYMENT`, `OPENSHIFT_CRONJOB`, `OPENSHIFT_SCALEDOWN`, `OPENSHIFT_ACTUATOR_REFRESH`, `MOCK_CONFIGURATION`, `DOCKER_DEPLOY_CONFIGURATION` |
 | `onboard`, `offboard` | `config/github.yml` (the database is still used at runtime, but is no longer a gate) |
-| `approvals` | `APPROVAL_DATABASE_URL` |
+| `approvals` | `DATABASE_URL` |
 | `jetbrains` | `JETBRAINS_TOKEN`, `JETBRAINS_CUSTOMER_CODE` |
-| `kudos` | `KUDOS_DATABASE_URL` |
+| `kudos` | `DATABASE_URL` |
 | `weather` | `WEGO_EXE` or `WEATHER_URL` |
 | `permissions` | none (needs the permissions database to be useful) |
 | Utilities | none |

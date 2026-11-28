@@ -41,8 +41,7 @@ LDAP_USERNAME_PATTERN=uid={},dc=example,dc=com
 LDAP_AUTHENTICATION_TYPE=SIMPLE
 
 # Database
-APPROVAL_DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/gyrobot
-PERMISSIONS_DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/gyrobot
+DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/gyrobot
 ```
 
 Notes:

@@ -4,7 +4,7 @@ import unittest
 from unittest import mock
 
 os.environ.setdefault('WEBAPP_SESSION_SECRET', 'test-secret')
-os.environ.setdefault('APPROVAL_DATABASE_URL', 'postgresql://u:p@localhost/x')
+os.environ.setdefault('DATABASE_URL', 'postgresql://u:p@localhost/x')
 
 from fastapi.testclient import TestClient
 

@@ -13,7 +13,7 @@ Required environment variables:
   authentication.
 * ``OAUTH2_CLIENTS_CONFIGURATION`` (optional, default ``config/oauth2_clients.yml``)
   -- REST API client_id/client_secret registry.
-* ``APPROVAL_DATABASE_URL`` / ``PERMISSIONS_DATABASE_URL`` -- required by the
+* ``DATABASE_URL`` -- required by the
   underlying ``onboard``/``offboard`` commands (see ``commands/onboarding``).
 """
 import pathlib

@@ -34,7 +34,7 @@ COLUMNS = ['email', 'resource', 'status', 'username', 'team', 'name', 'other_ema
 @click.option('-o', '--output', default='github_members.csv', show_default=True, help='CSV file to write')
 @gyrobot_env
 def main(output: str) -> None:
-    # backend.github_api imports account_storage, which needs APPROVAL_DATABASE_URL (no connection is made)
+    # backend.github_api imports account_storage, which needs DATABASE_URL (no connection is made)
     from backend.github_api import GitHubApi
     api = GitHubApi()
 

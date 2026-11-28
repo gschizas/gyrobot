@@ -102,7 +102,7 @@ uv run alembic -x env=myinstance check        # optional: model vs. database dri
 unset PGPASSWORD MIGRATIONS_DATABASE_URL
 ```
 
-`MIGRATIONS_DATABASE_URL` takes precedence over the `*_DATABASE_URL` variables in the env file. Use
+`MIGRATIONS_DATABASE_URL` takes precedence over the `DATABASE_URL` variable in the env file. Use
 it with a role that **owns** the tables, because the bot's normal database
 user usually does not (`CREATE INDEX IF NOT EXISTS` and `ALTER TABLE` need ownership even when
 nothing changes). Set it only for this command; do not put it in `.env.d/`. If the normal user

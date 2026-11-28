@@ -82,7 +82,7 @@ Rules are keyed on the module path, so each command needs one:
 
 ## Notes
 
-- Reading **writes** snapshots, so the bot needs `APPROVAL_DATABASE_URL`; without it the module fails to load.
+- Reading **writes** snapshots, so the bot needs `DATABASE_URL`; without it the module fails to load.
 - If Azure DevOps returns no users at all, nobody is marked `deprovisioned` (an empty answer is more likely
   a problem than everybody leaving).
 - Two Azure DevOps users matching the same account are both reported, but only the first is stored.

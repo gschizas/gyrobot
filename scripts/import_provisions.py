@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Import pre-existing users as account provisions (users added before gyrobot automated this).
 
-Usage (from the repository root; reads APPROVAL_DATABASE_URL from .env.d/<env-name>.env):
+Usage (from the repository root; reads DATABASE_URL from .env.d/<env-name>.env):
 
     uv run python scripts/import_provisions.py <env-name> users.csv            # preview only
     uv run python scripts/import_provisions.py <env-name> users.xlsx --apply   # write to the database

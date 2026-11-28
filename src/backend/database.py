@@ -2,7 +2,7 @@
 
 All the bot's tables live in one PostgreSQL database, whose schema is managed by Alembic (see ``migrations/``).
 Each feature keeps its tables in ``backend/models/<feature>.py`` and asks for an engine with :func:`get_engine`,
-passing the name of the environment variable that holds its connection string.
+which reads the connection string from the ``DATABASE_URL`` environment variable.
 """
 import os
 from functools import cache
@@ -28,6 +28,6 @@ def _engine(dsn: str) -> Engine:
     return create_engine(url, pool_pre_ping=True)
 
 
-def get_engine(env_var: str) -> Engine:
-    """The engine for the connection string in environment variable ``env_var`` (one engine per distinct string)."""
+def get_engine(env_var: str = 'DATABASE_URL') -> Engine:
+    """The engine for the connection string in ``DATABASE_URL`` (one engine per distinct string)."""
     return _engine(os.environ[env_var])

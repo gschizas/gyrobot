@@ -55,7 +55,7 @@ def _base_query(*columns):
 
 
 def _session() -> Session:
-    return Session(get_engine('APPROVAL_DATABASE_URL'))
+    return Session(get_engine())
 
 
 def list_github_users(where: Optional[ColumnElement] = None, order_by: Optional[list] = None,

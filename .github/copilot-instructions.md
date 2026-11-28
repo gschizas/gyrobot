@@ -346,7 +346,7 @@ Dice rolling with NdS+B notation (e.g. `roll 2d6+3`). Subcommands: `magic8` (Mag
 
 ### `kudos` group (`commands/kudos.py`)
 
-Env guard: `KUDOS_DATABASE_URL` (PostgreSQL via SQLAlchemy; model `backend/models/kudos.py`).
+Env guard: `DATABASE_URL` (PostgreSQL via SQLAlchemy; model `backend/models/kudos.py`).
 
 - **`kudos @user [reason]`** (default): records kudos in DB, randomly appends an emoji gift (75% chance). Parses Slack `<@USER_ID|name>` mentions via `EXTRACT_SLACK_ID` regex.
 - **`kudos view [days] [channel] [-g] [-t|-x|-v|-i]`**: leaderboard for last N days (default 14). Output formats: text table, Excel, PNG image, or MP4 video (retro arcade high-score animation using imageio + Pillow + Amstrad CPC464 font from `img/kudos/`).
@@ -355,7 +355,7 @@ Assets required: `img/kudos/wallpaper.jpg`, `img/kudos/amstrad_cpc464.ttf`.
 
 ### Approval queue (`backend/approval.py`, `commands/onboarding/`, `commands/approvals.py`)
 
-Env guards: `APPROVAL_DATABASE_URL` (PostgreSQL via SQLAlchemy; the schema is created by `alembic upgrade head`) **and** `APPROVAL_CONFIGURATION` (path to the security YAML, under `config/` or absolute — same convention as the OpenShift commands).
+Env guards: `DATABASE_URL` (PostgreSQL via SQLAlchemy; the schema is created by `alembic upgrade head`) **and** `APPROVAL_CONFIGURATION` (path to the security YAML, under `config/` or absolute — same convention as the OpenShift commands).
 
 A generic **command-approval queue**. Decorate any command with `@requires_approval` (placed *below* `@click.pass_context`) to make invoking it enqueue a pending request instead of running. Designated approvers act on the queue via the `approvals` group; approval re-invokes the original command body.
 
@@ -447,7 +447,7 @@ Used by `commands/onboarding/github.py` (`onboard github teams` renders the ente
 
 ### `backend/account_storage.py` / `backend/accounts.py` — onboarding persistence
 
-`account_storage.py` is a SQLAlchemy-backed store (models in `backend/models/accounts.py`, env: `APPROVAL_DATABASE_URL`) for the `ProvisionRequest`/`Provision` dataclasses defined in `accounts.py`. Key functions: `create_account`, `get_account`, `get_account_by_email`, `get_or_create_account`, `update_account`, `set_provision_status`, `get_provision`, `get_pending_provisions(resource, status)`, `get_account_provisions`, `get_active_provisions`. Used throughout `commands/onboarding/` and `github_provisioning.py` to track multi-stage provisioning (invited → accepted → assigned / active).
+`account_storage.py` is a SQLAlchemy-backed store (models in `backend/models/accounts.py`, env: `DATABASE_URL`) for the `ProvisionRequest`/`Provision` dataclasses defined in `accounts.py`. Key functions: `create_account`, `get_account`, `get_account_by_email`, `get_or_create_account`, `update_account`, `set_provision_status`, `get_provision`, `get_pending_provisions(resource, status)`, `get_account_provisions`, `get_active_provisions`. Used throughout `commands/onboarding/` and `github_provisioning.py` to track multi-stage provisioning (invited → accepted → assigned / active).
 
 ### `bot_framework/praw_wrapper.py` — Reddit OAuth
 
@@ -570,6 +570,6 @@ All runtime config lives outside the repo under mounted volumes:
 | `WEATHER_URL` | Base URL for `weather` PNG fetch (default: `http://wttr.in/`) |
 | `WEATHER_FONT` | Path to TTF font file used by the ANSI→PNG renderer |
 | `ALT_PROXY` | HTTP proxy for `joke` command |
-| `KUDOS_DATABASE_URL` | PostgreSQL DSN for `kudos` (SQLAlchemy) |
-| `APPROVAL_DATABASE_URL` | PostgreSQL DSN for the approval queue + account/provision storage (SQLAlchemy); used at runtime by `onboard`/`offboard`/`approvals` (not a plugin gate for `onboard`) |
+| `MIGRATIONS_DATABASE_URL` | Optional DSN (another database role that owns the tables) used by Alembic instead of `DATABASE_URL` |
+| `DATABASE_URL` | PostgreSQL DSN for the whole bot database (SQLAlchemy): `kudos`, the approval queue, accounts/provisions and `permission_rules`; used at runtime by `onboard`/`offboard`/`approvals` (not a plugin gate for `onboard`). `MIGRATIONS_DATABASE_URL` optionally overrides it for Alembic |
 | `APPROVAL_CONFIGURATION` | Path to the approval security YAML (under `config/` or absolute). Selects the active `environment`; per-environment `requesters`/`approvers`, their channels, `notify_channel` live in `.permissions.yml` |

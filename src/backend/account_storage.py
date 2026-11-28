@@ -1,7 +1,7 @@
 """Account storage layer for PostgreSQL persistence.
 
 Handles CRUD operations for accounts and their provisioning state across resources.
-Uses APPROVAL_DATABASE_URL environment variable for database connection.
+Uses DATABASE_URL environment variable for database connection.
 """
 import os
 from datetime import datetime, timezone
@@ -17,8 +17,8 @@ from backend.database import get_engine
 from backend.models.accounts import AccountHistoryRow, AccountRow, MembershipRow, ProvisionHistoryRow, ProvisionRow, \
     RoleRow
 
-if 'APPROVAL_DATABASE_URL' not in os.environ:
-    raise ImportError('APPROVAL_DATABASE_URL not found in environment')
+if 'DATABASE_URL' not in os.environ:
+    raise ImportError('DATABASE_URL not found in environment')
 
 # Provision statuses meaning the resource is held or an invitation is outstanding
 LIVE_STATUSES = ('pending', 'invited', 'accepted', 'active')
@@ -27,7 +27,7 @@ REINVITABLE_STATUSES = ('expired', 'cancelled', 'failed')
 
 
 def _session() -> Session:
-    return Session(get_engine('APPROVAL_DATABASE_URL'))
+    return Session(get_engine())
 
 
 def _to_account(row: AccountRow) -> Account:

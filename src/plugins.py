@@ -4,7 +4,7 @@ This module knows **nothing** about individual plugins. Every plugin declares it
 literal ``PLUGIN`` dict at the top of its own module (or package ``__init__``)::
 
     PLUGIN = {
-        'requires': ['KUDOS_DATABASE_URL'],        # all of these env vars must be set
+        'requires': ['DATABASE_URL'],        # all of these env vars must be set
         'requires_any': ['WEGO_EXE', 'WEATHER_URL'],  # at least one of these
         'requires_files': ['config/github.yml'],   # all of these files must exist (relative to the working directory)
         'dependencies': ['yfinance>=0.2.43'],      # pip requirements private to this plugin

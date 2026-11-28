@@ -5,7 +5,7 @@ Usage (from the repo root)::
     uv run alembic -x env=<env-name> upgrade head
 
 ``env`` selects ``.env.d/<env-name>.env`` (loaded like the bot does). The database is taken from
-``MIGRATIONS_DATABASE_URL``, otherwise from the first set of the variables in ``_DSN_VARIABLES``.
+``MIGRATIONS_DATABASE_URL`` (a different database user, see ``deploy/``), otherwise from ``DATABASE_URL``.
 """
 import os
 from logging.config import fileConfig
@@ -18,7 +18,7 @@ import backend.models  # noqa: F401  (registers the tables on Base.metadata)
 from backend.database import Base
 from backend.secret_store import load_environment
 
-_DSN_VARIABLES = ('MIGRATIONS_DATABASE_URL', 'APPROVAL_DATABASE_URL', 'PERMISSIONS_DATABASE_URL', 'KUDOS_DATABASE_URL')
+_DSN_VARIABLES = ('MIGRATIONS_DATABASE_URL', 'DATABASE_URL')
 
 config = context.config
 if config.config_file_name is not None:
