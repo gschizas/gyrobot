@@ -21,7 +21,6 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'src'))
 
 from backend.cli import gyrobot_env  # noqa: E402
 from backend.crowd_api import CrowdApi  # noqa: E402
-from backend.slack_accounts import parse_member_id  # noqa: E402
 
 ATTRIBUTE = 'slack-user-id'
 
@@ -38,6 +37,7 @@ class _NoLookup:
 def main(apply, resolve):
     from backend import account_storage as storage
     from backend import slack_accounts
+    from backend.slack_accounts import parse_member_id
     from backend.slack_directory import SlackDirectory
 
     crowd = CrowdApi()
