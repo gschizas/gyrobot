@@ -29,7 +29,9 @@ from backend.manager import refresh_manager, stored_manager_email
 from backend.providers import PROVIDERS, RESOURCE_LABELS
 from backend.providers import slack_provision
 from backend.providers.base import ProvisionRequest
-from commands import gyrobot
+from backend.slack_accounts import parse_member_id
+from backend import slack_accounts
+from commands import DefaultCommandGroup, gyrobot
 from commands.extended_context import ExtendedContext
 
 from commands.onboarding import crowd,github,jetbrains,team
@@ -37,7 +39,12 @@ from commands.onboarding import crowd,github,jetbrains,team
 
 def _slack_summary(params: dict) -> str:
     member_ids = ', '.join(params.get('member_ids', []))
-    return f"onboard {params['email']} to Slack (member IDs: {member_ids})"
+    return f"link Slack member IDs {member_ids} to {params['email']}"
+
+
+def _slack_validate(params: dict) -> str | None:
+    bad = [m for m in params.get('member_ids', []) if not parse_member_id(m)]
+    return f"Not a Slack member ID: {', '.join(bad)}" if bad else None
 
 
 def _offboard_summary(params: dict) -> str:
@@ -51,26 +58,68 @@ def onboard(ctx: ExtendedContext):
     ctx.ensure_object(dict)
 
 
-@onboard.command('slack')
+@onboard.group('slack', cls=DefaultCommandGroup)
+def slack_group():
+    """Link Slack member IDs to a colleague's account, so offboarding finds every Slack account.
+
+    Without a subcommand this is "add": bot onboard slack <email> <@mention or member ID> ...
+    Slack itself onboards people when they sign in; this only records which Slack accounts are theirs.
+    """
+
+
+@slack_group.command('add', default_command=True)
 @click.argument('email')
 @click.argument('member_ids', nargs=-1, required=True)
 @click.pass_context
-@requires_approval(summarize=_slack_summary)
+@requires_approval(summarize=_slack_summary, validate=_slack_validate)
 def onboard_slack(ctx: ExtendedContext, email: str, member_ids: tuple):
-    """Onboard a colleague for Slack.
-    
-    USAGE: bot onboard slack <email> <member_id> [<member_id> ...]
+    """Link Slack member IDs (or @mentions) to the account with this email.
+
+    USAGE: bot onboard slack <email> <member_id|@mention> [...]
+
+    Each Slack account's sign-in email is looked up and recorded too, and ids already linked are kept.
     """
-    provision_data = {'email': email, 'member_ids': list(member_ids)}
+    email = extract_email(ctx, email) or email.strip()
+    ids = [parse_member_id(m) for m in member_ids]
+    if not all(ids):
+        message = _slack_validate({'member_ids': list(member_ids)})
+        ctx.chat.send_text(message, is_error=True)
+        return f"Error: {message}"
 
-    account_obj = ProvisionRequest(name=email, email=email)
-    message = PROVIDERS['slack'].provision(ctx, account_obj)
-
-    account = get_or_create_account(primary_email=email, name=email)
-    set_provision_status(account.id, 'slack', 'active', provision_data)
-
+    outcome = slack_accounts.link(email, ids)
+    message = f"linked {', '.join(ids)}"
+    if outcome['emails']:
+        message += f"; sign-in emails: {', '.join(sorted(set(outcome['emails'])))}"
+    if outcome['unresolved']:
+        message += f"; email not found for {', '.join(outcome['unresolved'])}"
     result = [{'Resource': RESOURCE_LABELS['slack'], 'Result': message}]
-    ctx.chat.send_table(title=f'Onboarded {email}', table=result)
+    ctx.chat.send_table(title=f'Slack accounts of {email}', table=result)
+    return f"{RESOURCE_LABELS['slack']}: {message}"
+
+
+@slack_group.command('remove')
+@click.argument('email')
+@click.argument('member_ids', nargs=-1, required=True)
+@click.pass_context
+@requires_approval(summarize=lambda p: f"unlink Slack member IDs {', '.join(p['member_ids'])} from {p['email']}",
+                   validate=_slack_validate)
+def slack_remove(ctx: ExtendedContext, email: str, member_ids: tuple):
+    """Unlink Slack member IDs from the account with this email (does not deactivate them).
+
+    USAGE: bot onboard slack remove <email> <member_id|@mention> [...]
+    """
+    email = extract_email(ctx, email) or email.strip()
+    ids = [parse_member_id(m) for m in member_ids]
+    if not all(ids):
+        message = _slack_validate({'member_ids': list(member_ids)})
+        ctx.chat.send_text(message, is_error=True)
+        return f"Error: {message}"
+    removed = slack_accounts.unlink(email, ids)
+    if removed is None:
+        ctx.chat.send_text(f"{email} has no linked Slack accounts", is_error=True)
+        return f"Error: {email} has no linked Slack accounts"
+    message = f"unlinked {', '.join(removed) or 'nothing (not linked)'}"
+    ctx.chat.send_text(f"{email}: {message}")
     return f"{RESOURCE_LABELS['slack']}: {message}"
 
 
@@ -114,7 +163,9 @@ def offboard(ctx: ExtendedContext, email: str):
     # Slack is always attempted. A person can have several Slack accounts, so use every email and member id known.
     slack_provisions = [p for p in provisions if p.resource == 'slack']
     emails = sorted({email, account.primary_email or email,
-                     *(p.data['email'] for p in provisions if p.data.get('email'))}, key=str.lower)
+                     *account.metadata.get('additional_emails', []),
+                     *(p.data['email'] for p in provisions if p.data.get('email')),
+                     *(e for p in slack_provisions for e in p.data.get('emails', []))}, key=str.lower)
     member_ids = sorted({m for p in slack_provisions for m in p.data.get('member_ids', [])})
     try:
         results.append({'Resource': 'Slack account',
