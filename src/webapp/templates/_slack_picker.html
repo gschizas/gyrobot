@@ -1,0 +1,203 @@
+<style>
+    .slack-info { margin: 0.4rem 0 1rem; padding: 0.5rem 0.75rem; border: 1px solid #d0d7de; border-radius: 4px;
+                  background: #f6f8fa; font-size: 0.9rem; }
+    .slack-info.new { color: #9a6700; }
+    .slack-info dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 0.15rem 0.75rem; }
+    .slack-info dt { color: #57606a; }
+    .slack-info dd { margin: 0; }
+    .slack-members { max-height: 18rem; overflow-y: auto; border: 1px solid #ccc; border-radius: 4px; margin: 0.4rem 0; }
+    .slack-member { display: flex; align-items: baseline; gap: 0.5rem; padding: 0.25rem 0.6rem; cursor: pointer; }
+    .slack-member:hover { background: #f6f8fa; }
+    .slack-member input { margin: 0; }
+    .slack-member .meta { color: #57606a; font-size: 0.85rem; }
+    .slack-member .badge { font-size: 0.75rem; padding: 0 0.4rem; border-radius: 1rem; background: #ddf4ff; color: #0969da; }
+    .slack-member .badge.linked { background: #dafbe1; color: #1a7f37; }
+    .slack-member.deactivated { opacity: 0.6; }
+    .slack-tools { display: flex; gap: 1rem; align-items: center; font-size: 0.9rem; }
+    .slack-tools input[type=text] { flex: 1; }
+</style>
+<script>
+// Account autocomplete and Slack member picker of the Slack onboarding form.
+//   attachSlackPicker(form, {accountsUrl, accountUrl, membersUrl})
+// Typing in the account field suggests accounts; once the address belongs to a known account, its details (name,
+// team, other emails, Slack members already linked) are shown. The members of the workspace are listed with
+// checkboxes: members already linked to the account are shown ticked and locked, members whose sign-in email is an
+// address of the account are pre-ticked as suggestions.
+function attachSlackPicker(form, urls) {
+    const emailInput = form.querySelector('#email');
+    const datalist = document.getElementById('slack-accounts');
+    const info = document.getElementById('slack-account-info');
+    const box = document.getElementById('slack-members');
+    const filter = document.getElementById('slack-filter');
+    const showDeactivated = document.getElementById('slack-deactivated');
+    const refresh = document.getElementById('slack-refresh');
+    const status = document.getElementById('slack-members-status');
+    const fallback = document.getElementById('slack-members-fallback');
+
+    let members = [];
+    let account = null;
+    const picked = new Set();
+    let suggested = new Set();
+    let searchTimer = null;
+
+    function addRow(list, label, value) {
+        const dt = document.createElement('dt'); dt.textContent = label;
+        const dd = document.createElement('dd'); dd.textContent = value;
+        list.append(dt, dd);
+    }
+
+    function renderInfo() {
+        info.replaceChildren();
+        if (!emailInput.value.trim()) { info.hidden = true; return; }
+        info.hidden = false;
+        if (!account || !account.found) {
+            info.className = 'slack-info new';
+            info.textContent = 'No gyrobot account has this address; a new account will be created.';
+            return;
+        }
+        info.className = 'slack-info';
+        const list = document.createElement('dl');
+        addRow(list, 'Account', account.name || '(no name)');
+        addRow(list, 'Primary email', account.email);
+        if (account.team) addRow(list, 'Team', account.team);
+        if (account.additional_emails.length) addRow(list, 'Other emails', account.additional_emails.join(', '));
+        const linked = account.member_ids.map(function (id) {
+            const m = members.find(function (x) { return x.id === id; });
+            return m ? m.name + ' (' + id + ')' : id;
+        });
+        addRow(list, 'Slack members', linked.length ? linked.join(', ') : 'none linked yet');
+        info.appendChild(list);
+    }
+
+    function accountEmails() {
+        if (!account || !account.found) return new Set();
+        return new Set([account.email, ...account.additional_emails].map(function (e) { return e.toLowerCase(); }));
+    }
+
+    function renderMembers() {
+        const query = filter.value.trim().toLowerCase();
+        const linked = new Set(account && account.found ? account.member_ids : []);
+        box.replaceChildren();
+        let shown = 0;
+        members.forEach(function (m) {
+            if (m.deleted && !showDeactivated.checked && !linked.has(m.id) && !picked.has(m.id)) return;
+            if (query && !(m.name + ' ' + m.id + ' ' + m.email).toLowerCase().includes(query)) return;
+            const row = document.createElement('label');
+            row.className = 'slack-member' + (m.deleted ? ' deactivated' : '');
+            const check = document.createElement('input');
+            check.type = 'checkbox'; check.name = 'member_ids'; check.value = m.id;
+            check.checked = linked.has(m.id) || picked.has(m.id);
+            check.disabled = linked.has(m.id);
+            check.addEventListener('change', function () {
+                if (check.checked) picked.add(m.id); else picked.delete(m.id);
+                updateStatus();
+            });
+            row.appendChild(check);
+            const name = document.createElement('span'); name.textContent = m.name || m.id;
+            row.appendChild(name);
+            const meta = document.createElement('span');
+            meta.className = 'meta';
+            meta.textContent = m.id + (m.email ? ' · ' + m.email : '') + (m.deleted ? ' · deactivated' : '');
+            row.appendChild(meta);
+            [[linked.has(m.id), 'linked', 'linked'], [suggested.has(m.id) && !linked.has(m.id), 'suggested', 'same email']]
+                .forEach(function (b) {
+                    if (!b[0]) return;
+                    const badge = document.createElement('span');
+                    badge.className = 'badge ' + b[1]; badge.textContent = b[2];
+                    row.appendChild(badge);
+                });
+            box.appendChild(row);
+            shown++;
+        });
+        if (!shown) {
+            const empty = document.createElement('div');
+            empty.className = 'slack-member meta';
+            empty.textContent = 'No members match.';
+            box.appendChild(empty);
+        }
+        updateStatus();
+    }
+
+    function updateStatus() {
+        status.textContent = picked.size + ' new member(s) selected';
+    }
+
+    function applySuggestions() {
+        const emails = accountEmails();
+        suggested = new Set(members.filter(function (m) { return m.email && emails.has(m.email); })
+                                   .map(function (m) { return m.id; }));
+        suggested.forEach(function (id) { picked.add(id); });
+        if (account && account.found) account.member_ids.forEach(function (id) { picked.delete(id); });
+    }
+
+    function loadAccount() {
+        const email = emailInput.value.trim();
+        if (!email) { account = null; applySuggestions(); renderInfo(); renderMembers(); return; }
+        fetch(urls.accountUrl + '?email=' + encodeURIComponent(email), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (emailInput.value.trim() !== email) return;
+                account = data;
+                applySuggestions();
+                renderInfo();
+                renderMembers();
+            })
+            .catch(function () { info.hidden = false; info.className = 'slack-info new'; info.textContent = 'Could not look up the account.'; });
+    }
+
+    function loadMembers(forceRefresh) {
+        status.textContent = 'Loading the Slack members...';
+        fetch(urls.membersUrl + (forceRefresh ? '?refresh=true' : ''), { credentials: 'same-origin' })
+            .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+            .then(function (result) {
+                if (!result.ok) throw new Error(result.data.error || 'failed');
+                members = result.data.members;
+                fallback.hidden = true;
+                box.hidden = false;
+                applySuggestions();
+                renderInfo();
+                renderMembers();
+            })
+            .catch(function (err) {
+                box.hidden = true;
+                status.textContent = err.message;
+                fallback.hidden = false;
+                fallback.querySelector('input').disabled = false;
+            });
+    }
+
+    emailInput.addEventListener('input', function () {
+        clearTimeout(searchTimer);
+        const text = emailInput.value.trim();
+        searchTimer = setTimeout(function () {
+            if (text.length < 2) { datalist.replaceChildren(); return; }
+            fetch(urls.accountsUrl + '?q=' + encodeURIComponent(text), { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    datalist.replaceChildren();
+                    data.accounts.forEach(function (a) {
+                        const option = document.createElement('option');
+                        option.value = a.email;
+                        option.label = (a.name || '') + (a.team ? ' (' + a.team + ')' : '');
+                        datalist.appendChild(option);
+                    });
+                });
+        }, 250);
+    });
+    emailInput.addEventListener('change', loadAccount);
+    filter.addEventListener('input', renderMembers);
+    showDeactivated.addEventListener('change', renderMembers);
+    refresh.addEventListener('click', function (event) { event.preventDefault(); loadMembers(true); });
+
+    form.addEventListener('submit', function (event) {
+        const typed = fallback.hidden ? '' : fallback.querySelector('input').value.trim();
+        if (!picked.size && !typed) {
+            event.preventDefault();
+            alert('Please select at least one Slack member that is not linked yet.');
+        }
+    });
+
+    fallback.querySelector('input').disabled = true;
+    loadMembers(false);
+}
+</script>

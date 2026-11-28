@@ -15,6 +15,24 @@
             {% if team_tree_error %}<div class="error">{{ team_tree_error }}</div>{% endif %}
             <input type="text" id="{{ f.name }}" name="{{ f.name }}" placeholder="{{ f.placeholder or '' }}" {% if f.required %}required{% endif %}>
             {% endif %}
+        {% elif f.type == 'slack_account' %}
+            <label for="{{ f.name }}">{{ f.label }}</label>
+            <input type="text" id="{{ f.name }}" name="{{ f.name }}" list="slack-accounts" autocomplete="off"
+                   placeholder="Start typing a name or an email address" {% if f.required %}required{% endif %}>
+            <datalist id="slack-accounts"></datalist>
+            <div id="slack-account-info" class="slack-info" hidden></div>
+        {% elif f.type == 'slack_members' %}
+            <label for="slack-filter">{{ f.label }}</label>
+            <div class="slack-tools">
+                <input type="text" id="slack-filter" placeholder="Filter by name, id or email...">
+                <label><input type="checkbox" id="slack-deactivated"> Show deactivated</label>
+                <a href="#" id="slack-refresh">Refresh from Slack</a>
+            </div>
+            <div id="slack-members" class="slack-members"></div>
+            <div id="slack-members-status" class="tree-selected"></div>
+            <div id="slack-members-fallback" hidden>
+                <input type="text" name="member_ids" placeholder="Member IDs, comma-separated (U123, U456)">
+            </div>
         {% elif f.type == 'role' %}
             <label for="{{ f.name }}">{{ f.label }}</label>
             <select id="{{ f.name }}" name="{{ f.name }}">
@@ -36,6 +54,16 @@
 attachGithubUserValidation(document.getElementById('onboarding-form'),
                            "{{ request.url_for('github_validate_users') }}",
                            function () { return typeof teamsSelected !== 'function' || teamsSelected(); });
+</script>
+{% endif %}
+
+{% if action == 'slack' %}
+{% include "_slack_picker.html" %}
+<script>
+attachSlackPicker(document.getElementById('onboarding-form'), {
+    accountsUrl: "{{ request.url_for('slack_find_accounts') }}",
+    accountUrl: "{{ request.url_for('slack_account') }}",
+    membersUrl: "{{ request.url_for('slack_members') }}"});
 </script>
 {% endif %}
 

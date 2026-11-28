@@ -19,11 +19,13 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from backend.account_storage import LIVE_STATUSES, find_provisions_by_username, get_account_by_email, get_provision, \
-    list_reinvitable_github, list_roles
+from backend.account_storage import LIVE_STATUSES, find_account_by_any_email, find_provisions_by_username, \
+    get_account_by_email, get_provision, list_reinvitable_github, list_roles, \
+    search_accounts
 from backend.crowd_api import CrowdApi
 from backend.github_api import GitHubApi
 from backend.ldap_directory import LdapDirectory, verify_person
+from backend.slack_directory import SlackDirectory
 from webapp import config
 from webapp.auth import current_user, current_user_json, session_user
 from webapp.auth_ldap import ldap_authenticate
@@ -76,8 +78,8 @@ FORMS = {
     'slack': {
         'title': 'Onboard: Slack',
         'fields': [
-            {'name': 'email', 'label': 'Email address', 'required': True},
-            {'name': 'member_ids', 'label': 'Member IDs (comma-separated)', 'required': True},
+            {'name': 'email', 'label': 'Account (name or email address)', 'required': True, 'type': 'slack_account'},
+            {'name': 'member_ids', 'label': 'Slack members', 'required': True, 'type': 'slack_members'},
         ],
     },
     'offboard': {
@@ -317,6 +319,62 @@ def _check_crowd_emails(emails: list[str]) -> dict[str, dict]:
     return results
 
 
+@json_router.get('/onboarding/slack/accounts', include_in_schema=False)
+async def slack_find_accounts(q: str = ''):
+    """Accounts whose name or email contains ``q`` (at least 2 characters), for the Slack form's autocomplete."""
+    if len(q.strip()) < 2:
+        return {'accounts': []}
+    accounts = await run_in_threadpool(search_accounts, q)
+    return {'accounts': [{'name': a.name, 'email': a.primary_email, 'team': a.team} for a in accounts]}
+
+
+@json_router.get('/onboarding/slack/account', include_in_schema=False)
+async def slack_account(email: str):
+    """What the bot knows about the account of ``email`` (primary or additional address), for the Slack form."""
+    return await run_in_threadpool(_slack_account_details, email)
+
+
+def _slack_account_details(email: str) -> dict:
+    account = find_account_by_any_email(email.strip())
+    if account is None:
+        return {'found': False}
+    provision = get_provision(account.id, 'slack')
+    data = provision.data if provision else {}
+    return {
+        'found': True, 'name': account.name, 'email': account.primary_email, 'team': account.team,
+        'additional_emails': list(account.metadata.get('additional_emails', [])),
+        'member_ids': list(data.get('member_ids', [])), 'slack_status': provision.status if provision else None}
+
+
+_SLACK_MEMBERS_TTL = 1800
+_slack_members: dict = {'time': 0.0, 'members': None}
+_slack_members_lock = threading.Lock()
+
+
+def _load_slack_members(refresh: bool) -> list[dict]:
+    """Workspace members, cached for 30 minutes per process (listing them takes several API calls)."""
+    with _slack_members_lock:
+        if refresh or _slack_members['members'] is None or time.time() - _slack_members['time'] > _SLACK_MEMBERS_TTL:
+            users = SlackDirectory().list_users()
+            _slack_members['members'] = sorted(
+                ({'id': u.id, 'name': u.name, 'email': u.email, 'deleted': u.deleted}
+                 for u in users if not u.is_bot and u.id != 'USLACKBOT'),
+                key=lambda m: (m['deleted'], m['name'].lower()))
+            _slack_members['time'] = time.time()
+        return _slack_members['members']
+
+
+@json_router.get('/onboarding/slack/members', include_in_schema=False)
+async def slack_members(refresh: bool = False):
+    """The Slack workspace members (id, name, sign-in email, deactivated flag) for the member picker."""
+    try:
+        return {'members': await run_in_threadpool(_load_slack_members, refresh)}
+    except Exception as ex:
+        logger.warning(f"Failed to list the Slack members: {ex!r}")
+        return JSONResponse({'error': f'Could not load the Slack members ({ex}); enter the ids manually.'},
+                            status_code=status.HTTP_502_BAD_GATEWAY)
+
+
 @router.get('/onboarding/crowd/bulk', include_in_schema=False)
 def crowd_bulk_form(request: Request):
     team_tree, team_tree_error = _crowd_group_tree()
@@ -537,10 +595,11 @@ def _build_args(action: str, form_data) -> list[str] | None:
     if action == 'jetbrains':
         return ['onboard', 'jetbrains', form_data['email'], form_data['team_name']]
     if action == 'slack':
-        member_ids = [m.strip() for m in str(form_data['member_ids']).split(',') if m.strip()]
+        member_ids = [m.strip() for value in form_data.getlist('member_ids') for m in str(value).split(',')
+                      if m.strip()]
         if not member_ids:
             return None
-        return ['onboard', 'slack', form_data['email'], *member_ids]
+        return ['onboard', 'slack', form_data['email'], *dict.fromkeys(member_ids)]
     if action == 'offboard':
         return ['offboard', form_data['email']]
     return None

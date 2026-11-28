@@ -82,6 +82,16 @@ def get_all_accounts() -> List[Account]:
         return [_to_account(row) for row in session.scalars(select(AccountRow).order_by(AccountRow.created_at))]
 
 
+def search_accounts(text: str, limit: int = 20) -> List[Account]:
+    """Accounts whose name or primary email contains ``text`` (case-insensitive), ordered by name."""
+    pattern = '%' + text.strip().replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_') + '%'
+    with _session() as session:
+        rows = session.scalars(select(AccountRow).where(
+            AccountRow.name.ilike(pattern, escape='\\') | AccountRow.primary_email.ilike(pattern, escape='\\'))
+            .order_by(func.lower(AccountRow.name), AccountRow.primary_email).limit(limit))
+        return [_to_account(row) for row in rows]
+
+
 def add_additional_email(account_id: UUID, email: str) -> Optional[Account]:
     """Record ``email`` as another address of the account (``metadata['additional_emails']``)."""
     account = get_account(account_id)
