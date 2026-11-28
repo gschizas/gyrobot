@@ -61,6 +61,13 @@ class SlackFormTest(unittest.TestCase):
         self.assertEqual(response.status_code, 502)
         self.assertIn('no token', response.json()['error'])
 
+    def test_users_page_lists_provisions(self):
+        provision = Provision(account_id=uuid4(), resource='github', status='active', data={'username': 'alice-gh'})
+        with mock.patch.object(web, 'list_accounts_with_provisions', return_value=[(ACCOUNT, [provision])]):
+            text = self.client.get('/onboarding/users').text
+        self.assertIn('alice@out.test', text)
+        self.assertIn('alice-gh', text)
+
     def test_short_search_returns_nothing(self):
         with mock.patch.object(web, 'search_accounts') as search:
             self.assertEqual(self.client.get('/onboarding/slack/accounts', params={'q': 'a'}).json(), {'accounts': []})

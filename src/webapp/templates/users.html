@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Users - GyroBot Onboarding{% endblock %}
+{% block content %}
+<h1>GyroBot users</h1>
+<p>Every known account with all its provisions (any status).</p>
+{% if people %}
+<p>
+    <input type="search" id="filter" placeholder="Filter by name, email, team, resource, login or status" size="50">
+    <label>Resource
+        <select id="resource">
+            <option value="">all</option>
+            {% for r in people|map(attribute='provisions')|sum(start=[])|map(attribute='resource')|unique|sort %}<option>{{ r }}</option>{% endfor %}
+        </select>
+    </label>
+    <label>Status
+        <select id="status">
+            <option value="">all</option>
+            {% for s in people|map(attribute='provisions')|sum(start=[])|map(attribute='status')|unique|sort %}<option>{{ s }}</option>{% endfor %}
+        </select>
+    </label>
+    <span id="count"></span>
+</p>
+<table id="people">
+    <thead>
+        <tr><th>Name</th><th>Email</th><th>Team</th><th>Provisions</th></tr>
+    </thead>
+    <tbody>
+        {% for p in people %}
+        <tr>
+            <td>{{ p.account.name or '' }}</td>
+            <td>{{ p.account.primary_email }}{% for e in p.account.metadata.get('additional_emails', []) %}<br><small>{{ e }}</small>{% endfor %}</td>
+            <td>{{ p.account.team or '' }}</td>
+            <td>
+                {% for pr in p.provisions %}
+                <div class="prov" data-resource="{{ pr.resource }}" data-status="{{ pr.status }}">
+                    <strong>{{ pr.resource }}</strong>: {{ pr.status }}{% if pr.data.get('username') %} ({{ pr.data.username }}){% endif %}
+                </div>
+                {% else %}<em>none</em>{% endfor %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<script>
+(function () {
+    const rows = Array.from(document.querySelectorAll('#people tbody tr'));
+    const filter = document.getElementById('filter');
+    const resource = document.getElementById('resource');
+    const status = document.getElementById('status');
+    function render() {
+        const q = filter.value.trim().toLowerCase();
+        let shown = 0;
+        rows.forEach(r => {
+            const provs = Array.from(r.querySelectorAll('.prov'));
+            const match = (!resource.value && !status.value) || provs.some(p =>
+                (!resource.value || p.dataset.resource === resource.value) &&
+                (!status.value || p.dataset.status === status.value));
+            const ok = match && (!q || r.textContent.toLowerCase().includes(q));
+            r.style.display = ok ? '' : 'none';
+            if (ok) shown++;
+        });
+        document.getElementById('count').textContent = shown + ' of ' + rows.length + ' shown';
+    }
+    [filter, resource, status].forEach(e => e.addEventListener('input', render));
+    render();
+})();
+</script>
+{% else %}
+<p>There are no accounts yet.</p>
+{% endif %}
+<p><a href="{{ request.url_for('dashboard') }}">&larr; Back to onboarding</a></p>
+{% endblock %}

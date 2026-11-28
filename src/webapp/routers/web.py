@@ -20,7 +20,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from backend.account_storage import LIVE_STATUSES, find_account_by_any_email, find_provisions_by_username, \
-    get_account_by_email, get_provision, list_reinvitable_github, list_roles, \
+    get_account_by_email, get_provision, list_accounts_with_provisions, list_reinvitable_github, list_roles, \
     search_accounts
 from backend.crowd_api import CrowdApi
 from backend.github_api import GitHubApi
@@ -170,6 +170,13 @@ def reload_permissions(request: Request):
                              team_name=config.web_team_name())
     return templates.TemplateResponse(
         request, 'result.html', {'user': user, 'title': 'Reload permissions', 'result': result})
+
+
+@router.get('/onboarding/users', include_in_schema=False)
+def users_page(request: Request):
+    people = [{'account': account, 'provisions': provisions} for account, provisions in
+              list_accounts_with_provisions()]
+    return templates.TemplateResponse(request, 'users.html', {'user': _current_user(request), 'people': people})
 
 
 @router.get('/onboarding/{action}', include_in_schema=False)

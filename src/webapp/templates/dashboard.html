@@ -17,6 +17,7 @@ Greyed-out entries are not available to you.</p>
     <li>{{ action_link('reinvite', request.url_for('reinvite_form'), 'Reinvite GitHub users whose invitation expired') }}</li>
 </ul>
 {% set manage = can(request, 'manage_permissions') %}
+<p><a href="{{ request.url_for('users_page') }}">All users and their provisions</a></p>
 {% set reload = can(request, 'reload_permissions') %}
 {% if manage or reload %}
 <h2>Administration</h2>

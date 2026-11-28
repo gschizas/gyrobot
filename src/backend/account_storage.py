@@ -266,6 +266,16 @@ def list_reinvitable_github() -> List[dict]:
     return list(people.values())
 
 
+def list_accounts_with_provisions() -> List[tuple[Account, List[Provision]]]:
+    """Every account (by name) with all its provisions, whatever their status, in two queries."""
+    with _session() as session:
+        by_account: dict[UUID, List[Provision]] = {}
+        for row in session.scalars(select(ProvisionRow).order_by(ProvisionRow.resource, ProvisionRow.created_at)):
+            by_account.setdefault(row.account_id, []).append(_to_provision(row))
+        accounts = session.scalars(select(AccountRow).order_by(func.lower(AccountRow.name), AccountRow.primary_email))
+        return [(_to_account(a), by_account.get(a.id, [])) for a in accounts]
+
+
 def get_provisions(resource: str) -> List[Provision]:
     """All provisions of a resource, whatever their status."""
     return _provisions(ProvisionRow.resource == resource)
