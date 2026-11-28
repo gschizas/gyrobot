@@ -39,12 +39,29 @@ Core concepts:
 | `onboard slack remove <email> <member_id...>` | Unlinks ids; the slack provision becomes `removed` when none are left. Approval-gated. |
 | `onboard move <email> <team>` | Moves a person to another canonical team on every resource they hold, using the team mapping for each resource. The account's team is updated only if every resource succeeded, so a failed move can simply be run again. |
 
+## Seeding Slack ids
+
+Both scripts preview by default and write only with `--apply`; `--resolve` also looks every id up in Slack to record
+its sign-in email (needs `SLACK_BOT_TOKEN`). Run them from the repository root with the instance name:
+
+```powershell
+uv run python scripts/import_crowd_slack_ids.py <env-name>
+uv run python scripts/import_permission_slack_ids.py <env-name>
+```
+
+- `import_crowd_slack_ids.py` reads the plain `slack-user-id` attribute of the active Crowd users and links it to the
+  account with the same email. Users without an account are skipped: run `import_crowd_users.py` first.
+- `import_permission_slack_ids.py` reads the `{slack id: name}` comments stored with the permission rules
+  (`permission_rules.extra`). A name without spaces is taken as the local part of an email and tried with every domain
+  in `allowed_email_domains`; a name with spaces is compared with the account names. Unmatched ids are listed.
+
 ## `offboard <email>`
 
 Removes everything the account holds and deactivates Slack:
 
 - every live provision is deprovisioned through its provider (GitHub removal, JetBrains licence revoke, Crowd entry);
-- Slack is always attempted, using every email and member id known for the person;
+- Slack is always attempted, using every email and member id known for the person (the account's additional emails
+  and the sign-in emails of the linked Slack ids included); the Slack deactivation itself is still a stub;
 - only resources removed successfully are marked `deprovisioned`. A failure stays live, so the command can be re-run
   after fixing the cause. JetBrains refuses to revoke a licence in the first 30 days after it was assigned, so that
   case is reported as failed.
