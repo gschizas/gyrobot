@@ -91,6 +91,16 @@ It listens on `127.0.0.1:1389`. Mokapi watches the files, so edits to `users.ldi
 
   `True` means the login will work.
 - Usernames are lowercased and limited to `a-z 0-9 . _ -` before the bind.
+- To make Mokapi look more like production, copy people from the real directory into a git-ignored LDIF:
+
+  ```powershell
+  uv run python scripts/export_ldap_to_mokapi.py <env-name> --login jdoe --with-managers
+  ```
+
+  Select people with `--login` (repeatable), `--logins-file` (one login per line) or `--filter` plus `--limit`;
+  `--with-managers` also copies the manager chain. The script is read-only against the directory, writes
+  `config/ldap-production.ldif` by default, refuses a path that git does not ignore and refuses to overwrite without
+  `--force`. Production DNs look like `cn=<Full Name>,...`, so set `LDAP_USERNAME_PATTERN` to match them.
 
 ## 5. Create the tables and the permission rules
 
